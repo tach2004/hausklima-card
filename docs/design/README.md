@@ -2,6 +2,26 @@
 
 **Freigegebene Richtung:** Design B, der **wohnliche, räumliche (2,5D) Architektur-Cutaway**. **Änderung gegenüber dem früheren hellen Mockup:** Alle Messwertanzeigen im Gebäude sollen als **dunkle, kontrastreiche Panels** gestaltet werden. Desktop- und iPhone-Gestaltung sind gleichberechtigte Ziele.
 
+## Bildreferenzen aus der freigegebenen Gestaltung
+
+Diese zusätzlichen **echten Bilddateien** (komprimierte Vorschaubilder aus den im Chat ausgewählten Referenzen) verdeutlichen die gewünschte hochwertige, warme 2,5D-Anmutung und die konkrete Form der dunklen Messwertanzeige. Keine dieser Dateien wird als starrer Hintergrund in die produktive Karte übernommen.
+
+- [Ausgewähltes Design B – Bildreferenz](design-b-selected-photo.webp) – vom Projektinhaber ausgewählter räumlicher Haus-Cutaway, einschließlich Desktop und iPhone; das Bild dient der **Atmosphäre und Gesamtkomposition**, die ursprünglich gezeigten hellen Kästchen sind **nicht** die gewünschte Endversion
+- [Dunkle Messwert-Kästchen – Ausschnitt](design-b-dark-chip.webp) – vom Projektinhaber gewünschtes dunkles, gut lesbares Messfeld; **dessen Hintergrund soll leicht transparent sein**
+
+![Ausgewähltes Design B (komprimiertes Vorschaubild)](design-b-selected-photo.webp)
+
+![Dunkles Messwert-Kästchen (Ausschnitt)](design-b-dark-chip.webp)
+
+### Ganz wichtig: Transparenz der dunklen Messwert-Kästchen
+
+- Dunkel anthrazit/schwarz, aber **leicht durchsichtig**: der jeweilige Raum bzw. die Einrichtung bleibt dezent dahinter sichtbar.
+- Gestalterischer **Startwert** z. B. `background: rgba(22, 26, 30, 0.82)`; Feinabstimmung nach Screenshots bei etwa 0,75–0,88. Das ist ein vorgeschlagener Designparameter, **kein bestätigter exakter Alphawert**.
+- Optional dezenter `backdrop-filter: blur(3px)` mit robuster Safari-/Fallback-Darstellung.
+- **Nur Hintergrund transparent gestalten!** Nicht `opacity: 0.82` auf den gesamten Kasten anwenden, sonst werden Text, Temperaturzahlen und Icons mit ausgegraut.
+- Weiße/helle Beschriftungen, kräftige Werte und klar sichtbare Symbole bleiben voll deckend. Kontrast auch auf iPhone/kleinen Karten und in HA Light/Dark Theme prüfen.
+- Beliebig viele Messwerte und kleine Räume können nicht alle mit gleich großen Kästchen abgedeckt werden: bei Platzmangel eine kompaktere Darstellung mit aufklappbaren Raumdetails verwenden.
+
 ## Visuelle Designvorlagen im Repository
 
 | Format | Datei | Einsatz |
