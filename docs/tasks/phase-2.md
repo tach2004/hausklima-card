@@ -8,7 +8,7 @@ PR #1 (`feat/phase-1-foundation`) ist gemergt. Das Grundgerüst und Sensordatenm
 ## Vorher lesen
 1. `AGENTS.md`
 2. `docs/design/README.md`
-3. **Beide tatsächlichen Designvorlagen**: `docs/design/design-b-desktop.svg` und `docs/design/design-b-mobile.svg` (als Bild **rendern und ansehen**, nicht nur den SVG-Quelltext lesen)
+3. **Alle vier Bildreferenzen tatsächlich visuell betrachten:** `docs/design/design-b-selected-photo.webp` (gewählter hochwertiger Bildstil), `docs/design/design-b-dark-chip.webp` (dunkles Messwertfeld), sowie `docs/design/design-b-desktop.svg` und `docs/design/design-b-mobile.svg` (editierbare Desktop-/Mobil-Kompositionsvorlagen). Nicht nur SVG-Quelltext lesen.
 4. `docs/architecture.md`, `README.md`, `src/types.ts`, `src/config.ts`, `src/hausklima-card-editor.ts`
 5. `examples/views/panel.yaml` und `examples/views/sections.yaml`
 
@@ -21,7 +21,7 @@ Erstmals eine **wirklich benutzbare und schöne Hausklima-Übersicht** liefern. 
 - Das Wohnhaus und die freistehende Garage rechts müssen in der Desktop-Panelansicht **vollständig** im sichtbaren Bereich liegen. Kein abgeschnittenes Gebäude und keine aufwendige waagerechte Scrollleiste als Standard. Bei begrenztem Platz lieber eine bewusst andere Anordnung wählen (z.B. Außen-/Garagenblock unter statt neben dem Haus).
 - Header maximal kompakt: kein übergroßes Branding, keine sinnlosen Metazeilen, keine Schraffur-Erklärung in der Hauptansicht. Maße/technische Hinweise nur optional in Details/Einstellungen.
 - Temperatur und relative Feuchte als primäre Werte direkt in den Räumen; optional absoluter Feuchtewert, CO₂ und VOC im Raum, wenn explizit aktiviert oder in Raumdetails.
-- Dunkle Panels: zuverlässig kontrastierende Schrift und Icons, ausreichende Abstände, visuelle Hierarchie, saubere Zahlen-/Einheitendarstellung. Farben sind nicht alleiniger Informationsträger.
+- Dunkle Panels: **leicht transparente schwarze/anthrazitfarbene Hintergrundfläche** (Anfangswert etwa `rgba(22,26,30,0.82)` als justierbarer Designvorschlag), sodass man den Raum dezent dahinter erkennt. **Nicht das gesamte Panel per `opacity` transparent machen**: Schrift, Zahlen und Icons müssen voll deckend und gut kontrastiert bleiben. Falls sinnvoll leichtes Backdrop-Blur mit WebKit/Safari-Fallback. Ausreichende Abstände, visuelle Hierarchie und saubere Zahlen-/Einheitendarstellung. Farben sind nicht alleiniger Informationsträger.
 - Die 12-m-**Traufseite** ist sichtbar, der Dachfirst parallel dazu! Die Visual-Mockups können rein illustrativ Details zeigen: **keinen frontalen Giebel auf die 12-m-Seite übertragen**. Das Dach bleibt eine plausible, schematische Cutaway-Grafik ohne erfundene reale Dachneigung.
 - Keine reale Fotografie oder extern nachgeladenen Bilder, Fonts oder APIs nötig. Design-Mockups dienen nur der Zielabstimmung und dürfen **nicht** als starres Hintergrund-Screenshot in der produktiven Card verwendet werden.
 - Die Garage ist ein eigenständiger Klima-Messort; Außenmesswerte bekommen einen separaten Bereich. Echte konfigurierbare Räume bleiben in der Übersicht vollständig erreichbar.
