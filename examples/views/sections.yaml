@@ -1,0 +1,19 @@
+# ALTERNATIVE: Dies ist EIN Ansichtsobjekt für eine Sections-Ansicht.
+# In 'Ansicht bearbeiten > YAML' verwenden, oder unter 'views:' einfügen.
+# Sections sind am Desktop häufig schmaler als Panel: Panel ist die Empfehlung.
+title: HausKlima
+path: hausklima
+icon: mdi:home-thermometer
+type: sections
+sections:
+  - type: grid
+    cards:
+      - type: custom:hausklima-card
+        title: HausKlima
+        show_dimensions: false
+        show_room_names: true
+        grid_options:
+          columns: full
+          rows: auto
+# Je nach HA-Layout ggf. Sektion in der UI auf mehr Spalten verbreitern.
+# Sensoren anschließend über den visuellen Karteneditor zuordnen.
