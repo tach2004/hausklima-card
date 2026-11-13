@@ -1,0 +1,14 @@
+# Diese Datei ist EIN Ansichtsobjekt, NICHT die gesamte Dashboard-YAML.
+# In 'Ansicht bearbeiten > YAML' den Inhalt dieser Datei verwenden.
+# Bei Dashboard-YAML als Element unter 'views:' einrücken.
+# HACS HausKlima Card muss zuvor installiert und als Ressource geladen sein.
+title: HausKlima
+path: hausklima
+icon: mdi:home-thermometer
+type: panel
+cards:
+  - type: custom:hausklima-card
+    title: HausKlima
+    show_dimensions: false
+    show_room_names: true
+# Sensoren später im visuellen Karteneditor zuordnen.
