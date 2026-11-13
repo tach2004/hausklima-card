@@ -1,0 +1,25 @@
+{
+  "name": "hausklima-card",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Eigenständige Home-Assistant-Karte für eine räumliche Hausklimaübersicht.",
+  "type": "module",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/tach2004/hausklima-card.git" },
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "dev": "node scripts/dev.mjs",
+    "test:browser": "node scripts/browser-test.mjs"
+  },
+  "dependencies": { "lit": "^3.3.1" },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "esbuild": "^0.27.0",
+    "happy-dom": "^20.0.10",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.9"
+  }
+}

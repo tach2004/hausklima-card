@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HausKlima Card · lokale Vorschau</title>
+  <style>
+    :root { color-scheme: light; --primary-color: #26766b; --primary-text-color: #293d42; --secondary-text-color: #6b7d80; --card-background-color: #fff; --divider-color: #dce5e4; }
+    body { margin: 0; background: #f0f4f3; color: var(--primary-text-color); font-family: system-ui, sans-serif; padding: 32px; }
+    main { max-width: 1080px; margin: auto; }
+    nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; font-size: 13px; }
+    nav button { background: var(--card-background-color); color: inherit; border: 1px solid var(--divider-color); border-radius: 8px; padding: 9px 14px; cursor: pointer; }
+    body.dark { color-scheme: dark; --primary-color: #82cabe; --primary-text-color: #e0e9e8; --secondary-text-color: #a0b4b1; --card-background-color: #202d30; --divider-color: #3a4c4d; background: #142023; }
+    details { margin-top: 24px; padding: 18px; border: 1px solid var(--divider-color); border-radius: 14px; background: var(--card-background-color); }
+    summary { cursor: pointer; margin-bottom: 16px; }
+    @media(max-width:600px) { body { padding: 14px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <nav><span>HausKlima Card · lokale Entwicklungsvorschau</span><button id="theme">Dunkles Theme</button></nav>
+    <hausklima-card></hausklima-card>
+    <details><summary>Basiskonfiguration bearbeiten</summary><div id="editor"></div></details>
+  </main>
+  <script type="module">
+    import '/dist/hausklima-card.js';
+    const card = document.querySelector('hausklima-card');
+    const config = {type: 'custom:hausklima-card', title: 'HausKlima'};
+    card.hass = { states: {} };
+    card.setConfig(config);
+    const editor = await card.constructor.getConfigElement();
+    editor.hass = card.hass;
+    editor.setConfig(config);
+    editor.addEventListener('config-changed', (event) => card.setConfig(event.detail.config));
+    document.querySelector('#editor').append(editor);
+    document.querySelector('#theme').addEventListener('click', (event) => {
+      const dark = document.body.classList.toggle('dark');
+      event.target.textContent = dark ? 'Helles Theme' : 'Dunkles Theme';
+    });
+  </script>
+</body>
+</html>

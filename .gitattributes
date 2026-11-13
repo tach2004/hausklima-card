@@ -1,0 +1,2 @@
+# Lit's bundled template strings contain significant trailing whitespace.
+dist/hausklima-card.js linguist-generated=true -whitespace
