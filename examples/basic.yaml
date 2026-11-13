@@ -1,0 +1,4 @@
+type: custom:hausklima-card
+title: HausKlima
+show_dimensions: true
+show_room_names: true
