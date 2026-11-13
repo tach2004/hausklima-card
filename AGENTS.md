@@ -43,3 +43,11 @@ This repository develops **HausKlima Card** (`custom:hausklima-card`), an indepe
 - For UI changes, review at least desktop and narrow/mobile widths and light/dark themes when available.
 - Preserve the MIT license notices and relevant attribution.
 - Describe the actual changed files, open questions, verification outcomes and next proposed phase in the pull request. Do not claim HA/HACS integration testing unless it was actually performed.
+
+## Approved visual direction and phone requirement (from November 2026)
+- Approved style: **Design B** — a warm, spatial **2.5D architectural cutaway**, **with dark, high-contrast measurement tiles** for excellent readability, not the former white/light tiles.
+- See all the actual design pictures in `docs/design/`: **`design-b-selected-photo.webp` (user-selected spatial look)**, **`design-b-dark-chip.webp` (user-selected dark metric badge)**, `design-b-desktop.svg`, `design-b-mobile.svg`, and `docs/design/README.md`. Visually inspect the files before redesigning the card. The WebP pictures are compressed reference thumbnails, not production assets. All visuals are aesthetic references, not real measurements or runtime backgrounds.\n- Dark metric tiles must have **slightly translucent backgrounds**, e.g. starting at `rgba(22,26,30,0.82)` and fine-tuned visually. **Keep labels/values/icons fully opaque**, do not lower the whole tile's `opacity`. Background material/rooms should remain subtly visible behind the dark tile.
+- **iPhone 17 (portrait and landscape) is a first-class target**. No default horizontally scrolling / clipped house or garage, no tiny text-only desktop shrink. Touch-friendly room details and access to all sensor values are essential.
+- Concealed / rear rooms: current selected solution **variant A (separate room overview)**, later optional **variant B ('Vorne / Hinten' view switch)**. Do not invent the unconfirmed rear-side floor plan.
+- Preferred Home Assistant view: **Panel** with one HausKlima Card. The optional **Sections** example must remain functional, even if the section is narrower. See `examples/views/`.
+- For the currently approved Phase 2 implementation, follow `docs/tasks/phase-2.md` once available on the selected working branch. The existence of this file does **not** mean unrelated future tasks are automatically approved.
