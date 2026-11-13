@@ -43,3 +43,11 @@ This repository develops **HausKlima Card** (`custom:hausklima-card`), an indepe
 - For UI changes, review at least desktop and narrow/mobile widths and light/dark themes when available.
 - Preserve the MIT license notices and relevant attribution.
 - Describe the actual changed files, open questions, verification outcomes and next proposed phase in the pull request. Do not claim HA/HACS integration testing unless it was actually performed.
+
+## Approved visual direction and phone requirement (from November 2026)
+- Approved style: **Design B** — a warm, spatial **2.5D architectural cutaway**, **with dark, high-contrast measurement tiles** for excellent readability, not the former white/light tiles.
+- See the actual repository design pictures at `docs/design/design-b-desktop.svg` and `docs/design/design-b-mobile.svg`, plus `docs/design/README.md`. Render/view them visually before redesigning the card. These are stylized visual references, not real architectural measurements or runtime backgrounds.
+- **iPhone 17 (portrait and landscape) is a first-class target**. No default horizontally scrolling / clipped house or garage, no tiny text-only desktop shrink. Touch-friendly room details and access to all sensor values are essential.
+- Concealed / rear rooms: current selected solution **variant A (separate room overview)**, later optional **variant B ('Vorne / Hinten' view switch)**. Do not invent the unconfirmed rear-side floor plan.
+- Preferred Home Assistant view: **Panel** with one HausKlima Card. The optional **Sections** example must remain functional, even if the section is narrower. See `examples/views/`.
+- For the currently approved Phase 2 implementation, follow `docs/tasks/phase-2.md` once available on the selected working branch. The existence of this file does **not** mean unrelated future tasks are automatically approved.
