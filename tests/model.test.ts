@@ -198,16 +198,17 @@ describe('measurement resolution', () => {
 
 
 describe('Phase 2 overview and details', () => {
-  it('prioritizes temperature and relative humidity while keeping every configured metric in details', () => {
+  it('includes all five configured metrics in the overview unless individually hidden', () => {
     const room = configuredRoom();
     room.measurements!.relative_humidity = { sensors: [{ entity: 'sensor.test_relative' }] };
     room.measurements!.absolute_humidity = { sensors: [{ entity: 'sensor.test_absolute' }] };
     room.measurements!.co2 = { sensors: [{ entity: 'sensor.test_co2' }] };
     room.measurements!.voc = { sensors: [{ entity: 'sensor.test_voc' }] };
-    expect(resolveMeasurements(room, undefined, 'overview').map((metric) => metric.type)).toEqual(['temperature', 'relative_humidity']);
+    expect(resolveMeasurements(room, undefined, 'overview').map((metric) => metric.type)).toEqual(['temperature', 'relative_humidity', 'absolute_humidity', 'co2', 'voc']);
     expect(resolveMeasurements(room, undefined, 'details')).toHaveLength(5);
-    room.measurements!.co2.show_in_overview = true;
-    expect(resolveMeasurements(room, undefined, 'overview').map((metric) => metric.type)).toEqual(['temperature', 'relative_humidity', 'co2']);
+    room.measurements!.co2.show_in_overview = false;
+    expect(resolveMeasurements(room, undefined, 'overview').map((metric) => metric.type)).toEqual(['temperature', 'relative_humidity', 'absolute_humidity', 'voc']);
+    expect(resolveMeasurements(room, undefined, 'details')).toHaveLength(5);
   });
 
   it('preserves hidden metric and main-display sources in room details after dashboard reload', () => {
