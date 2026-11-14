@@ -1,6 +1,6 @@
 {
   "name": "hausklima-card",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Eigenständige Home-Assistant-Karte für eine räumliche Hausklimaübersicht.",
   "type": "module",
