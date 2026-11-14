@@ -21,7 +21,14 @@ export function renderPhotoView(
   hass: HomeAssistant | undefined,
   showNames: boolean,
   onSelect: (room: RoomConfig) => void,
+  selectedRoomId?: string,
 ) {
+  const conciseValue = (raw: string, status: string) => {
+    if (status === 'unavailable') return 'Ausfall';
+    if (status === 'unknown') return 'Unbekannt';
+    if (status === 'missing') return 'Fehlt';
+    return raw.length <= 9 ? raw : 'Details';
+  };
   const rooms = building.rooms.filter((room) => ROOM_ART_POSITIONS[room.id] && room.visible);
   return html`
     <div class="photo-overview">
@@ -35,14 +42,14 @@ export function renderPhotoView(
             <button class="photo-room ${metrics.length ? 'with-metrics' : 'name-only'}"
               data-room-id=${room.id} data-select-room=${room.id}
               style=${`left: ${position.x}%; top: ${position.y}%;`}
-              type="button" aria-label=${`${room.name}: Details öffnen`}
+              type="button" aria-pressed=${String(selectedRoomId === room.id)} aria-label=${`${room.name}: Details öffnen`}
               @click=${() => onSelect(room)}>
               ${showNames ? html`<span class="photo-room-name">${room.name}</span>` : nothing}
               ${metrics.map((metric) => html`
                 <span class="photo-metric" data-metric=${metric.type}>
                   <span class="photo-metric-icon ${metric.type}" aria-hidden="true">${symbols[metric.type]}</span>
-                  <strong>${formatSensorValue(metric.primary, hass)}</strong>
-                  ${metric.primary.status === 'available' && metric.primary.unit
+                  <strong>${conciseValue(formatSensorValue(metric.primary, hass), metric.primary.status)}</strong>
+                  ${metric.primary.status === 'available' && metric.primary.unit && metric.primary.unit.length <= 5 && formatSensorValue(metric.primary, hass).length <= 9
                     ? html`<small>${metric.primary.unit}</small>` : nothing}
                 </span>
               `)}
