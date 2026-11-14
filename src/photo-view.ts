@@ -30,6 +30,7 @@ export function renderPhotoView(
     return raw.length <= 9 ? raw : 'Details';
   };
   const rooms = building.rooms.filter((room) => ROOM_ART_POSITIONS[room.id] && room.visible);
+  const garage = building.rooms.find((room) => room.id === 'garage');
   return html`
     <div class="photo-overview">
       <div class="photo-stage">
@@ -37,7 +38,7 @@ export function renderPhotoView(
           alt="Gestaltete Hausansicht mit Dachgeschoss, Erdgeschoss und Keller sowie einer freistehenden Garage mit Batterie- und Schaltschranktechnik. Die Einrichtung ist illustrativ." />
         ${rooms.map((room) => {
           const position = ROOM_ART_POSITIONS[room.id]!;
-          const metrics = resolveMeasurements(room, hass, 'overview').slice(0, 3);
+          const metrics = resolveMeasurements(room, hass, 'overview');
           return html`
             <button class="photo-room ${metrics.length ? 'with-metrics' : 'name-only'}"
               data-room-id=${room.id} data-select-room=${room.id}
@@ -56,6 +57,22 @@ export function renderPhotoView(
             </button>
           `;
         })}
+        ${garage && resolveMeasurements(garage, hass, 'overview').length ? html`
+          <button class="photo-room photo-garage with-metrics" data-room-id=${garage.id} data-select-room=${garage.id}
+            style="left: 85%; top: 53%;" type="button"
+            aria-pressed=${String(selectedRoomId === garage.id)}
+            aria-label=${`${garage.name}: Details öffnen`} @click=${() => onSelect(garage)}>
+            ${showNames ? html`<span class="photo-room-name">${garage.name}</span>` : nothing}
+            ${resolveMeasurements(garage, hass, 'overview').map((metric) => html`
+              <span class="photo-metric" data-metric=${metric.type}>
+                <span class="photo-metric-icon ${metric.type}" aria-hidden="true">${symbols[metric.type]}</span>
+                <strong>${conciseValue(formatSensorValue(metric.primary, hass), metric.primary.status)}</strong>
+                ${metric.primary.status === 'available' && metric.primary.unit && metric.primary.unit.length <= 5 && formatSensorValue(metric.primary, hass).length <= 9
+                  ? html`<small>${metric.primary.unit}</small>` : nothing}
+              </span>
+            `)}
+          </button>
+        ` : nothing}
       </div>
     </div>
   `;
@@ -91,11 +108,11 @@ export const photoStyles = css`
   .photo-room {
     position: absolute;
     transform: translate(-50%, -50%);
-    max-width: 14%;
+    max-width: 17%;
     min-width: 86px;
     border-radius: 10px;
     border: 1px solid #ffffff45;
-    background: rgba(22, 26, 30, 0.82);
+    background: var(--hk-chip, rgba(22, 26, 30, .72));
     backdrop-filter: blur(3px);
     -webkit-backdrop-filter: blur(3px);
     box-shadow: 0 3px 12px #0d172554;
@@ -110,7 +127,7 @@ export const photoStyles = css`
     transition: background-color .15s ease, transform .15s ease;
   }
   .photo-room:hover, .photo-room:focus-visible {
-    background: rgba(12, 19, 25, .94);
+    background: var(--hk-chip, rgba(22, 26, 30, .72));
     transform: translate(-50%, calc(-50% - 3px));
     outline: 2px solid #fff;
     outline-offset: 1px;
@@ -153,8 +170,23 @@ export const photoStyles = css`
   .photo-room.name-only {
     min-width: unset;
     max-width: 13%;
-    padding: 5px 7px;
-    background: rgba(22, 26, 30, .70);
+    padding: 3px;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .photo-room.name-only .photo-room-name {
+    color: #263238;
+    text-shadow: 0 1px 3px #ffffff, 0 0 8px #ffffff;
+  }
+  .photo-room.name-only:hover, .photo-room.name-only:focus-visible {
+    background: rgba(255, 255, 255, .65);
+  }
+  .photo-room.photo-garage {
+    max-width: 17%;
+    z-index: 2;
   }
   @container hausklima (max-width: 900px) {
     .photo-room { max-width: 16%; }
