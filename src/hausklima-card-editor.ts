@@ -234,7 +234,7 @@ export class HausKlimaCardEditor extends LitElement {
               </label>
               <button id="delete-room" type="button" class="text-button danger" @click=${() => { this._confirmDelete = true; }}>Raum entfernen</button>
             </div>
-            <p class="hint">${room.location === 'outdoor' ? 'Außenmessort · eigener Bereich außerhalb des Hauses.' : `${building.levels.find((level) => level.id === room.level_id)?.name ?? 'Weiterer Raum'} · ${room.visible ? 'im Gebäudeschnitt vorgesehen' : 'in der separaten Raumübersicht'}.`}</p>
+            <p class="hint">${room.location === 'outdoor' ? 'Außenmessort · eigener Bereich außerhalb des Hauses.' : `${room.level_id === 'garage' ? 'Garage · eigenständiger Klimamessort' : `${building.levels.find((level) => level.id === room.level_id)?.name ?? 'Weiterer Raum'} · ${room.visible ? 'im Gebäudeschnitt vorgesehen' : 'in der separaten Raumübersicht'}`}.`}</p>
             ${this._confirmDelete ? html`
               <div class="confirmation" role="alert">
                 <strong>„${room.name}“ mit allen Sensorzuordnungen entfernen?</strong>
