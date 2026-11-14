@@ -27,7 +27,7 @@ function find<T extends Element>(card: HausKlimaCard, selector: string): T {
 async function openRoom(card: HausKlimaCard, id: string) {
   const tile = card.shadowRoot?.querySelector<HTMLButtonElement>(`[data-select-room="${id}"]`);
   if (tile) tile.click();
-  else find<SVGGElement>(card, `.building .room[data-room-id="${id}"]`).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  else find<HTMLButtonElement>(card, `.photo-room[data-room-id="${id}"]`).click();
   await card.updateComplete;
   return find<HTMLElement>(card, '.room-detail');
 }
@@ -67,12 +67,12 @@ describe('Lovelace card integration', () => {
     expect(() => card.setConfig({ type: 'custom:hausklima-card', show_room_names: 'yes' })).toThrow();
   });
 
-  it('keeps all nine default spaces selectable without inventing readings', async () => {
+  it('keeps all room and garage component locations selectable without inventing readings', async () => {
     const building = getDefaultBuilding();
     const card = await createCard();
-    expect(card.shadowRoot?.querySelectorAll('.building .room[role="button"]')).toHaveLength(8);
+    expect(card.shadowRoot?.querySelectorAll('.photo-room')).toHaveLength(8);
     expect(card.shadowRoot?.querySelectorAll('.garage-block')).toHaveLength(1);
-    expect(card.shadowRoot?.querySelectorAll('[data-overview-chip], .reading, .sensor-row')).toHaveLength(0);
+    expect(card.shadowRoot?.querySelectorAll('.photo-metric, .reading, .sensor-row')).toHaveLength(0);
     expect(building.rooms.every((room) => !room.measurements || Object.values(room.measurements).every((metric) => !metric.sensors.length))).toBe(true);
     expect(find(card, '.house-room-list').textContent).toContain('Keine Sensoren zugeordnet');
     for (const room of building.rooms) {
@@ -81,41 +81,44 @@ describe('Lovelace card integration', () => {
       expect(detail.textContent).toContain('Noch keine Sensoren zugeordnet');
       expect(detail.querySelectorAll('.metric-group')).toHaveLength(0);
     }
-    const ridge = find<SVGPathElement>(card, '.ridge');
-    expect(ridge.getAttribute('d')?.trim()).toMatch(/^M [\d.]+ [\d.]+ h [\d.]+$/);
+    const image = find<HTMLImageElement>(card, '.photo-image');
+    expect(image.getAttribute('src')?.length).toBeGreaterThan(10);
+    expect(card.shadowRoot?.querySelectorAll('.garage-zone')).toHaveLength(4);
   });
 
-  it('opens room details by pointer, Enter and Space and closes explicitly', async () => {
+  it('opens room details through the accessible photo buttons and closes explicitly', async () => {
     const card = await createCard();
-    const workshop = find<SVGGElement>(card, '.building .room[data-room-id="workshop"]');
-    workshop.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const workshop = find<HTMLButtonElement>(card, '.photo-room[data-room-id="workshop"]');
+    workshop.click();
     await card.updateComplete;
     expect(find(card, '.room-detail h2').textContent).toBe('Werkstatt');
     expect(workshop.getAttribute('aria-pressed')).toBe('true');
+    expect(workshop.tagName).toBe('BUTTON');
 
     find<HTMLButtonElement>(card, '.close-detail').click();
     await card.updateComplete;
     expect(card.shadowRoot?.querySelector('.room-detail')).toBeNull();
     expect(workshop.getAttribute('aria-pressed')).toBe('false');
+    workshop.click();
+    await card.updateComplete;
+    expect(find(card, '.room-detail h2').textContent).toBe('Werkstatt');
+  });
 
-    const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
-    workshop.dispatchEvent(enter);
-    await card.updateComplete;
-    expect(enter.defaultPrevented).toBe(true);
-    expect(find(card, '.room-detail h2').textContent).toBe('Werkstatt');
-    // Repeated activation selects the room rather than toggling its details off.
-    const space = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
-    workshop.dispatchEvent(space);
-    await card.updateComplete;
-    expect(space.defaultPrevented).toBe(true);
-    expect(find(card, '.room-detail h2').textContent).toBe('Werkstatt');
+  it('keeps each battery and cabinet separately configurable and selectable', async () => {
+    const card = await createCard();
+    for (const id of ['garage', 'garage_battery_pylontech', 'garage_battery_litime', 'garage_cabinet']) {
+      const button = find<HTMLButtonElement>(card, `.garage-zone[data-select-room="${id}"]`);
+      button.click();
+      await card.updateComplete;
+      expect(find(card, '.room-detail h2').textContent).not.toBe('');
+    }
   });
 
   it('keeps hidden additional rooms reachable through the separate overview', async () => {
     const building = getDefaultBuilding();
     building.rooms.push({ id: 'additional_room', name: 'Weiterer Raum', level_id: 'ground_floor', visible: false, width_m: null });
     const card = await createCard({ ...getDefaultConfig(), building });
-    expect(card.shadowRoot?.querySelector('.building [data-room-id="additional_room"]')).toBeNull();
+    expect(card.shadowRoot?.querySelector('.photo-stage [data-room-id="additional_room"]')).toBeNull();
     const button = find<HTMLButtonElement>(card, '.other-rooms [data-select-room="additional_room"]');
     expect(button.textContent).toContain('Weiterer Raum');
     button.click();
@@ -129,7 +132,7 @@ describe('Lovelace card integration', () => {
     const card = await createCard({ ...getDefaultConfig(), building }, { states: {} });
     const tile = find(card, '.room-tile[data-select-room="workshop"]');
     expect(tile.textContent).toContain('Entität fehlt');
-    expect(find(card, '[data-overview-chip][data-room-id="workshop"]').textContent).toContain('Entität fehlt');
+    expect(find(card, '.photo-room[data-room-id="workshop"] .photo-metric').textContent).toContain('Entität fehlt');
     await openRoom(card, 'workshop');
     expect(find(card, '.room-detail').textContent).toContain('Entität fehlt');
 
@@ -141,7 +144,7 @@ describe('Lovelace card integration', () => {
     expect(tile.textContent).toContain('21,4');
     expect(find(card, '.room-detail').textContent).toContain('21,4');
     expect(find(card, '.room-detail .source-value').textContent).toContain('°C');
-    expect(find(card, '[data-overview-chip][data-room-id="workshop"]').textContent).toContain('21,4');
+    expect(find(card, '.photo-room[data-room-id="workshop"] .photo-metric').textContent).toContain('21,4');
     expect(card.shadowRoot?.querySelector('.room-detail .unavailable')).toBeNull();
 
     let detail: unknown;
@@ -166,7 +169,7 @@ describe('Lovelace card integration', () => {
       'sensor.test_absolute': { state: '8.2', attributes: { unit_of_measurement: 'g/m³' } },
       'sensor.test_voc': { state: '210', attributes: { unit_of_measurement: 'ppb' } },
     } });
-    expect(card.shadowRoot?.querySelector('[data-overview-chip][data-room-id="workshop"]')).toBeNull();
+    expect(card.shadowRoot?.querySelector('.photo-room[data-room-id="workshop"] .photo-metric')).toBeNull();
     expect(find(card, '.room-tile[data-select-room="workshop"]').textContent).toContain('Messwerte in den Details');
     const detail = await openRoom(card, 'workshop');
     expect(detail.querySelectorAll('.metric-group')).toHaveLength(3);
@@ -208,7 +211,7 @@ describe('Lovelace card integration', () => {
       'sensor.test_primary': { state: 'unavailable', attributes: { unit_of_measurement: '°C' } },
       'sensor.test_unknown': { state: 'unknown', attributes: { unit_of_measurement: '°C' } },
     } });
-    expect(card.shadowRoot?.querySelector('.building [data-room-id="test_outdoor"]')).toBeNull();
+    expect(card.shadowRoot?.querySelector('.photo-stage [data-room-id="test_outdoor"]')).toBeNull();
     expect(find(card, '.outdoor-block').querySelectorAll('.outdoor-source')).toHaveLength(3);
     const detail = await openRoom(card, 'test_outdoor');
     expect(detail.querySelectorAll('.sensor-row')).toHaveLength(3);
@@ -253,13 +256,13 @@ describe('Lovelace card integration', () => {
 
   it('updates title and optional labels while keeping technical details out of the main drawing', async () => {
     const card = await createCard();
-    expect(card.shadowRoot?.querySelector('.building .dimension-label')).toBeNull();
+    expect(card.shadowRoot?.querySelector('.photo-stage .dimension-label')).toBeNull();
     expect(card.shadowRoot?.querySelector('.building-details')).not.toBeNull();
     card.setConfig({ ...getDefaultConfig(), title: 'Mein Haus', show_room_names: false, show_dimensions: false });
     await card.updateComplete;
     expect(find(card, 'h1').textContent).toBe('Mein Haus');
-    expect(card.shadowRoot?.querySelectorAll('.room-name, .dimension-label, .building-details')).toHaveLength(0);
-    expect(card.shadowRoot?.querySelectorAll('.building .room[role="button"]')).toHaveLength(8);
+    expect(card.shadowRoot?.querySelectorAll('.photo-room-name, .dimension-label, .building-details')).toHaveLength(0);
+    expect(card.shadowRoot?.querySelectorAll('.photo-room')).toHaveLength(8);
     expect(card.shadowRoot?.querySelector('.garage-block [data-select-room="garage"]')).not.toBeNull();
   });
 });
