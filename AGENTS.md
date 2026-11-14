@@ -51,3 +51,11 @@ This repository develops **HausKlima Card** (`custom:hausklima-card`), an indepe
 - Concealed / rear rooms: current selected solution **variant A (separate room overview)**, later optional **variant B ('Vorne / Hinten' view switch)**. Do not invent the unconfirmed rear-side floor plan.
 - Preferred Home Assistant view: **Panel** with one HausKlima Card. The optional **Sections** example must remain functional, even if the section is narrower. See `examples/views/`.
 - For the currently approved Phase 2 implementation, follow `docs/tasks/phase-2.md` once available on the selected working branch. The existence of this file does **not** mean unrelated future tasks are automatically approved.
+
+## Current approved implementation direction (post Phase 2)
+- **Do not use the rejected Phase 1 or Phase 2 SVG screenshots as styling references.** The earlier hand-drawn room/roof/furniture approach was rejected by the owner.
+- The new card uses `src/assets/hausklima-cutaway.webp` as a locally bundled, **illustrative** architectural scene; live climate values, labels, touch targets and details are separate dynamic UI components in `src/photo-view.ts`. It is **not** a photograph of the owner's property or a precise construction drawing.
+- In a Home Assistant Panel view keep the architectural scene **centered and limited to approximately 1180 CSS px** rather than spanning a full ultrawide screen. iPhone 17 portrait/landscape must show a legible separate room list and garage-device controls.
+- Inside the garage there are **four independently named and sensor-configurable areas** with stable room IDs: `garage` (garage air), `garage_battery_pylontech`, `garage_battery_litime`, `garage_cabinet`. The displayed names can be changed in the editor. Temperature and relative humidity are expected; absolute humidity remains optional (other existing metric types also remain supported). Do not fabricate values or actual sensor entity IDs.
+- Existing saved Lovelace card configurations must continue working. `garage_components_initialized` is the migration marker; do not repeatedly re-add equipment the user has intentionally removed.
+- Design approval remains with the owner. A passing build/browser suite is a technical check, **not** visual acceptance.

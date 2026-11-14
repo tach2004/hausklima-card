@@ -10,6 +10,9 @@ export const editorStyles = css`
   .field small { font-size: 11px; color: var(--secondary-text-color, #687b81); font-weight: 400; }
   input[type='text'], select { width: 100%; min-width: 0; min-height: 46px; border: 1px solid var(--divider-color, #dce4e5); border-radius: 9px; padding: 10px 12px; background: var(--input-fill-color, var(--card-background-color, #fff)); color: inherit; font: inherit; }
   button, input, select { font: inherit; }
+  .chip-opacity { gap: 10px; }
+  .chip-opacity input[type='range'] { display: block; width: 100%; min-height: 44px; margin: 0; cursor: pointer; accent-color: var(--primary-color, #2b8279); touch-action: pan-y; }
+
   button { min-height: 44px; border: 1px solid var(--divider-color, #dce4e5); border-radius: 9px; padding: 9px 13px; background: var(--card-background-color, #fff); color: inherit; cursor: pointer; }
   input:focus-visible, button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--primary-color, #2b8279); outline-offset: 3px; }
   .base-options, .measurement-options { display: flex; flex-wrap: wrap; gap: 4px 20px; }

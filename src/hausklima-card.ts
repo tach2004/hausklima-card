@@ -1,8 +1,7 @@
-import { LitElement, html, nothing, svg } from 'lit';
+import { LitElement, html, nothing } from 'lit';
 import { getDefaultConfig, normalizeConfig, resolveBuilding } from './config';
-import { renderHouseScene, sceneStyles } from './house-scene';
+import { renderPhotoView, photoStyles } from './photo-view';
 import { createLayout } from './layout';
-import type { RoomShape } from './layout';
 import { formatSensorValue, resolveMeasurements, sensorStatusLabel } from './metrics';
 import type { BuildingConfig, HausKlimaCardConfig, HomeAssistant, MetricType, ResolvedMeasurement, ResolvedSensor, RoomConfig } from './types';
 import { cardStyles } from './styles';
@@ -12,7 +11,6 @@ const metricSymbols: Record<MetricType, string> = {
 };
 const formatDimension = (value: number) => value.toLocaleString('de-DE', { maximumFractionDigits: 2 });
 const arrowIcon = () => html`<svg class="arrow-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M 4 12 12 4 M 4 4 h 8 v 8" /></svg>`;
-let cardSequence = 0;
 
 export class HausKlimaCard extends LitElement {
   static properties = {
@@ -25,7 +23,6 @@ export class HausKlimaCard extends LitElement {
   private _config?: HausKlimaCardConfig;
   private _selected?: string;
   private _showRooms = false;
-  private readonly drawingId = `hausklima-${++cardSequence}`;
 
   setConfig(config: unknown): void {
     this._config = normalizeConfig(config);
@@ -68,44 +65,9 @@ export class HausKlimaCard extends LitElement {
     this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId: entity }, bubbles: true, composed: true }));
   }
 
-  private renderSvgMetrics(shape: RoomShape) {
-    const measurements = resolveMeasurements(shape.room, this.hass, 'overview');
-    if (!measurements.length) return nothing;
-    if (shape.width < 130 || shape.height < 75) {
-      return svg`<g class="compact-sensor-marker" aria-hidden="true">
-        <circle cx=${shape.x + shape.width / 2} cy=${shape.y + shape.height - 17} r="5" />
-        <title>${measurements.map((metric) => `${metric.label}: ${this.sensorText(metric.primary)}`).join(', ')}</title>
-      </g>`;
-    }
-    const width = Math.min(shape.width - 20, 150);
-    const rows = Math.max(1, Math.min(3, Math.floor((shape.height - 51) / 20)));
-    const shown = measurements.slice(0, rows);
-    const remainder = measurements.length - shown.length;
-    const height = 16 + shown.length * 21 + (remainder ? 16 : 0);
-    const x = shape.x + (shape.width - width) / 2;
-    const y = shape.y + 33;
-    return svg`<g class="metric-panel" data-overview-chip data-room-id=${shape.room.id} aria-hidden="true">
-      <rect class="metric-panel-bg" x=${x} y=${y} width=${width} height=${height} rx="9" />
-      ${shown.map((metric, index) => {
-        const value = formatSensorValue(metric.primary, this.hass);
-        const unit = metric.primary.status === 'available' ? metric.primary.unit : '';
-        const estimatedWidth = value.length * (metric.primary.status === 'available' ? 8.5 : 5) + unit.length * 5;
-        const fits = estimatedWidth <= width - 42;
-        return svg`
-          <text class="chip-symbol ${metric.type}" x=${x + 11} y=${y + 23 + index * 21}>${metricSymbols[metric.type]}</text>
-          <text class="chip-value ${!fits || metric.primary.status !== 'available' ? 'chip-status' : ''}" x=${x + 32} y=${y + 23 + index * 21}>
-            ${fits ? value : metric.primary.status === 'unavailable' ? 'Ausfall' : 'Details'}<tspan class="chip-unit">${fits && unit ? ` ${unit}` : ''}</tspan>
-          </text>
-        `;
-      })}
-      ${remainder ? svg`<text class="chip-more" x=${x + 12} y=${y + height - 9}>+${remainder} Details</text>` : nothing}
-      <title>${measurements.map((metric) => `${metric.label}: ${this.sensorText(metric.primary)}`).join(', ')}</title>
-    </g>`;
-  }
-
   private renderReadings(room: RoomConfig, compact = false) {
     const measurements = resolveMeasurements(room, this.hass, 'overview');
-    if (!measurements.length) return html`<span class="empty-reading">${resolveMeasurements(room, this.hass, 'details').length ? 'Messwerte in den Details' : 'Keine Sensoren zugeordnet'}</span>`;
+    if (!measurements.length) return nothing;
     return html`<span class=${compact ? 'room-readings compact' : 'room-readings'}>
       ${measurements.map((metric) => html`<span class="reading" data-metric=${metric.type} title=${metric.label}>
         <span class="reading-icon ${metric.type}" aria-label=${metric.label}>${metricSymbols[metric.type]}</span>
@@ -117,7 +79,7 @@ export class HausKlimaCard extends LitElement {
 
   private renderRoomTile(room: RoomConfig, building: BuildingConfig, number?: number) {
     const level = building.levels.find((entry) => entry.id === room.level_id);
-    return html`<button class="room-tile" data-select-room=${room.id} aria-pressed=${String(this._selected === room.id)} @click=${() => this.selectRoom(room)}>
+    return html`<button class="room-tile ${resolveMeasurements(room, this.hass, 'overview').length ? '' : 'no-readings'}" data-select-room=${room.id} aria-pressed=${String(this._selected === room.id)} @click=${() => this.selectRoom(room)}>
       <span class="tile-heading">${number !== undefined ? html`<span class="room-number">${String(number).padStart(2, '0')}</span>` : nothing}
         <span>${room.name}</span><span class="tile-arrow" aria-hidden="true">${arrowIcon()}</span></span>
       ${this.renderReadings(room)}
@@ -149,24 +111,28 @@ export class HausKlimaCard extends LitElement {
     </section>`;
   }
 
-  private renderGarage(room: RoomConfig) {
-    return html`<section class="garage-block location-block" aria-label=${room.name}>
-      <button class="location-heading" data-select-room=${room.id} @click=${() => this.selectRoom(room)}><span><span class="location-icon" aria-hidden="true">▤</span>${room.name}</span><span aria-hidden="true">${arrowIcon()}</span></button>
-      <button class="garage-picture" aria-label=${`${room.name} – Raumdetails öffnen`} @click=${() => this.selectRoom(room)}>
-        <svg class="garage-graphic" viewBox="0 0 320 196" role="img" aria-label="Freistehende Garage, schematische Darstellung">
-          <defs><linearGradient id="${this.drawingId}-garage-wall" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e0d3bd"/><stop offset="1" stop-color="#bbaa91"/></linearGradient>
-          <linearGradient id="${this.drawingId}-garage-door" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#69716d"/><stop offset="1" stop-color="#3c4942"/></linearGradient></defs>
-          <ellipse cx="163" cy="173" rx="134" ry="13" fill="#1e302219"/>
-          <path d="M 43 55 L 66 37 H 284 V 151 L 263 173 Z" fill="#b1a48e"/>
-          <rect x="42" y="56" width="222" height="116" fill="url(#${this.drawingId}-garage-wall)" stroke="#8a826f" stroke-width="1"/>
-          <path d="M 35 55 L 60 36 H 291 L 270 55 Z" fill="#59605a" stroke="#424c46" stroke-width="3"/>
-          <rect x="64" y="77" width="177" height="93" rx="3" fill="url(#${this.drawingId}-garage-door)" stroke="#424a44" stroke-width="4"/>
-          <path d="M 67 99 H 238 M 67 121 H 238 M 67 144 H 238" stroke="#a8b1a366" stroke-width="2"/>
-          <path d="M 22 175 H 294" stroke="#83a170" stroke-width="4"/>
-        </svg>
-        <span class="garage-readings">${this.renderReadings(room, true)}</span>
-      </button>
-      <p class="location-caption">Freistehend rechts vom Wohnhaus</p>
+  /** Garage air, two batteries and control cabinet each have their own HA sensors. */
+  private renderGarage(room: RoomConfig, equipment: RoomConfig[]) {
+    return html`<section class="garage-block location-block" aria-label="Garage und Batterietechnik">
+      <div class="garage-title">
+        <div><span class="location-icon" aria-hidden="true">▣</span>
+          <strong>Garage und Batterietechnik</strong>
+          <p>Vier unabhängig konfigurierbare Klimamessstellen</p>
+        </div>
+      </div>
+      <div class="garage-zones">
+        ${[room, ...equipment].map((device) => html`<button type="button"
+          class="garage-zone ${resolveMeasurements(device, this.hass, 'overview').length ? '' : 'no-readings'}" data-select-room=${device.id}
+          @click=${() => this.selectRoom(device)}
+          aria-label=${`${device.name} – Messwerte und Sensorquellen öffnen`}>
+          <span class="garage-device-icon" aria-hidden="true">${device.id === 'garage' ? '▣' : device.id === 'garage_cabinet' ? '▦' : '▥'}</span>
+          <span class="garage-device-content">
+            <strong>${device.name}</strong>
+            ${this.renderReadings(device, true)}
+          </span>
+          <span class="garage-zone-arrow" aria-hidden="true">›</span>
+        </button>`)}
+      </div>
     </section>`;
   }
 
@@ -200,24 +166,26 @@ export class HausKlimaCard extends LitElement {
     const outdoor = building.rooms.filter((room) => room.location === 'outdoor');
     const garages = building.rooms.filter((room) => room.location !== 'outdoor' && building.levels.find((level) => level.id === room.level_id)?.building_id === 'garage');
     const garageIds = new Set(garages.map((room) => room.id));
+    const garage = garages.find((room) => room.id === 'garage');
+    const garageEquipment = garages.filter((room) => room.id !== 'garage');
     const others = building.rooms.filter((room) => !drawnIds.has(room.id) && !garageIds.has(room.id) && room.location !== 'outdoor');
     const selected = building.rooms.find((room) => room.id === this._selected);
-    return html`<ha-card>
+    return html`<ha-card style=${`--hk-chip: rgba(22, 26, 30, ${config.chip_opacity ?? 0.72});`}>
       <header class="card-header"><div class="card-title"><span class="home-icon" aria-hidden="true">⌂</span>${config.title ? html`<h1>${config.title}</h1>` : nothing}</div>
         <button class="overview-toggle" aria-expanded=${String(this._showRooms)} @click=${() => { this._showRooms = !this._showRooms; }}>Räume <span>${building.rooms.length}</span></button></header>
-      <div class="main-grid">
-        <div class="house-column">
-          <div class="house-drawing" aria-label="Hausansicht">${renderHouseScene(building, {
-            idPrefix: this.drawingId, selected: this._selected, showNames: config.show_room_names ?? true,
-            showDimensions: false, onSelect: (room) => this.selectRoom(room), renderMetrics: (shape) => this.renderSvgMetrics(shape),
-          })}</div>
-          ${selected ? this.renderDetails(selected, building) : nothing}
-          <section class="rooms-section ${this._showRooms ? 'expanded' : ''}" aria-label="Raumübersicht">
-            <div class="section-title"><h2>Räume</h2><span>Antippen für alle Quellen</span></div>
-            <div class="room-list house-room-list">${shapes.map((shape, index) => this.renderRoomTile(shape.room, building, index + 1))}</div>
-          </section>
-        </div>
-        ${outdoor.length || garages.length ? html`<aside class="location-column" aria-label="Außen und Garage">${outdoor.map((room) => this.renderOutdoor(room))}${garages.map((room) => this.renderGarage(room))}</aside>` : nothing}
+      <div class="photo-main">
+        ${renderPhotoView(building, this.hass, config.show_room_names ?? true, (room) => this.selectRoom(room), this._selected)}
+        ${selected ? this.renderDetails(selected, building) : nothing}
+      </div>
+      <div class="photo-lower">
+        <section class="rooms-section ${this._showRooms ? 'expanded' : ''}" aria-label="Raumübersicht">
+          <div class="section-title"><h2>Räume</h2><span>Antippen für alle Sensorquellen</span></div>
+          <div class="room-list house-room-list">${shapes.map((shape, index) => this.renderRoomTile(shape.room, building, index + 1))}</div>
+        </section>
+        ${outdoor.length || garage ? html`<aside class="location-column" aria-label="Außen und Garage">
+          ${outdoor.map((room) => this.renderOutdoor(room))}
+          ${garage ? this.renderGarage(garage, garageEquipment) : nothing}
+        </aside>` : nothing}
       </div>
       ${others.length ? html`<section class="other-rooms" aria-label="Weitere Räume"><div class="section-title"><h2>Weitere Räume</h2><span>Alle Messorte, auch außerhalb der Hausansicht</span></div>
         <div class="room-list">${others.map((room) => this.renderRoomTile(room, building))}</div></section>` : nothing}
@@ -225,7 +193,7 @@ export class HausKlimaCard extends LitElement {
     </ha-card>`;
   }
 
-  static styles = [sceneStyles, cardStyles];
+  static styles = [photoStyles, cardStyles];
 }
 
 if (!customElements.get('hausklima-card')) customElements.define('hausklima-card', HausKlimaCard);

@@ -26,6 +26,7 @@ const DEFAULT_BUILDING: BuildingConfig = {
     { id: 'garage', name: 'Garage', building_id: 'garage', clear_height_m: null },
   ],
   layers: [{ id: 'main', name: 'Sichtbare Raumebene' }],
+  garage_components_initialized: true,
   rooms: [
     { id: 'workshop', name: 'Werkstatt', level_id: 'basement', layer_id: 'main', visible: true, width_m: 4 },
     { id: 'basement_hall', name: 'Flur', level_id: 'basement', layer_id: 'main', visible: true, width_m: 3.4 },
@@ -36,6 +37,9 @@ const DEFAULT_BUILDING: BuildingConfig = {
     { id: 'bedroom', name: 'Schlafzimmer', level_id: 'attic', layer_id: 'main', visible: true, width_m: 7.6 },
     { id: 'storage', name: 'Abstellraum', level_id: 'attic', layer_id: 'main', visible: true, width_m: 3.6 },
     { id: 'garage', name: 'Garage', level_id: 'garage', layer_id: 'main', visible: true, width_m: 6 },
+    { id: 'garage_battery_pylontech', name: 'Pylontech', level_id: 'garage', layer_id: 'main', visible: false, width_m: null },
+    { id: 'garage_battery_litime', name: 'LiTime', level_id: 'garage', layer_id: 'main', visible: false, width_m: null },
+    { id: 'garage_cabinet', name: 'Schaltschrank', level_id: 'garage', layer_id: 'main', visible: false, width_m: null },
   ],
   notes: [
     'Die Raummaße schließen die 12 m Außenbreite nicht vollständig. Es erfolgt keine automatische Anpassung.',

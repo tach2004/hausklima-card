@@ -8,7 +8,7 @@ export const cardStyles = css`
     --hk-line: var(--divider-color, #e2e6db);
     --hk-paper: var(--ha-card-background, var(--card-background-color, #fffdf8));
     --hk-accent: var(--primary-color, #527652);
-    --hk-chip: rgba(22, 26, 30, .82);
+    --hk-chip: rgba(22, 26, 30, .72);
     color: var(--hk-ink);
     font-family: var(--paper-font-body1_-_font-family, system-ui, sans-serif);
   }
@@ -84,6 +84,8 @@ export const cardStyles = css`
   .rooms-section.expanded { display: block; }
   .room-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(165px, 100%), 1fr)); gap: 10px; }
   .room-tile { display: flex; flex-direction: column; gap: 11px; min-width: 0; min-height: 112px; text-align: left; border: 1px solid #ffffff1a; border-radius: 13px; background: var(--hk-chip); color: #fff; padding: 13px; }
+  .room-tile.no-readings { background: var(--hk-paper); color: var(--hk-ink); border-color: var(--hk-line); }
+  .room-tile.no-readings .tile-arrow, .room-tile.no-readings .tile-level, .room-tile.no-readings .room-number { color: var(--hk-muted); }
   .room-tile[aria-pressed='true'] { outline: 2px solid var(--hk-accent); outline-offset: 2px; }
   .tile-heading { display: flex; gap: 7px; align-items: baseline; width: 100%; font-size: 12px; font-weight: 600; }
   .tile-heading > span:nth-last-child(2) { overflow-wrap: anywhere; }
@@ -125,6 +127,81 @@ export const cardStyles = css`
   .building-details summary { cursor: pointer; padding: 14px 0; min-height: 44px; }
   .building-details p { margin: 0 0 10px; }
   .building-details ul { padding-left: 17px; margin: 0 0 20px; }
+
+  /* Photo-backed architectural scene; keep the panel view modestly sized. */
+  .photo-main { min-width: 0; padding: 10px 24px 12px; }
+  .photo-lower { width: 100%; max-width: 1180px; margin: auto; padding: 0 0 20px; }
+  .photo-lower .location-column {
+    display: grid;
+    grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr);
+    align-items: start;
+    gap: 16px;
+    padding: 0;
+  }
+  .photo-lower .location-block {
+    margin: 0;
+    border-radius: 16px;
+    padding: 16px;
+    background: color-mix(in srgb, var(--hk-paper) 95%, #d5e6e3);
+  }
+  .photo-main .room-detail { margin: 14px auto; max-width: 1180px; }
+  .garage-title { display: flex; align-items: center; margin-bottom: 12px; }
+  .garage-title strong { font-size: 15px; }
+  .garage-title p { margin: 3px 0 0; color: var(--hk-muted); font-size: 11px; }
+  .garage-title .location-icon { padding-right: 7px; }
+  .garage-zones { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+  .garage-zone {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    min-width: 0;
+    min-height: 84px;
+    padding: 12px;
+    background: var(--hk-chip);
+    border: 1px solid #ffffff2e;
+    color: #fff;
+    border-radius: 12px;
+    text-align: left;
+    transition: border-color .15s, transform .15s;
+  }
+  .garage-zone.no-readings { background: var(--hk-paper); color: var(--hk-ink); border-color: var(--hk-line); }
+  .garage-zone.no-readings .garage-device-content > strong { color: var(--hk-ink); }
+  .garage-zone.no-readings .garage-zone-arrow { color: var(--hk-muted); }
+  .garage-zone:hover, .garage-zone:focus-visible { border-color: #9dd8e1; transform: translateY(-2px); }
+  .garage-device-icon {
+    display: flex; flex-shrink: 0; align-items: center; justify-content: center;
+    width: 31px; height: 31px; border-radius: 9px;
+    background: #eef8fd22; color: #b8e0f8; font-size: 20px;
+  }
+  .garage-device-content { flex: 1 1 auto; min-width: 0; }
+  .garage-device-content > strong { display: block; color: #fff; font-size: 12px; overflow-wrap: anywhere; }
+  .garage-device-content .room-readings { margin-top: 6px; gap: 4px 6px; }
+  .garage-device-content .reading strong { font-size: 14px; color: #fff; }
+  .garage-device-content .reading-unit { color: #e5ecf0; font-size: 10px; }
+  .garage-device-content .empty-reading { color: #d9e5e9; font-size: 11px; }
+  .garage-zone-arrow { font-size: 18px; color: #e4eff4; flex-shrink: 0; }
+  .photo-lower .outdoor-source { min-height: 48px; }
+  @supports ((backdrop-filter: blur(3px)) or (-webkit-backdrop-filter: blur(3px))) {
+    .garage-zone { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+  }
+  @container hausklima (max-width: 900px) {
+    .photo-lower { padding: 0 15px 16px; }
+    .photo-lower .location-column { grid-template-columns: 1fr; }
+  }
+  @container hausklima (max-width: 780px) {
+    .photo-main { padding: 8px 12px; }
+    .photo-lower .rooms-section { display: block; padding: 12px 0 16px; }
+    .photo-lower .location-column { grid-template-columns: 1fr; gap: 12px; }
+    .photo-lower .location-block { padding: 13px; }
+    .garage-zone { min-height: 76px; padding: 9px; gap: 7px; }
+    .garage-device-icon { width: 26px; height: 26px; font-size: 17px; }
+    .garage-device-content .reading strong { font-size: 13px; }
+  }
+  @container hausklima (max-width: 380px) {
+    .garage-zones { gap: 7px; }
+    .garage-zone { padding: 8px; }
+    .garage-device-content > strong { font-size: 11px; }
+  }
   @supports ((backdrop-filter: blur(3px)) or (-webkit-backdrop-filter: blur(3px))) {
     .room-tile, .garage-readings, .metric-group { backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
   }

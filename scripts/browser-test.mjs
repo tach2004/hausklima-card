@@ -8,7 +8,7 @@ import { demoConfig, demoStates } from '../dev/fixtures.js';
 // DEMO-WERTE: only the development harness receives these synthetic HA states.
 const server = await startPreview(0);
 const url = `http://127.0.0.1:${server.address().port}`;
-const screenshotDirectory = process.env.UPDATE_SCREENSHOTS === '1' ? 'docs/screenshots/phase-2' : 'work/screenshots/phase-2';
+const screenshotDirectory = process.env.UPDATE_SCREENSHOTS === '1' ? 'docs/screenshots/phase-3' : 'work/screenshots/phase-3';
 const launched = [];
 const webkitDisabled = process.env.SKIP_WEBKIT === '1';
 
@@ -37,19 +37,17 @@ async function assertLayout(page, card, name) {
   const overflows = await card.locator('.room-tile:visible').evaluateAll((nodes) => nodes.filter((node) => node.scrollWidth > node.clientWidth + 1).map((node) => node.textContent));
   assert.deepEqual(overflows, [], `${name}: room tiles overflow`);
   const cardWidth = await card.evaluate((element) => element.clientWidth);
+  const sceneImage = card.locator('.photo-image');
+  const imageBounds = await sceneImage.boundingBox();
+  assert.ok(imageBounds, `${name}: house artwork available`);
+  assert.ok(imageBounds.x >= -1 && imageBounds.x + imageBounds.width <= viewport.width + 1,
+    `${name}: complete architecture image fits horizontally`);
   if (cardWidth <= 780) {
-    const numbers = await card.locator('.house-scene .compact-room-number:visible').evaluateAll((nodes) => nodes.map((node) => ({
-      id: node.closest('[data-room-id]').getAttribute('data-room-id'),
-      number: node.textContent.trim(),
-      fontSize: parseFloat(getComputedStyle(node).fontSize) * Math.hypot(node.getScreenCTM().a, node.getScreenCTM().b),
-    })));
-    assert.equal(numbers.length, 8, `${name}: mobile map has all eight visible room numbers`);
-    for (const item of numbers) {
-      assert.equal((await card.locator(`.house-room-list [data-select-room="${item.id}"] .room-number`).innerText()).trim(), item.number, `${name}: map number matches room tile`);
-      assert.ok(item.fontSize >= 11.5, `${name}: map number ${item.number} remains legible (${item.fontSize}px)`);
-    }
+    const roomTiles = card.locator('.house-room-list [data-select-room]');
+    assert.equal(await roomTiles.count(), 8, `${name}: mobile has eight selectable rooms`);
+    assert.equal(await card.locator('.photo-room:visible').count(), 0, `${name}: tiny photo overlay labels hidden on phone`);
   }
-  const panels = await card.locator('[data-overview-chip]:visible').evaluateAll((nodes) => nodes.map((node) => {
+  const panels = await card.locator('.photo-room.with-metrics:visible').evaluateAll((nodes) => nodes.map((node) => {
     const rect = node.getBoundingClientRect();
     return { id: node.getAttribute('data-room-id'), x: rect.x, y: rect.y, width: rect.width, height: rect.height, opacity: getComputedStyle(node).opacity };
   }));
@@ -131,7 +129,12 @@ async function checkStates(browser) {
   // Default production-style config stays an honest empty state without demo values.
   const empty = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });
   const initial = await ready(empty, '/');
-  assert.equal(await initial.card.locator('[data-overview-chip]').count(), 0);
+  assert.equal(await initial.card.locator('.photo-metric').count(), 0);
+  assert.equal(await initial.card.locator('.photo-room.with-metrics, .photo-garage').count(), 0, 'unconfigured sensors create no dark photo panel');
+  assert.equal(await initial.card.locator('.garage-zone.no-readings').count(), 4, 'unconfigured garage devices use light navigation tiles');
+  const emptyBackground = await initial.card.locator('.photo-room.name-only').first().evaluate((element) => getComputedStyle(element).backgroundColor);
+  assert.equal(emptyBackground, 'rgba(0, 0, 0, 0)', 'unconfigured room has no dark overlay');
+
   assert.equal(await initial.card.locator('.sensor-row').count(), 0);
   assert.doesNotMatch(await initial.card.evaluate((element) => element.shadowRoot.textContent), /19[,.]8|21[,.]3|745/);
   await assertLayout(empty, initial.card, 'empty-state/mobile');
@@ -154,11 +157,8 @@ async function checkLongValues(browser) {
       window.hausklimaPreview.setStates(next);
     }, states);
     await assertLayout(page, card, `long-value/${width}`);
-    const escaping = await card.locator('.metric-panel:visible .chip-value').evaluateAll((nodes) => nodes.filter((node) => {
-      const text = node.getBoundingClientRect();
-      const panel = node.closest('.metric-panel').querySelector('rect').getBoundingClientRect();
-      return text.right > panel.right + 1;
-    }).map((node) => node.textContent.trim()));
+    const escaping = await card.locator('.photo-room.with-metrics:visible').evaluateAll((nodes) =>
+      nodes.filter((node) => node.scrollWidth > node.clientWidth + 1).map((node) => node.textContent.trim()));
     assert.deepEqual(escaping, [], `long-value/${width}: overview values remain inside their panels`);
     await selectRoom(page, card, 'bedroom', width < 768);
     const detail = card.locator('.room-detail');
@@ -176,6 +176,16 @@ async function checkEditor(browser) {
   const page = await browser.newPage({ viewport: { width: 390, height: 900 }, hasTouch: true });
   const { card, editor, errors, external } = await ready(page);
   await page.locator('#editor-panel > summary').click();
+  const opacity = editor.locator('#chip-opacity');
+  assert.equal(await opacity.inputValue(), '72', 'default translucent background is 72 percent opaque');
+  await opacity.evaluate((element) => {
+    element.value = '55';
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  assert.equal((await page.evaluate(() => window.hausklimaPreview.getConfig())).chip_opacity, 0.55);
+  assert.ok((await card.locator('ha-card').getAttribute('style')).includes('0.55'), 'opacity propagated to all dark panels');
+  // The editor panel is already open.
+
   await editor.locator('#room-select').selectOption('workshop');
   await editor.locator('#metric-select').selectOption('temperature');
   await editor.locator('#new-sensor select').selectOption('sensor.demo_additional_temperature');

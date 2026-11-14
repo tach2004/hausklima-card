@@ -93,6 +93,8 @@ export interface BuildingConfig {
   /** Array order preserves the given left-to-right order within each level. */
   rooms: RoomConfig[];
   notes: string[];
+  /** Migration marker: garage climate sub-locations were added to this config. */
+  garage_components_initialized?: boolean;
 }
 
 export interface HausKlimaCardConfig {
@@ -100,6 +102,8 @@ export interface HausKlimaCardConfig {
   title?: string;
   show_dimensions?: boolean;
   show_room_names?: boolean;
+  /** Opacity of the dark sensor tiles, from 0.35 to 1 (inclusive). */
+  chip_opacity?: number;
   building?: BuildingConfig;
   /** Lovelace may attach layout/visibility properties; preserve these in editor. */
   [key: string]: unknown;

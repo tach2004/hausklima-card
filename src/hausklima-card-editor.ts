@@ -108,7 +108,7 @@ export class HausKlimaCardEditor extends LitElement {
     catch (error) { this._error = error instanceof Error ? error.message : 'Die Änderung konnte nicht übernommen werden.'; }
   }
 
-  private updateBase(key: 'title' | 'show_dimensions' | 'show_room_names', value: string | boolean): void {
+  private updateBase(key: 'title' | 'show_dimensions' | 'show_room_names' | 'chip_opacity', value: string | boolean | number): void {
     this.apply(() => ({ ...this._config, [key]: value }));
   }
 
@@ -203,13 +203,18 @@ export class HausKlimaCardEditor extends LitElement {
     const room = building.rooms.find((candidate) => candidate.id === this._roomId);
     const measurement = room?.measurements?.[this._metric];
     const houseLevels = building.levels.filter((level) => level.building_id === 'house');
-    const overview = measurement?.show_in_overview ?? (this._metric === 'temperature' || this._metric === 'relative_humidity');
+    const overview = measurement?.show_in_overview ?? true;
     return html`
       <div class="editor">
         <section class="base-settings" aria-label="Darstellung">
           <label class="field" for="title"><span>Kartentitel</span>
             <input id="title" type="text" .value=${live(this._config.title ?? '')}
               @change=${(event: Event) => this.updateBase('title', (event.target as HTMLInputElement).value)} />
+          </label>
+          <label class="field chip-opacity" for="chip-opacity"><span>Transparenz der dunklen Messwert-Kästchen: ${Math.round((this._config.chip_opacity ?? 0.72) * 100)} % Deckkraft</span>
+            <input id="chip-opacity" type="range" min="35" max="100" step="1"
+              .value=${String(Math.round((this._config.chip_opacity ?? 0.72) * 100))}
+              @input=${(event: Event) => this.updateBase('chip_opacity', Number((event.target as HTMLInputElement).value) / 100)} />
           </label>
           <div class="base-options">
             <label class="check-label"><input id="show-room-names" type="checkbox" .checked=${this._config.show_room_names ?? true}
@@ -234,7 +239,7 @@ export class HausKlimaCardEditor extends LitElement {
               </label>
               <button id="delete-room" type="button" class="text-button danger" @click=${() => { this._confirmDelete = true; }}>Raum entfernen</button>
             </div>
-            <p class="hint">${room.location === 'outdoor' ? 'Außenmessort · eigener Bereich außerhalb des Hauses.' : `${building.levels.find((level) => level.id === room.level_id)?.name ?? 'Weiterer Raum'} · ${room.visible ? 'im Gebäudeschnitt vorgesehen' : 'in der separaten Raumübersicht'}.`}</p>
+            <p class="hint">${room.location === 'outdoor' ? 'Außenmessort · eigener Bereich außerhalb des Hauses.' : `${room.level_id === 'garage' ? 'Garage · eigenständiger Klimamessort' : `${building.levels.find((level) => level.id === room.level_id)?.name ?? 'Weiterer Raum'} · ${room.visible ? 'im Gebäudeschnitt vorgesehen' : 'in der separaten Raumübersicht'}`}.`}</p>
             ${this._confirmDelete ? html`
               <div class="confirmation" role="alert">
                 <strong>„${room.name}“ mit allen Sensorzuordnungen entfernen?</strong>
