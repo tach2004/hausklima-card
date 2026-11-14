@@ -67,7 +67,7 @@ export class HausKlimaCard extends LitElement {
 
   private renderReadings(room: RoomConfig, compact = false) {
     const measurements = resolveMeasurements(room, this.hass, 'overview');
-    if (!measurements.length) return html`<span class="empty-reading">${resolveMeasurements(room, this.hass, 'details').length ? 'Messwerte in den Details' : 'Keine Sensoren zugeordnet'}</span>`;
+    if (!measurements.length) return nothing;
     return html`<span class=${compact ? 'room-readings compact' : 'room-readings'}>
       ${measurements.map((metric) => html`<span class="reading" data-metric=${metric.type} title=${metric.label}>
         <span class="reading-icon ${metric.type}" aria-label=${metric.label}>${metricSymbols[metric.type]}</span>
@@ -79,7 +79,7 @@ export class HausKlimaCard extends LitElement {
 
   private renderRoomTile(room: RoomConfig, building: BuildingConfig, number?: number) {
     const level = building.levels.find((entry) => entry.id === room.level_id);
-    return html`<button class="room-tile" data-select-room=${room.id} aria-pressed=${String(this._selected === room.id)} @click=${() => this.selectRoom(room)}>
+    return html`<button class="room-tile ${resolveMeasurements(room, this.hass, 'overview').length ? '' : 'no-readings'}" data-select-room=${room.id} aria-pressed=${String(this._selected === room.id)} @click=${() => this.selectRoom(room)}>
       <span class="tile-heading">${number !== undefined ? html`<span class="room-number">${String(number).padStart(2, '0')}</span>` : nothing}
         <span>${room.name}</span><span class="tile-arrow" aria-hidden="true">${arrowIcon()}</span></span>
       ${this.renderReadings(room)}
@@ -122,7 +122,7 @@ export class HausKlimaCard extends LitElement {
       </div>
       <div class="garage-zones">
         ${[room, ...equipment].map((device) => html`<button type="button"
-          class="garage-zone" data-select-room=${device.id}
+          class="garage-zone ${resolveMeasurements(device, this.hass, 'overview').length ? '' : 'no-readings'}" data-select-room=${device.id}
           @click=${() => this.selectRoom(device)}
           aria-label=${`${device.name} – Messwerte und Sensorquellen öffnen`}>
           <span class="garage-device-icon" aria-hidden="true">${device.id === 'garage' ? '▣' : device.id === 'garage_cabinet' ? '▦' : '▥'}</span>
@@ -170,7 +170,7 @@ export class HausKlimaCard extends LitElement {
     const garageEquipment = garages.filter((room) => room.id !== 'garage');
     const others = building.rooms.filter((room) => !drawnIds.has(room.id) && !garageIds.has(room.id) && room.location !== 'outdoor');
     const selected = building.rooms.find((room) => room.id === this._selected);
-    return html`<ha-card>
+    return html`<ha-card style=${`--hk-chip: rgba(22, 26, 30, ${config.chip_opacity ?? 0.72});`}>
       <header class="card-header"><div class="card-title"><span class="home-icon" aria-hidden="true">⌂</span>${config.title ? html`<h1>${config.title}</h1>` : nothing}</div>
         <button class="overview-toggle" aria-expanded=${String(this._showRooms)} @click=${() => { this._showRooms = !this._showRooms; }}>Räume <span>${building.rooms.length}</span></button></header>
       <div class="photo-main">
