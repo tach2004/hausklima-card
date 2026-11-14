@@ -64,7 +64,7 @@ describe('approved-image climate overlays', () => {
     } };
     const card = await createCard(building, hass);
     const panel = query<HTMLButtonElement>(card, '.photo-room.with-metrics[data-room-id="laundry"]');
-    expect(textValues(panel)).toEqual(['16,8', '68,5', '5,0', '745,0', '12345678901234567890,0']);
+    expect(textValues(panel)).toEqual(['16,8', '68,5', '5,0', '745', '12345678901234567890']);
     expect([...panel.querySelectorAll('.photo-metric small')].map((node) => node.textContent)).toEqual(['°C', '%', 'g/m³', 'ppm', longUnit]);
     expect(panel.textContent).not.toContain('Details');
     panel.click();
@@ -232,6 +232,69 @@ describe('approved-image climate overlays', () => {
       expect(query(card, '.room-detail').getAttribute('data-room-id')).toBe(id);
     }
     expect(building.rooms.some((room) => room.id === 'garage')).toBe(false);
+  });
+
+  it('shows selected source groups with icons and both pressure kinds, retaining secondary sources only in details', async () => {
+    const building = getDefaultBuilding();
+    const room = outdoor('test_grouped_outdoor', 'Außen', 'sensor.test_homematic', 'sensor.test_ecowitt');
+    room.measurements = {
+      temperature: { sensors: [
+        { entity: 'sensor.test_homematic', overview_group: 'Homematic', show_in_overview: true },
+        { entity: 'sensor.test_ecowitt', overview_group: 'Ecowitt', show_in_overview: true },
+        { entity: 'sensor.test_secondary', overview_group: 'Nur Details', show_in_overview: false },
+      ] },
+      relative_humidity: { sensors: [{ entity: 'sensor.test_homematic_rh', overview_group: 'Homematic' }] },
+      pressure_relative: { sensors: [{ entity: 'sensor.test_pressure_rel', overview_group: 'Ecowitt' }] },
+      pressure_absolute: { sensors: [{ entity: 'sensor.test_pressure_abs', overview_group: 'Ecowitt' }] },
+    };
+    building.rooms.push(room);
+    const hass: HomeAssistant = { states: {
+      'sensor.test_homematic': { state: '3.39999', attributes: { unit_of_measurement: '°C' } },
+      'sensor.test_ecowitt': { state: '6.3', attributes: { unit_of_measurement: '°C' } },
+      'sensor.test_secondary': { state: '9.9', attributes: { unit_of_measurement: '°C' } },
+      'sensor.test_homematic_rh': { state: '86', attributes: { unit_of_measurement: '%' } },
+      'sensor.test_pressure_rel': { state: '1013.26', attributes: { unit_of_measurement: 'hPa' } },
+      'sensor.test_pressure_abs': { state: '996.7', attributes: { unit_of_measurement: 'hPa' } },
+    } };
+    const card = await createCard(building, hass);
+    const panel = query<HTMLButtonElement>(card, '.photo-outdoor');
+    expect([...panel.querySelectorAll('[data-overview-group]')].map((node) => node.getAttribute('data-overview-group'))).toEqual(['Homematic', 'Ecowitt']);
+    expect(textValues(panel)).toEqual(['3,4', '86,0', '6,3', '1013', '997']);
+    expect(panel.querySelectorAll('.photo-metric svg.metric-icon')).toHaveLength(5);
+    expect(panel.querySelector('[data-room-icon="outdoor"]')).not.toBeNull();
+    expect(panel.querySelectorAll('.metric-qualifier')).toHaveLength(2);
+    expect(panel.querySelector('[data-metric="pressure_relative"]')?.textContent).toContain('rel.');
+    expect(panel.querySelector('[data-metric="pressure_absolute"]')?.textContent).toContain('abs.');
+    expect(panel.textContent).not.toContain('9,9');
+    const lower = query(card, '.outdoor-block[data-room-id="test_grouped_outdoor"]');
+    expect(lower.querySelectorAll('.reading')).toHaveLength(5);
+    expect(lower.querySelectorAll('[data-overview-group]')).toHaveLength(2);
+    panel.click();
+    await card.updateComplete;
+    const detail = query(card, '.room-detail');
+    expect(detail.querySelectorAll('.sensor-row')).toHaveLength(6);
+    expect(detail.querySelector('[data-entity="sensor.test_secondary"]')?.textContent).toContain('9,9');
+    expect(detail.querySelector('[data-entity="sensor.test_ecowitt"]')?.textContent).toContain('Hauptanzeige');
+    expect(detail.querySelectorAll('.overview-sensor')).toHaveLength(5);
+  });
+
+  it('keeps a named single indoor temperature source vertical and introduces rows only for multiple selected sources', async () => {
+    const building = getDefaultBuilding();
+    const room = building.rooms.find((entry) => entry.id === 'bedroom')!;
+    room.measurements = {
+      temperature: { sensors: [{ entity: 'sensor.test_indoor_t', overview_group: 'Zimmerfühler' }] },
+      relative_humidity: { sensors: [{ entity: 'sensor.test_indoor_rh', overview_group: 'Zimmerfühler' }] },
+    };
+    const card = await createCard(building);
+    expect(query(card, '.photo-room[data-room-id="bedroom"] .sensor-groups').classList.contains('group-columns')).toBe(true);
+    expect(query(card, '.room-tile[data-select-room="bedroom"] .sensor-groups').classList.contains('group-columns')).toBe(true);
+    expect(query(card, '.photo-room[data-room-id="bedroom"] [data-room-icon="bedroom"]')).not.toBeNull();
+    expect(query(card, '.photo-placement[data-overlay-id="bedroom"]').hasAttribute('data-width')).toBe(false);
+    room.measurements.temperature!.sensors.push({ entity: 'sensor.test_second_t', overview_group: 'Zweiter Fühler', show_in_overview: true });
+    card.setConfig({ ...getDefaultConfig(), building });
+    await card.updateComplete;
+    expect(query(card, '.photo-room[data-room-id="bedroom"] .sensor-groups').classList.contains('group-rows')).toBe(true);
+    expect(query(card, '.photo-room[data-room-id="bedroom"]').querySelectorAll('[data-overview-group]')).toHaveLength(2);
   });
 
 });

@@ -1,5 +1,5 @@
 import { METRIC_TYPES } from './types';
-import type { HomeAssistant, MetricType, ResolvedMeasurement, ResolvedSensor, RoomConfig, SensorConfig, SensorStatus } from './types';
+import type { HomeAssistant, MetricType, OverviewGroup, ResolvedMeasurement, ResolvedSensor, RoomConfig, SensorConfig, SensorStatus } from './types';
 
 export const METRIC_LABELS: Record<MetricType, string> = {
   temperature: 'Temperatur',
@@ -7,6 +7,8 @@ export const METRIC_LABELS: Record<MetricType, string> = {
   absolute_humidity: 'Absolute Luftfeuchtigkeit',
   co2: 'CO₂',
   voc: 'VOC',
+  pressure_relative: 'Luftdruck relativ',
+  pressure_absolute: 'Luftdruck absolut',
 };
 
 export type MeasurementScope = 'visible' | 'overview' | 'details';
@@ -20,7 +22,7 @@ export function sensorStatusLabel(status: SensorStatus): string {
   }
 }
 
-/** Format display values only: exactly one decimal, no unit/state mutation. */
+/** Format display values only; precision follows the metric, never its HA unit. */
 export function formatSensorValue(sensor: ResolvedSensor, hass?: HomeAssistant): string {
   if (sensor.status !== 'available' || sensor.value === null) return sensorStatusLabel(sensor.status);
   const raw = sensor.value;
@@ -32,13 +34,14 @@ export function formatSensorValue(sensor: ResolvedSensor, hass?: HomeAssistant):
   const integer = numeric[2] ?? '0';
   const fraction = numeric[3] ?? numeric[4] ?? '';
   const digits = integer + fraction;
-  const retained = integer.length + Number(numeric[5] ?? 0) + 1;
+  const precision = ['temperature', 'relative_humidity', 'absolute_humidity'].includes(sensor.metric_type) ? 1 : 0;
+  const retained = integer.length + Number(numeric[5] ?? 0) + precision;
   const isZero = !/[1-9]/.test(digits);
-  let tenths = isZero || retained <= 0 ? 0n : BigInt(digits.slice(0, retained).padEnd(retained, '0'));
-  if (!isZero && retained >= 0 && Number(digits[retained] ?? '0') >= 5) tenths += 1n;
-  const rounded = tenths.toString().padStart(2, '0');
-  const whole = rounded.slice(0, -1);
-  const decimal = rounded.slice(-1);
+  let scaled = isZero || retained <= 0 ? 0n : BigInt(digits.slice(0, retained).padEnd(retained, '0'));
+  if (!isZero && retained >= 0 && Number(digits[retained] ?? '0') >= 5) scaled += 1n;
+  const rounded = scaled.toString().padStart(precision + 1, '0');
+  const whole = precision ? rounded.slice(0, -precision) : rounded;
+  const decimal = precision ? rounded.slice(-precision) : '';
   const negative = numeric[1] === '-';
   const numberFormat = hass?.locale?.number_format;
   const language = numberFormat === 'none' || numberFormat === 'comma_decimal' ? 'en-US'
@@ -46,22 +49,23 @@ export function formatSensorValue(sensor: ResolvedSensor, hass?: HomeAssistant):
     : numberFormat === 'space_comma' ? 'fr-FR'
     : numberFormat === 'system' ? undefined
     : hass?.locale?.language ?? hass?.language ?? 'de-DE';
-  const options = { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false };
+  const options = { minimumFractionDigits: precision, maximumFractionDigits: precision, useGrouping: false };
   let formatter: Intl.NumberFormat;
   try { formatter = new Intl.NumberFormat(language, options); }
   catch { formatter = new Intl.NumberFormat('de-DE', options); }
   const signedWhole = negative && whole === '0' ? -0 : BigInt(`${negative ? '-' : ''}${whole}`);
-  const localizedDecimal = formatter.formatToParts(Number(decimal)).find((part) => part.type === 'integer')!.value;
+  const localizedDecimal = precision ? formatter.formatToParts(Number(decimal)).find((part) => part.type === 'integer')!.value : '';
   return formatter.formatToParts(signedWhole)
     .map((part) => part.type === 'fraction' ? localizedDecimal : part.value).join('');
 }
 
-function resolveSensor(sensor: SensorConfig, primary: string, hass?: HomeAssistant): ResolvedSensor {
+function resolveSensor(sensor: SensorConfig, primary: string, type: MetricType, hass?: HomeAssistant): ResolvedSensor {
   const state = hass?.states[sensor.entity];
   const status = !state ? 'missing' : state.state === 'unavailable' ? 'unavailable' : state.state === 'unknown' ? 'unknown' : 'available';
   const friendlyName = state?.attributes.friendly_name;
   const unit = state?.attributes.unit_of_measurement;
   return {
+    metric_type: type,
     entity: sensor.entity,
     name: sensor.name ?? (typeof friendlyName === 'string' ? friendlyName : sensor.entity),
     value: status === 'available' ? state!.state : null,
@@ -69,6 +73,8 @@ function resolveSensor(sensor: SensorConfig, primary: string, hass?: HomeAssista
     unit: typeof unit === 'string' ? unit : '',
     status,
     is_primary: sensor.entity === primary,
+    show_in_overview: sensor.show_in_overview ?? sensor.entity === primary,
+    ...(sensor.overview_group ? { overview_group: sensor.overview_group.trim() } : {}),
   };
 }
 
@@ -84,7 +90,7 @@ export function resolveMeasurements(room: RoomConfig, hass?: HomeAssistant, scop
     const showInOverview = measurement.show_in_overview ?? true;
     if (scope !== 'details' && (!visible || (scope === 'overview' && !showInOverview))) return [];
     const primaryId = measurement.primary ?? measurement.sensors[0]!.entity;
-    const sensors = measurement.sensors.map((sensor) => resolveSensor(sensor, primaryId, hass));
+    const sensors = measurement.sensors.map((sensor) => resolveSensor(sensor, primaryId, type, hass));
     const primary = sensors.find((sensor) => sensor.is_primary) ?? sensors[0]!;
     return [{
       type, label: METRIC_LABELS[type], primary, sensors,
@@ -92,4 +98,22 @@ export function resolveMeasurements(room: RoomConfig, hass?: HomeAssistant, scop
       ...(measurement.position ? { position: measurement.position } : {}),
     }];
   });
+}
+
+/** Full, selected source readings, grouped only within the requested location. */
+export function resolveOverviewGroups(room: RoomConfig, hass?: HomeAssistant): OverviewGroup[] {
+  const groups = new Map<string, OverviewGroup>();
+  for (const measurement of resolveMeasurements(room, hass, 'overview')) {
+    const selected = measurement.sensors.filter((sensor) => sensor.show_in_overview);
+    for (const sensor of selected) {
+      const name = sensor.overview_group ?? (selected.length > 1 ? sensor.name : '');
+      // Distinct explicit group names are intentionally not case-folded: labels
+      // are user controlled, and entities from other locations never enter here.
+      const key = sensor.overview_group ? `group:${name}` : selected.length > 1 ? `source:${sensor.entity}` : 'default';
+      const group = groups.get(key) ?? { name, readings: [] };
+      group.readings.push({ type: measurement.type, label: measurement.label, sensor });
+      groups.set(key, group);
+    }
+  }
+  return [...groups.values()];
 }

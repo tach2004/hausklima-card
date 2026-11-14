@@ -185,11 +185,21 @@ export class HausKlimaCardEditor extends LitElement {
             placeholder="Name der HA-Entität verwenden"
             @change=${(event: Event) => this.apply(() => editSensor(this._config, room.id, this._metric, sensor.entity, { name: (event.target as HTMLInputElement).value }))} />
         </label>
+        <label class="field"><span>Gruppe in der Übersicht <small>(optional)</small></span>
+          <input type="text" data-action="sensor-group" data-entity=${sensor.entity}
+            aria-label=${`Sensorgruppe für Sensor ${index + 1}`} .value=${live(sensor.overview_group ?? '')}
+            placeholder="z. B. Homematic, Ecowitt, Vitodens"
+            @change=${(event: Event) => this.apply(() => editSensor(this._config, room.id, this._metric, sensor.entity, { overview_group: (event.target as HTMLInputElement).value }))} />
+        </label>
         <div class="sensor-actions">
           <label class="radio-label"><input type="radio" name="primary-sensor"
             data-action="sensor-primary" data-entity=${sensor.entity}
             .checked=${(primary ?? room.measurements?.[this._metric]?.sensors[0]?.entity) === sensor.entity}
-            @change=${() => this.apply(() => setPrimarySensor(this._config, room.id, this._metric, sensor.entity))} /> Hauptsensor</label>
+            @change=${() => this.apply(() => setPrimarySensor(this._config, room.id, this._metric, sensor.entity))} /> Standardquelle</label>
+          <label class="check-label"><input type="checkbox"
+            data-action="sensor-overview" data-entity=${sensor.entity}
+            .checked=${sensor.show_in_overview ?? (primary ?? room.measurements?.[this._metric]?.sensors[0]?.entity) === sensor.entity}
+            @change=${(event: Event) => this.apply(() => editSensor(this._config, room.id, this._metric, sensor.entity, { show_in_overview: (event.target as HTMLInputElement).checked }))} /> Haupt – in Übersicht</label>
           <button type="button" class="text-button danger" data-action="remove-sensor" data-entity=${sensor.entity}
             aria-label=${`Sensor ${index + 1} entfernen`}
             @click=${() => this.apply(() => removeSensor(this._config, room.id, this._metric, sensor.entity))}>Entfernen</button>
@@ -217,7 +227,7 @@ export class HausKlimaCardEditor extends LitElement {
               @input=${(event: Event) => this.updateBase('chip_opacity', Number((event.target as HTMLInputElement).value) / 100)} />
           </label>
           <label class="field scene-width" for="scene-max-width"><span>Maximale Breite der Gebäudeansicht: ${this._config.scene_max_width ?? 1400} px</span>
-            <input id="scene-max-width" type="range" min="900" max="1600" step="10"
+            <input id="scene-max-width" type="range" min="900" max="3200" step="10"
               .value=${String(this._config.scene_max_width ?? 1400)}
               @input=${(event: Event) => this.updateBase('scene_max_width', Number((event.target as HTMLInputElement).value))} />
             <small>Die Ansicht nutzt höchstens den verfügbaren Platz. Eine schmale HA-Sektion wird dadurch nicht verbreitert.</small>
@@ -267,7 +277,7 @@ export class HausKlimaCardEditor extends LitElement {
               <label class="check-label"><input id="metric-overview" type="checkbox" .checked=${overview}
                 @change=${(event: Event) => this.apply(() => updateMeasurement(this._config, room.id, this._metric, { show_in_overview: (event.target as HTMLInputElement).checked }))} /> Hauptwert im Raum anzeigen</label>
             </div>
-            <p class="hint">Alle zugeordneten Sensoren bleiben in den Raumdetails erreichbar, auch bei ausgeblendeter Hauptanzeige.</p>
+            <p class="hint">Mit „Haupt – in Übersicht“ können mehrere Quellen sichtbar sein. Gleiche Gruppennamen bündeln Werte unter einem gemeinsamen Namen, z. B. Temperatur und Feuchte von „Homematic“. Ohne Gruppe bleiben einzelne Hauptwerte schmal untereinander; mehrere Quellen derselben Messart erhalten ihren Anzeigenamen. „Standardquelle“ bestimmt die Hauptanzeige nur, solange der jeweilige Haupt-Haken nicht ausdrücklich gesetzt oder entfernt wurde. Alle Quellen bleiben in den Details erreichbar.</p>
             <div class="sensor-list">${measurement?.sensors.map((sensor, index) => this.renderSensor(room, sensor, index, measurement.primary))}</div>
             ${!measurement?.sensors.length ? html`<p class="empty-hint">Noch kein Sensor für diese Messart zugeordnet.</p>` : nothing}
             ${this._selectorAvailable ? html`

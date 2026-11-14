@@ -42,8 +42,17 @@ export const demoConfig = {
       { ...room('garage_battery_litime', 'LiTime', 'garage', null), visible: false },
       { id: 'demo_outdoor', name: 'Außen', location: 'outdoor', level_id: 'ground_floor', visible: false, width_m: null,
         measurements: {
-          temperature: { sensors: [{ entity: 'sensor.demo_outdoor_homematic_temperature', name: 'Homematic' }, { entity: 'sensor.demo_outdoor_ecowitt_temperature', name: 'Ecowitt' }], primary: 'sensor.demo_outdoor_ecowitt_temperature' },
-          relative_humidity: { sensors: [{ entity: 'sensor.demo_outdoor_homematic_humidity', name: 'Homematic' }, { entity: 'sensor.demo_outdoor_ecowitt_humidity', name: 'Ecowitt' }], primary: 'sensor.demo_outdoor_ecowitt_humidity' },
+          temperature: { sensors: [
+            { entity: 'sensor.demo_outdoor_homematic_temperature', name: 'Homematic', show_in_overview: true, overview_group: 'Homematic' },
+            { entity: 'sensor.demo_outdoor_ecowitt_temperature', name: 'Ecowitt', show_in_overview: true, overview_group: 'Ecowitt' },
+            { entity: 'sensor.demo_outdoor_vitodens_temperature', name: 'Vitodens', show_in_overview: true, overview_group: 'Vitodens' },
+          ], primary: 'sensor.demo_outdoor_ecowitt_temperature' },
+          relative_humidity: { sensors: [
+            { entity: 'sensor.demo_outdoor_homematic_humidity', name: 'Homematic', show_in_overview: true, overview_group: 'Homematic' },
+            { entity: 'sensor.demo_outdoor_ecowitt_humidity', name: 'Ecowitt', show_in_overview: true, overview_group: 'Ecowitt' },
+          ], primary: 'sensor.demo_outdoor_ecowitt_humidity' },
+          pressure_relative: { sensors: [{ entity: 'sensor.demo_outdoor_relative_pressure', name: 'Luftdruck relativ', overview_group: 'Ecowitt' }] },
+          pressure_absolute: { sensors: [{ entity: 'sensor.demo_outdoor_absolute_pressure', name: 'Luftdruck absolut', overview_group: 'Ecowitt' }] },
         },
       },
       { id: 'demo_outdoor_north', name: 'Außen Nord', location: 'outdoor', level_id: 'ground_floor', visible: false, width_m: null,
@@ -74,6 +83,8 @@ for (const [id, [temp, rh]] of Object.entries(values)) {
 for (const [id, value, unit] of [
   ['outdoor_homematic_temperature', '3.4', '°C'], ['outdoor_ecowitt_temperature', '3.6', '°C'],
   ['outdoor_homematic_humidity', '86', '%'], ['outdoor_ecowitt_humidity', '85', '%'],
+  ['outdoor_vitodens_temperature', '3.8', '°C'],
+  ['outdoor_relative_pressure', '1013.27', 'hPa'], ['outdoor_absolute_pressure', '998.72', 'hPa'],
   ['bedroom_co2', '745', 'ppm'], ['bedroom_voc', '218', 'VOC-Index'], ['bedroom_absolute_humidity', '8.9', 'g/m³'],
   ['additional_temperature', '20.7', '°C'],
 ]) demoStates[`sensor.demo_${id}`] = { state: value, attributes: { friendly_name: id.replaceAll('_', ' '), unit_of_measurement: unit } };

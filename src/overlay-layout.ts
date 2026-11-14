@@ -21,7 +21,10 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
   stage.style.height = '';
   for (const element of entries) {
     element.classList.remove('is-docked');
-    element.style.width = `${width * Number(element.dataset.width) / 100}px`;
+    // Natural content width keeps one-value badges compact at every scene size.
+    // Named source rows may grow wider, but long units always wrap within bounds.
+    element.style.width = 'max-content';
+    element.style.maxWidth = `${Math.min(width - 8, element.querySelector('.has-named-groups') ? 360 : 220)}px`;
     const w = element.offsetWidth;
     const h = element.offsetHeight;
     const preferredX = width * Number(element.dataset.preferredX) / 100 - w / 2;
@@ -42,7 +45,6 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
   const docked: Rectangle[] = [];
   for (const element of dock) {
     element.classList.add('is-docked');
-    element.style.width = `${Math.min(width - 8, Math.max(210, width * Number(element.dataset.width) / 100))}px`;
     const w = element.offsetWidth, h = element.offsetHeight;
     const preferred = Math.max(4, Math.min(width - w - 4, width * Number(element.dataset.anchorX) / 100 - w / 2));
     const candidatesX = [preferred, 4, width - w - 4, ...docked.flatMap((rect) => [rect.x - w - 12, rect.x + rect.width + 12])]

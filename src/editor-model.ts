@@ -104,6 +104,11 @@ export function editSensor(config: HausKlimaCardConfig, roomId: string, type: Me
       if (alias) sensor.name = alias;
       else delete sensor.name;
     }
+    if (patch.overview_group !== undefined) {
+      const group = patch.overview_group.trim();
+      if (group) sensor.overview_group = group;
+      else delete sensor.overview_group;
+    }
     if (measurement.primary === entity && patch.entity !== undefined) measurement.primary = patch.entity;
   });
 }

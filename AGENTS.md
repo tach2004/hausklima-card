@@ -31,9 +31,9 @@ This repository develops **HausKlima Card** (`custom:hausklima-card`), an indepe
 - Show climate measurements in context without overloading the house drawing. Prioritize temperature and relative humidity on the overview; allow detail views/optional visibility for further values.
 
 ## Sensor model and behavior
-- Room or location metrics may include **temperature**, **relative humidity**, **absolute humidity**, **CO₂**, **VOC**, and future extensible types.
+- Room or location metrics may include **temperature**, **relative humidity**, **absolute humidity**, **CO₂**, **VOC**, **relative air pressure**, **absolute air pressure**, and future extensible types.
 - All types are optional. Only show configured metrics, while preserving a clear `unavailable` state for configured but unavailable entities.
-- Support multiple entities of a given metric for one room/location, for example distinct Homematic and Ecowitt outdoor temperature sensors, with a configurable primary reading and secondary readings in details.
+- Support multiple entities of a given metric for one room/location, for example distinct Homematic and Ecowitt outdoor temperature sensors. Retain the legacy primary as the default; independently selected overview sources can be grouped under freely configured names. All sources remain accessible in details.
 - Relative and absolute humidity are separate optional inputs; do not assume absolute humidity is present or automatically calculate it unless explicitly requested in a later phase.
 - VOC measurements differ in unit/index conventions; use the actual entity metadata, not an assumed universal unit.
 - Do not hard-code private real-world Home Assistant entity IDs in the source or examples.
@@ -55,7 +55,7 @@ This repository develops **HausKlima Card** (`custom:hausklima-card`), an indepe
 ## Current approved implementation direction (post Phase 2)
 - **Do not use the rejected Phase 1 or Phase 2 SVG screenshots as styling references.** The earlier hand-drawn room/roof/furniture approach was rejected by the owner.
 - The new card uses `src/assets/hausklima-cutaway.webp` as a locally bundled, **illustrative** architectural scene; live climate values, labels, touch targets and details are separate dynamic UI components in `src/photo-view.ts`. It is **not** a photograph of the owner's property or a precise construction drawing.
-- In a Home Assistant Panel view keep the architectural scene **centered and limited to approximately 1180 CSS px** rather than spanning a full ultrawide screen. iPhone 17 portrait/landscape must show a legible separate room list and garage-device controls.
+- In a Home Assistant Panel view keep the architectural scene centered with a configurable maximum width (default 1400 CSS px, editor range 900–3200). Respect the available container width. iPhone 17 portrait/landscape must show a legible separate room list and garage-device controls.
 - Inside the garage there are **four independently named and sensor-configurable areas** with stable room IDs: `garage` (garage air), `garage_battery_pylontech`, `garage_battery_litime`, `garage_cabinet`. The displayed names can be changed in the editor. Temperature and relative humidity are expected; absolute humidity remains optional (other existing metric types also remain supported). Do not fabricate values or actual sensor entity IDs.
 - Existing saved Lovelace card configurations must continue working. `garage_components_initialized` is the migration marker; do not repeatedly re-add equipment the user has intentionally removed.
 - Design approval remains with the owner. A passing build/browser suite is a technical check, **not** visual acceptance.

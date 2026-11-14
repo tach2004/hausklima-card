@@ -89,6 +89,8 @@ export const cardStyles = css`
   .room-tile[aria-pressed='true'] { outline: 2px solid var(--hk-accent); outline-offset: 2px; }
   .tile-heading { display: flex; gap: 7px; align-items: baseline; width: 100%; font-size: 12px; font-weight: 600; }
   .tile-heading > span:nth-last-child(2) { overflow-wrap: anywhere; }
+  .room-label { display: inline-flex; gap: 5px; align-items: center; min-width: 0; }
+  .room-label > span { min-width: 0; overflow-wrap: anywhere; }
   .room-number { font-size: 9px; color: #c7d6c9; letter-spacing: .04em; }
   .arrow-icon { width: 13px; height: 13px; display: inline-block; vertical-align: middle; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
   .tile-arrow { color: #b7c4ba; margin-left: auto; }
@@ -101,6 +103,11 @@ export const cardStyles = css`
   .outdoor-source small { display: block; color: var(--hk-muted); font-size: 9px; margin-top: 4px; }
   .outdoor-source strong { font-size: 13px; min-width: 0; max-width: 50%; overflow-wrap: anywhere; text-align: right; }
   .outdoor-empty { display: block; width: 100%; background: transparent; border: 0; padding: 14px 2px; text-align: left; color: var(--hk-muted); font-size: 12px; min-height: 44px; }
+  .outdoor-overview { display: flex; align-items: center; justify-content: space-between; width: 100%; min-width: 0;
+    min-height: 44px; gap: 10px; padding: 12px; border: 1px solid #ffffff2e; border-radius: 12px;
+    background: var(--hk-chip); color: #fff; text-align: left; }
+  .outdoor-overview .room-readings { min-width: 0; }
+  .outdoor-detail-arrow { flex-shrink: 0; font-size: 22px; }
   .room-detail { margin: 10px 3px 18px; border: 1px solid var(--hk-line); background: color-mix(in srgb, var(--hk-paper) 95%, #bdcbb8); border-radius: 16px; padding: 18px; outline: none; }
   .detail-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
   .section-kicker { display: block; color: var(--hk-muted); font-size: 10px; margin-bottom: 5px; }
@@ -128,7 +135,7 @@ export const cardStyles = css`
   .building-details p { margin: 0 0 10px; }
   .building-details ul { padding-left: 17px; margin: 0 0 20px; }
 
-  /* Photo-backed architectural scene; keep the panel view modestly sized. */
+  /* Full scene width follows the configured limit and the actual HA container. */
   .photo-main { min-width: 0; padding: 10px 24px 12px; }
   .photo-lower { width: 100%; max-width: var(--hk-scene-max-width, 1400px); margin: auto; padding: 0 0 20px; }
   .photo-lower .location-column {

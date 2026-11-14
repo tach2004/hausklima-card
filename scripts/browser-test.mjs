@@ -9,7 +9,7 @@ import { demoConfig, demoStates } from '../dev/fixtures.js';
 // DEMO-WERTE: only the development harness receives these synthetic HA states.
 const server = await startPreview(0);
 const url = `http://127.0.0.1:${server.address().port}`;
-const screenshotDirectory = process.env.UPDATE_SCREENSHOTS === '1' ? 'docs/screenshots/v0.1.2' : 'work/screenshots/v0.1.2';
+const screenshotDirectory = process.env.UPDATE_SCREENSHOTS === '1' ? 'docs/screenshots/adaptive-groups' : 'work/screenshots/adaptive-groups';
 const launched = [];
 const webkitDisabled = process.env.SKIP_WEBKIT === '1';
 const artworkHash = 'fc840fd3cdd7ec1ecbae75a475c14674eafa28e99d7c43888ce6ffef7cbbef98';
@@ -64,8 +64,13 @@ async function assertLayout(page, card, name) {
     }
   }
   const invalid = await card.locator('.photo-metric strong, .reading strong, .source-value strong').evaluateAll((nodes) =>
-    nodes.map((node) => node.textContent.trim()).filter((value) => value === 'Details' || /^[-+]?\d+(?:[,.]\d+)?$/.test(value) && !/^[-+]?\d+[,.]\d$/.test(value)));
-  assert.deepEqual(invalid, [], `${name}: numeric sensor readings have exactly one decimal and never a Details placeholder`);
+    nodes.flatMap((node) => {
+      const value = node.textContent.trim();
+      const type = node.closest('[data-metric]')?.getAttribute('data-metric');
+      const decimal = ['temperature', 'relative_humidity', 'absolute_humidity'].includes(type);
+      return value === 'Details' || /^[-+]?\d+(?:[,.]\d+)?$/.test(value) && !(decimal ? /^[-+]?\d+[,.]\d$/ : /^[-+]?\d+$/).test(value) ? [{ type, value }] : [];
+    }));
+  assert.deepEqual(invalid, [], `${name}: temperature/humidity have one decimal, other readings whole numbers, never a Details placeholder`);
 }
 async function checkResponsive(browser, engine) {
   const matrix = [
@@ -119,9 +124,9 @@ async function checkStates(browser) {
   const { card, errors } = await ready(page);
   await selectRoom(page, card, 'demo_outdoor');
   const outdoor = card.locator('.room-detail');
-  assert.equal(await outdoor.locator('.sensor-row').count(), 4);
+  assert.equal(await outdoor.locator('.sensor-row').count(), 7);
   const primary = outdoor.locator('.sensor-row[data-entity="sensor.demo_outdoor_ecowitt_temperature"]');
-  assert.match(await primary.innerText(), /Hauptsensor/);
+  assert.match(await primary.innerText(), /Standardquelle.*Hauptanzeige/);
   assert.match(await primary.innerText(), /3[,.]6/);
   const states = structuredClone(demoStates);
   states['sensor.demo_outdoor_ecowitt_temperature'].state = 'unavailable';
@@ -132,7 +137,7 @@ async function checkStates(browser) {
   assert.match(await outdoor.innerText(), /Unbekannt/);
   assert.match(await outdoor.innerText(), /Entität fehlt/);
   assert.match(await card.locator('.photo-outdoor[data-room-id="demo_outdoor"]').innerText(), /Nicht verfügbar/, 'unavailable primary remains explicit on the image');
-  assert.equal(await outdoor.locator('.sensor-row').count(), 4);
+  assert.equal(await outdoor.locator('.sensor-row').count(), 7);
   states['sensor.demo_outdoor_ecowitt_temperature'].state = '5.7';
   await page.evaluate((next) => window.hausklimaPreview.setStates(next), states);
   await page.waitForFunction(() => /5[,.]7/.test(document.querySelector('hausklima-card').shadowRoot.querySelector('.room-detail')?.textContent ?? ''));
@@ -181,7 +186,7 @@ async function checkLongValues(browser) {
       assert.equal(await panel.locator('.photo-metric').count(), 5);
       assert.match(await panel.innerText(), /16,8/);
       assert.match(await panel.innerText(), new RegExp(longUnit));
-      assert.equal(await panel.locator('[data-metric="co2"] strong').innerText(), '1234567890123456789012345,7', 'large readings are rounded for display without truncation');
+      assert.equal(await panel.locator('[data-metric="co2"] strong').innerText(), '1234567890123456789012346', 'large CO₂ readings are rounded to whole numbers without truncation');
       assert.doesNotMatch(await panel.innerText(), /Details/);
     }
     assert.equal(await page.evaluate(() => window.hausklimaPreview.card.hass.states['sensor.demo_bedroom_temperature'].state), raw, 'rounding never mutates HA state');
@@ -197,7 +202,7 @@ async function checkLongValues(browser) {
     assert.deepEqual(errors, []);
     await page.close();
   }
-  console.log('PASS long values/units: one decimal display, unchanged source state and complete units, no placeholder or overflow');
+  console.log('PASS long values/units: metric-dependent rounding, unchanged source state and complete units, no placeholder or overflow');
 }
 
 async function checkOverlayBehavior(browser) {
@@ -207,7 +212,8 @@ async function checkOverlayBehavior(browser) {
   assert.equal(await bedroom.locator('.photo-metric').count(), 5, 'all five configured metric types appear on image');
   assert.match(await bedroom.innerText(), /21,3/);
   assert.match(await bedroom.innerText(), /48,0/);
-  assert.match(await bedroom.innerText(), /745,0/);
+  assert.equal(await bedroom.locator('[data-metric="co2"] strong').innerText(), '745');
+  assert.equal(await bedroom.locator('[data-metric="voc"] strong').innerText(), '218');
   assert.match(await bedroom.innerText(), /VOC-Index/);
   assert.equal(await card.locator('.photo-room[data-room-id="laundry"] .photo-metric strong').first().innerText(), '16,8');
   for (const id of ['garage', 'garage_cabinet', 'garage_battery_pylontech', 'garage_battery_litime']) {
@@ -240,7 +246,7 @@ async function checkOverlayBehavior(browser) {
     await panel.click();
     await card.locator(`.room-detail[data-room-id="${id}"]`).waitFor();
     const entities = await card.locator('.room-detail .sensor-row').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-entity')));
-    assert.equal(entities.length, id === 'demo_outdoor' ? 4 : 2);
+    assert.equal(entities.length, id === 'demo_outdoor' ? 7 : 2);
     assert.ok(entities.every((entity) => id === 'demo_outdoor' ? !entity.includes('outdoor_north') : entity.includes('outdoor_north')), 'outdoor sources never mixed');
     await card.getByRole('button', { name: 'Raumdetails schließen' }).click();
   }
@@ -275,18 +281,23 @@ async function checkOverlayBehavior(browser) {
 }
 
 async function checkSceneSizing(browser) {
-  const page = await browser.newPage({ viewport: { width: 1920, height: 1200 } });
+  const page = await browser.newPage({ viewport: { width: 3440, height: 1600 } });
   const { card, editor, errors } = await ready(page);
   const initial = await card.locator('.photo-overview').boundingBox();
   assert.ok(initial.width >= 1300 && initial.width <= 1450, 'default scene maximum is moderately enlarged');
   await page.locator('#editor-panel > summary').click();
   const slider = editor.locator('#scene-max-width');
-  for (const width of [900, 1600, 1400]) {
+  for (const width of [900, 1600, 2560, 3200, 1400]) {
     await slider.evaluate((node, value) => { node.value = String(value); node.dispatchEvent(new Event('input', { bubbles: true })); }, width);
     await page.waitForFunction((value) => window.hausklimaPreview.getConfig().scene_max_width === value, width);
     const bounds = await card.locator('.photo-overview').boundingBox();
     assert.ok(Math.abs(bounds.width - width) < 2, `Panel uses chosen maximum ${width}`);
     await assertLayout(page, card, `width-slider/${width}`);
+    if (width === 2560) {
+      await page.locator('#editor-panel > summary').click();
+      await page.screenshot({ path: `${screenshotDirectory}/panel-ultrawide.png`, fullPage: true });
+      await page.locator('#editor-panel > summary').click();
+    }
   }
   await page.reload(); await page.waitForFunction(() => window.previewReady === true);
   assert.equal((await page.evaluate(() => window.hausklimaPreview.getConfig())).scene_max_width, 1400);
@@ -295,11 +306,79 @@ async function checkSceneSizing(browser) {
   await page.close();
   const section = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
   const result = await ready(section, '/?demo=1&layout=sections&section_width=480');
-  await section.evaluate(() => { const config=window.hausklimaPreview.getConfig(); config.scene_max_width=1600; window.hausklimaPreview.setConfig(config); });
+  await section.evaluate(() => { const config=window.hausklimaPreview.getConfig(); config.scene_max_width=3200; window.hausklimaPreview.setConfig(config); });
   assert.ok((await result.card.locator('.photo-overview').boundingBox()).width <= 480, 'scene never overrides Sections grid/container width');
   await assertLayout(section, result.card, 'sections-width-boundary');
   await section.close();
-  console.log('PASS visual scene-size slider: live 900/1600/1400px Panel, reload persistence and Sections width boundary');
+  console.log('PASS visual scene-size slider: live 900/1600/2560/3200/1400px Panel, reload persistence and Sections width boundary');
+}
+
+async function checkSourceGroups(browser) {
+  for (const width of [390, 1440]) {
+    const page = await browser.newPage({ viewport: { width, height: 1100 }, hasTouch: width < 768 });
+    const { card, editor, errors, external } = await ready(page);
+    const outdoor = card.locator(width < 768 ? '.outdoor-block[data-room-id="demo_outdoor"]' : '.photo-outdoor[data-room-id="demo_outdoor"]').first();
+    const groups = outdoor.locator('[data-overview-group]');
+    assert.deepEqual(await groups.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-overview-group'))), ['Homematic', 'Ecowitt', 'Vitodens']);
+    const metricSelector = width < 768 ? '.reading' : '.photo-metric';
+    const homematic = outdoor.locator('[data-overview-group="Homematic"]');
+    const ecowitt = outdoor.locator('[data-overview-group="Ecowitt"]');
+    assert.equal(await homematic.locator(metricSelector).count(), 2, 'temperature and humidity share their named source');
+    assert.match(await homematic.innerText(), /3,4/);
+    assert.match(await homematic.innerText(), /86,0/);
+    assert.equal(await ecowitt.locator(metricSelector).count(), 4, 'relative and absolute air pressure join Ecowitt only');
+    assert.equal(await ecowitt.locator('[data-metric="pressure_relative"] strong').innerText(), '1013');
+    assert.equal(await ecowitt.locator('[data-metric="pressure_absolute"] strong').innerText(), '999');
+    assert.match(await ecowitt.innerText(), /hPa/);
+    assert.equal(await outdoor.locator(`${metricSelector} svg`).count(), 7, 'each visible reading uses a genuine SVG icon');
+
+    await page.locator('#editor-panel > summary').click();
+    await editor.locator('#room-select').selectOption('demo_outdoor');
+    await editor.locator('#metric-select').selectOption('temperature');
+    const entity = 'sensor.demo_outdoor_homematic_temperature';
+    const main = editor.locator(`[data-action="sensor-overview"][data-entity="${entity}"]`);
+    assert.equal(await main.isChecked(), true);
+    await main.uncheck();
+    await page.waitForFunction(() => window.hausklimaPreview.getConfig().building.rooms.find((room) => room.id === 'demo_outdoor').measurements.temperature.sensors[0].show_in_overview === false);
+    assert.equal(await homematic.locator('[data-metric="temperature"]').count(), 0, 'unchecked source disappears from overview');
+    await selectRoom(page, card, 'demo_outdoor', width < 768);
+    assert.equal(await card.locator('.room-detail .sensor-row').count(), 7, 'unchecked sources remain in full details');
+    await card.getByRole('button', { name: 'Raumdetails schließen' }).click();
+    await main.check();
+    const group = editor.locator(`[data-action="sensor-group"][data-entity="${entity}"]`);
+    await group.fill('Garten West'); await group.press('Tab');
+    assert.equal(await outdoor.locator('[data-overview-group="Garten West"] [data-metric="temperature"]').count(), 1, 'custom group labels are displayed');
+    await editor.locator('#metric-select').selectOption('relative_humidity');
+    const humidityGroup = editor.locator('[data-action="sensor-group"][data-entity="sensor.demo_outdoor_homematic_humidity"]');
+    await humidityGroup.fill('Garten West'); await humidityGroup.press('Tab');
+    assert.equal(await outdoor.locator(`[data-overview-group="Garten West"] ${metricSelector}`).count(), 2, 'matching free labels join metrics');
+    await page.reload(); await page.waitForFunction(() => window.previewReady === true);
+    assert.equal(await outdoor.locator(`[data-overview-group="Garten West"] ${metricSelector}`).count(), 2, 'selection and group names persist after reload');
+    await assertLayout(page, card, `source-groups/${width}`);
+    assert.deepEqual(errors, []); assert.deepEqual(external, []);
+    await page.close();
+  }
+  // A single-source room keeps its metrics in a compact vertical column, whose
+  // content width is independent of the overall scene width.
+  const page = await browser.newPage({ viewport: { width: 2560, height: 1400 } });
+  const { card } = await ready(page);
+  await page.evaluate(() => {
+    const config = window.hausklimaPreview.getConfig();
+    config.scene_max_width = 2400;
+    const room = config.building.rooms.find((entry) => entry.id === 'living_room');
+    delete room.measurements.relative_humidity;
+    window.hausklimaPreview.setConfig(config);
+  });
+  await assertLayout(page, card, 'adaptive-content-width');
+  const compact = card.locator('.photo-room.with-metrics[data-room-id="living_room"]');
+  const five = card.locator('.photo-room.with-metrics[data-room-id="bedroom"]');
+  assert.ok((await compact.boundingBox()).width < 180, 'a short single reading stays narrow on a 2400px scene');
+  assert.ok((await five.boundingBox()).height > (await compact.boundingBox()).height, 'additional single-source metrics grow downwards');
+  const rows = await five.locator('.photo-metric').evaluateAll((nodes) => nodes.map((node) => ({ x: node.getBoundingClientRect().x, y: node.getBoundingClientRect().y })));
+  assert.ok(rows.every((row) => Math.abs(row.x - rows[0].x) < 2), 'single-source room readings remain vertically aligned');
+  assert.ok(rows.every((row, index) => !index || row.y > rows[index - 1].y), 'single-source readings are stacked, not in wide horizontal rows');
+  await page.close();
+  console.log('PASS adaptive source groups: all checked sources, editable names, isolated pressure types, icons, reload, compact vertical single-source rooms');
 }
 
 async function checkEditor(browser) {
@@ -384,7 +463,9 @@ async function checkEditor(browser) {
   measurement = config.building.rooms.find((room) => room.id === 'workshop').measurements.temperature;
   assert.equal(measurement.sensors.length, 1);
   assert.ok(!measurement.primary || measurement.primary === measurement.sensors[0].entity, 'removed primary has valid fallback');
-  await page.screenshot({ path: `${screenshotDirectory}/editor-mobile.png`, fullPage: true });
+  await editor.locator('#room-select').selectOption('demo_outdoor');
+  await editor.locator('#metric-select').selectOption('temperature');
+  await page.locator('#editor-panel').screenshot({ path: `${screenshotDirectory}/editor-mobile.png` });
   assert.deepEqual(errors, []); assert.deepEqual(external, []);
   await page.close();
   console.log('PASS editor: native selector contract, unlimited list operations, primary, visibility, names, indoor/outdoor, safe delete, JSON reload persistence');
@@ -397,12 +478,13 @@ try {
     headless: true,
   });
   launched.push(browser);
-  await checkResponsive(browser, 'chromium');
+  await checkSourceGroups(browser);
   await checkStates(browser);
   await checkLongValues(browser);
   await checkEditor(browser);
   await checkOverlayBehavior(browser);
   await checkSceneSizing(browser);
+  await checkResponsive(browser, 'chromium');
   for (const [width, sectionWidth] of [[360, 480], [1440, 480], [1440, 1100]]) {
     for (const theme of ['light', 'dark']) {
       const page = await browser.newPage({ viewport: { width, height: 1100 } });

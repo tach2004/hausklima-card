@@ -176,7 +176,7 @@ describe('Lovelace card integration', () => {
     expect(detail.querySelectorAll('.metric-group')).toHaveLength(3);
     expect(detail.querySelectorAll('.sensor-row')).toHaveLength(4);
     expect(detail.querySelectorAll('.hidden-label')).toHaveLength(3);
-    expect(detail.querySelector('[data-entity="sensor.test_secondary"]')?.textContent).toContain('Hauptsensor');
+    expect(detail.querySelector('[data-entity="sensor.test_secondary"]')?.textContent).toContain('Standardquelle');
     expect(detail.querySelector('[data-metric="voc"] .source-value')?.textContent).toContain('ppb');
     expect(detail.querySelector('[data-metric="relative_humidity"]')).toBeNull();
     expect(detail.querySelector('[data-metric="co2"]')).toBeNull();
@@ -260,7 +260,7 @@ describe('Lovelace card integration', () => {
       'sensor.test_unknown': { state: 'unknown', attributes: { unit_of_measurement: '°C' } },
     } });
     expect(find(card, '.photo-stage .photo-outdoor[data-room-id="test_outdoor"]').textContent).toContain('Nicht verfügbar');
-    expect(find(card, '.outdoor-block').querySelectorAll('.outdoor-source')).toHaveLength(3);
+    expect(find(card, '.outdoor-block').querySelectorAll('.reading')).toHaveLength(1);
     const detail = await openRoom(card, 'test_outdoor');
     expect(detail.querySelectorAll('.sensor-row')).toHaveLength(3);
     expect(detail.textContent).toContain('Nicht verfügbar');
