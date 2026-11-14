@@ -93,6 +93,8 @@ export interface BuildingConfig {
   /** Array order preserves the given left-to-right order within each level. */
   rooms: RoomConfig[];
   notes: string[];
+  /** Migration marker: garage climate sub-locations were added to this config. */
+  garage_components_initialized?: boolean;
 }
 
 export interface HausKlimaCardConfig {
