@@ -102,6 +102,8 @@ export interface HausKlimaCardConfig {
   title?: string;
   show_dimensions?: boolean;
   show_room_names?: boolean;
+  /** Opacity of the dark sensor tiles, from 0.35 to 1 (inclusive). */
+  chip_opacity?: number;
   building?: BuildingConfig;
   /** Lovelace may attach layout/visibility properties; preserve these in editor. */
   [key: string]: unknown;
