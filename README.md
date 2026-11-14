@@ -74,6 +74,24 @@ show_room_names: true
 
 Die lichte Raumfolge und sämtliche bestätigten Maße bleiben unverändert. Die verbleibenden Breiten bis 12 m werden nicht als neue Räume ausgegeben und nicht stillschweigend durch angepasste Raum- oder Wandmaße aufgefüllt. Wandzuordnung, Dachneigung, Deckendicken und endgültige Schnittgeometrie sind weiterhin offen. Die Garage steht schematisch rechts mit ungefähr 5 m Abstand und hat keine bauliche Verbindung zum Haus. [Architektur und Maßprüfung](docs/architecture.md)
 
+
+## Neue visuelle Hausansicht und Garagen-Klimamessstellen
+
+Ab der nächsten Version wird eine **eigenständige, lokale Hausillustration** in `src/assets/hausklima-cutaway.webp` zusammen mit dem Kartencode ausgeliefert. Über der Illustration zeigt die Karte **dynamische, leicht transparente Messwert-Panels** aus den tatsächlich konfigurierten Home-Assistant-Sensoren. Die Illustration enthält **keine** vorgegebenen Sensorwerte. Möbel, Fenster und Dachdetails sind gestalterisch, nicht als maßstäbliche reale Hauseigenschaften zu verstehen.
+
+Für die Garage gibt es nun vier unabhängige Messorte im visuellen Editor:
+
+- **Garage** – allgemeine Raumluft der Garage
+- **Pylontech** – erste Batterie
+- **LiTime** – zweite Batterie
+- **Schaltschrank** – elektrische Ausrüstung
+
+Jeder Messort unterstützt Temperatur und relative Luftfeuchtigkeit sowie **optional absolute Feuchtigkeit, CO₂ und VOC**. Die angezeigten Namen sind über den GUI-Editor änderbar, ebenso können mehrere Sensoren einer Messart zugeordnet werden. Die neuen Messorte werden einmalig zu älteren gespeicherten Konfigurationen hinzugefügt, ohne deren vorhandene Sensor-Entity-IDs zu ersetzen.
+
+Die Architekturillustration ist auf Desktop/Panel **auf maximal 1180 px Breite begrenzt**, damit das Haus nicht überdimensioniert wirkt. Auf iPhone 17 (Hoch-/Querformat) wird dieselbe Gesamtansicht zur Orientierung verwendet und eine darunterliegende, größere Raum-/Geräteauswahl angeboten. Eine eigene zweite YAML-Konfiguration fürs iPhone ist nicht erforderlich.
+
+**Hinweis zur Installation:** Die Bilddatei wird über esbuild in `dist/hausklima-card.js` eingebettet; die übliche einzelne HACS-JavaScript-Datei genügt. Beim ersten Öffnen nach einem Update eventuell den Browsercache aktualisieren.
+
 ## Entwicklung und Prüfung
 
 Voraussetzung: Node.js ab Version 22 und npm; die CI verwendet Node.js 24. Das Home-Assistant-System benötigt keinen eigenen Node.js-Build.
