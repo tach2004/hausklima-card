@@ -1,32 +1,93 @@
-name: Release
+name: Version & GitHub Release
 
+# One release for every merged PR into main. A failed job does not publish a partial release.
 on:
-  push:
-    tags: ["v*"]
+  pull_request:
+    types: [closed]
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: hausklima-main-release
+  cancel-in-progress: false
 
 jobs:
   release:
+    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: Checkout current main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Prepare current main and version tags
+        shell: bash
+        run: |
+          git fetch origin main --tags --prune
+          git checkout -B main origin/main
+          git status --short
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: npm
-      - run: npm ci
-      - run: npm run check
-      - run: npm test
-      - run: npm run build
-      - name: Verify committed distribution
-        run: git diff --exit-code -- dist
-      - name: Publish GitHub release
+
+      - name: Install & verify
+        run: |
+          npm ci
+          node --test scripts/next-version.test.mjs
+          npm run check
+          npm test
+
+      - name: Compute next release version
+        id: version
+        shell: bash
+        env:
+          PR_LABELS_JSON: ${{ toJSON(github.event.pull_request.labels) }}
+        run: |
+          LAST_RELEASE_TAG="$(git tag -l 'v[0-9]*' --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)"
+          export LAST_RELEASE_TAG
+          NEXT_VERSION="$(node scripts/next-version.mjs)"
+          echo "version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Releasing v$NEXT_VERSION (previous: ${LAST_RELEASE_TAG:-none})"
+
+      - name: Update package version and build distributable
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          npm version "$RELEASE_VERSION" --no-git-tag-version --allow-same-version
+          npm run build
+          test -s dist/hausklima-card.js
+          head -c 120 dist/hausklima-card.js | grep -q "HausKlima Card v$RELEASE_VERSION"
+
+      - name: Commit version, tag, and push
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json dist/hausklima-card.js
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(release): v$RELEASE_VERSION (after PR #$PR_NUMBER)"
+          fi
+          git tag -a "v$RELEASE_VERSION" -m "HausKlima Card v$RELEASE_VERSION"
+          git push origin HEAD:main
+          git push origin "v$RELEASE_VERSION"
+
+      - name: Publish GitHub Release with HACS-compatible JS
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release create "$RELEASE_TAG" dist/hausklima-card.js --verify-tag --generate-notes
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "v$RELEASE_VERSION" dist/hausklima-card.js \
+            --verify-tag --generate-notes --title "HausKlima Card v$RELEASE_VERSION"
