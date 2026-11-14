@@ -1,15 +1,11 @@
-import { LitElement, html, nothing, svg } from 'lit';
+import { LitElement, html, nothing } from 'lit';
 import { getDefaultConfig, normalizeConfig, resolveBuilding } from './config';
-import { renderHouseScene, sceneStyles } from './house-scene';
+import { renderPhotoView, photoStyles } from './photo-view';
 import { createLayout } from './layout';
-import type { RoomShape } from './layout';
 import { formatSensorValue, resolveMeasurements, sensorStatusLabel } from './metrics';
-import type { BuildingConfig, HausKlimaCardConfig, HomeAssistant, MetricType, ResolvedMeasurement, ResolvedSensor, RoomConfig } from './types';
+import type { BuildingConfig, HausKlimaCardConfig, HomeAssistant, ResolvedMeasurement, ResolvedSensor, RoomConfig } from './types';
 import { cardStyles } from './styles';
 
-const metricSymbols: Record<MetricType, string> = {
-  temperature: 'T', relative_humidity: '%', absolute_humidity: 'AH', co2: 'CO₂', voc: 'VOC',
-};
 const formatDimension = (value: number) => value.toLocaleString('de-DE', { maximumFractionDigits: 2 });
 const arrowIcon = () => html`<svg class="arrow-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M 4 12 12 4 M 4 4 h 8 v 8" /></svg>`;
 let cardSequence = 0;
@@ -66,41 +62,6 @@ export class HausKlimaCard extends LitElement {
 
   private showEntity(entity: string): void {
     this.dispatchEvent(new CustomEvent('hass-more-info', { detail: { entityId: entity }, bubbles: true, composed: true }));
-  }
-
-  private renderSvgMetrics(shape: RoomShape) {
-    const measurements = resolveMeasurements(shape.room, this.hass, 'overview');
-    if (!measurements.length) return nothing;
-    if (shape.width < 130 || shape.height < 75) {
-      return svg`<g class="compact-sensor-marker" aria-hidden="true">
-        <circle cx=${shape.x + shape.width / 2} cy=${shape.y + shape.height - 17} r="5" />
-        <title>${measurements.map((metric) => `${metric.label}: ${this.sensorText(metric.primary)}`).join(', ')}</title>
-      </g>`;
-    }
-    const width = Math.min(shape.width - 20, 150);
-    const rows = Math.max(1, Math.min(3, Math.floor((shape.height - 51) / 20)));
-    const shown = measurements.slice(0, rows);
-    const remainder = measurements.length - shown.length;
-    const height = 16 + shown.length * 21 + (remainder ? 16 : 0);
-    const x = shape.x + (shape.width - width) / 2;
-    const y = shape.y + 33;
-    return svg`<g class="metric-panel" data-overview-chip data-room-id=${shape.room.id} aria-hidden="true">
-      <rect class="metric-panel-bg" x=${x} y=${y} width=${width} height=${height} rx="9" />
-      ${shown.map((metric, index) => {
-        const value = formatSensorValue(metric.primary, this.hass);
-        const unit = metric.primary.status === 'available' ? metric.primary.unit : '';
-        const estimatedWidth = value.length * (metric.primary.status === 'available' ? 8.5 : 5) + unit.length * 5;
-        const fits = estimatedWidth <= width - 42;
-        return svg`
-          <text class="chip-symbol ${metric.type}" x=${x + 11} y=${y + 23 + index * 21}>${metricSymbols[metric.type]}</text>
-          <text class="chip-value ${!fits || metric.primary.status !== 'available' ? 'chip-status' : ''}" x=${x + 32} y=${y + 23 + index * 21}>
-            ${fits ? value : metric.primary.status === 'unavailable' ? 'Ausfall' : 'Details'}<tspan class="chip-unit">${fits && unit ? ` ${unit}` : ''}</tspan>
-          </text>
-        `;
-      })}
-      ${remainder ? svg`<text class="chip-more" x=${x + 12} y=${y + height - 9}>+${remainder} Details</text>` : nothing}
-      <title>${measurements.map((metric) => `${metric.label}: ${this.sensorText(metric.primary)}`).join(', ')}</title>
-    </g>`;
   }
 
   private renderReadings(room: RoomConfig, compact = false) {
@@ -225,7 +186,7 @@ export class HausKlimaCard extends LitElement {
     </ha-card>`;
   }
 
-  static styles = [sceneStyles, cardStyles];
+  static styles = [photoStyles, cardStyles];
 }
 
 if (!customElements.get('hausklima-card')) customElements.define('hausklima-card', HausKlimaCard);
