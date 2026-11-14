@@ -8,7 +8,6 @@ import { cardStyles } from './styles';
 
 const formatDimension = (value: number) => value.toLocaleString('de-DE', { maximumFractionDigits: 2 });
 const arrowIcon = () => html`<svg class="arrow-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M 4 12 12 4 M 4 4 h 8 v 8" /></svg>`;
-let cardSequence = 0;
 
 export class HausKlimaCard extends LitElement {
   static properties = {
@@ -21,7 +20,6 @@ export class HausKlimaCard extends LitElement {
   private _config?: HausKlimaCardConfig;
   private _selected?: string;
   private _showRooms = false;
-  private readonly drawingId = `hausklima-${++cardSequence}`;
 
   setConfig(config: unknown): void {
     this._config = normalizeConfig(config);
