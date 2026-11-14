@@ -110,24 +110,28 @@ export class HausKlimaCard extends LitElement {
     </section>`;
   }
 
-  private renderGarage(room: RoomConfig) {
-    return html`<section class="garage-block location-block" aria-label=${room.name}>
-      <button class="location-heading" data-select-room=${room.id} @click=${() => this.selectRoom(room)}><span><span class="location-icon" aria-hidden="true">▤</span>${room.name}</span><span aria-hidden="true">${arrowIcon()}</span></button>
-      <button class="garage-picture" aria-label=${`${room.name} – Raumdetails öffnen`} @click=${() => this.selectRoom(room)}>
-        <svg class="garage-graphic" viewBox="0 0 320 196" role="img" aria-label="Freistehende Garage, schematische Darstellung">
-          <defs><linearGradient id="${this.drawingId}-garage-wall" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e0d3bd"/><stop offset="1" stop-color="#bbaa91"/></linearGradient>
-          <linearGradient id="${this.drawingId}-garage-door" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#69716d"/><stop offset="1" stop-color="#3c4942"/></linearGradient></defs>
-          <ellipse cx="163" cy="173" rx="134" ry="13" fill="#1e302219"/>
-          <path d="M 43 55 L 66 37 H 284 V 151 L 263 173 Z" fill="#b1a48e"/>
-          <rect x="42" y="56" width="222" height="116" fill="url(#${this.drawingId}-garage-wall)" stroke="#8a826f" stroke-width="1"/>
-          <path d="M 35 55 L 60 36 H 291 L 270 55 Z" fill="#59605a" stroke="#424c46" stroke-width="3"/>
-          <rect x="64" y="77" width="177" height="93" rx="3" fill="url(#${this.drawingId}-garage-door)" stroke="#424a44" stroke-width="4"/>
-          <path d="M 67 99 H 238 M 67 121 H 238 M 67 144 H 238" stroke="#a8b1a366" stroke-width="2"/>
-          <path d="M 22 175 H 294" stroke="#83a170" stroke-width="4"/>
-        </svg>
-        <span class="garage-readings">${this.renderReadings(room, true)}</span>
-      </button>
-      <p class="location-caption">Freistehend rechts vom Wohnhaus</p>
+  /** Garage air, two batteries and control cabinet each have their own HA sensors. */
+  private renderGarage(room: RoomConfig, equipment: RoomConfig[]) {
+    return html`<section class="garage-block location-block" aria-label="Garage und Batterietechnik">
+      <div class="garage-title">
+        <div><span class="location-icon" aria-hidden="true">▣</span>
+          <strong>Garage und Batterietechnik</strong>
+          <p>Vier unabhängig konfigurierbare Klimamessstellen</p>
+        </div>
+      </div>
+      <div class="garage-zones">
+        ${[room, ...equipment].map((device) => html`<button type="button"
+          class="garage-zone" data-select-room=${device.id}
+          @click=${() => this.selectRoom(device)}
+          aria-label=${`${device.name} – Messwerte und Sensorquellen öffnen`}>
+          <span class="garage-device-icon" aria-hidden="true">${device.id === 'garage' ? '▣' : device.id === 'garage_cabinet' ? '▦' : '▥'}</span>
+          <span class="garage-device-content">
+            <strong>${device.name}</strong>
+            ${this.renderReadings(device, true)}
+          </span>
+          <span class="garage-zone-arrow" aria-hidden="true">›</span>
+        </button>`)}
+      </div>
     </section>`;
   }
 
@@ -161,24 +165,26 @@ export class HausKlimaCard extends LitElement {
     const outdoor = building.rooms.filter((room) => room.location === 'outdoor');
     const garages = building.rooms.filter((room) => room.location !== 'outdoor' && building.levels.find((level) => level.id === room.level_id)?.building_id === 'garage');
     const garageIds = new Set(garages.map((room) => room.id));
+    const garage = garages.find((room) => room.id === 'garage');
+    const garageEquipment = garages.filter((room) => room.id !== 'garage');
     const others = building.rooms.filter((room) => !drawnIds.has(room.id) && !garageIds.has(room.id) && room.location !== 'outdoor');
     const selected = building.rooms.find((room) => room.id === this._selected);
     return html`<ha-card>
       <header class="card-header"><div class="card-title"><span class="home-icon" aria-hidden="true">⌂</span>${config.title ? html`<h1>${config.title}</h1>` : nothing}</div>
         <button class="overview-toggle" aria-expanded=${String(this._showRooms)} @click=${() => { this._showRooms = !this._showRooms; }}>Räume <span>${building.rooms.length}</span></button></header>
-      <div class="main-grid">
-        <div class="house-column">
-          <div class="house-drawing" aria-label="Hausansicht">${renderHouseScene(building, {
-            idPrefix: this.drawingId, selected: this._selected, showNames: config.show_room_names ?? true,
-            showDimensions: false, onSelect: (room) => this.selectRoom(room), renderMetrics: (shape) => this.renderSvgMetrics(shape),
-          })}</div>
-          ${selected ? this.renderDetails(selected, building) : nothing}
-          <section class="rooms-section ${this._showRooms ? 'expanded' : ''}" aria-label="Raumübersicht">
-            <div class="section-title"><h2>Räume</h2><span>Antippen für alle Quellen</span></div>
-            <div class="room-list house-room-list">${shapes.map((shape, index) => this.renderRoomTile(shape.room, building, index + 1))}</div>
-          </section>
-        </div>
-        ${outdoor.length || garages.length ? html`<aside class="location-column" aria-label="Außen und Garage">${outdoor.map((room) => this.renderOutdoor(room))}${garages.map((room) => this.renderGarage(room))}</aside>` : nothing}
+      <div class="photo-main">
+        ${renderPhotoView(building, this.hass, config.show_room_names ?? true, (room) => this.selectRoom(room))}
+        ${selected ? this.renderDetails(selected, building) : nothing}
+      </div>
+      <div class="photo-lower">
+        <section class="rooms-section ${this._showRooms ? 'expanded' : ''}" aria-label="Raumübersicht">
+          <div class="section-title"><h2>Räume</h2><span>Antippen für alle Sensorquellen</span></div>
+          <div class="room-list house-room-list">${shapes.map((shape, index) => this.renderRoomTile(shape.room, building, index + 1))}</div>
+        </section>
+        ${outdoor.length || garage ? html`<aside class="location-column" aria-label="Außen und Garage">
+          ${outdoor.map((room) => this.renderOutdoor(room))}
+          ${garage ? this.renderGarage(garage, garageEquipment) : nothing}
+        </aside>` : nothing}
       </div>
       ${others.length ? html`<section class="other-rooms" aria-label="Weitere Räume"><div class="section-title"><h2>Weitere Räume</h2><span>Alle Messorte, auch außerhalb der Hausansicht</span></div>
         <div class="room-list">${others.map((room) => this.renderRoomTile(room, building))}</div></section>` : nothing}
