@@ -1,55 +1,90 @@
-# Validierung – Phase 2
+# Validierung – Overlay-Auftrag v0.1.2
 
-Prüfstand vom 14. November 2026. Die Phase-2-Implementierung wird gegen den aktuellen `main` mit der freigegebenen [Aufgabenbeschreibung](tasks/phase-2.md) und den [Designreferenzen](design/README.md) geprüft. Dieser Bericht unterscheidet ausgeführte Tests und verbleibende Integrationsprüfungen.
+Prüfstand vom 14. November 2026. Diese Überarbeitung folgt [docs/tasks/v0.1.2-overlays.md](tasks/v0.1.2-overlays.md) auf dem vorhandenen Branch `docs/task-v012-overlays` und aktualisiert ausschließlich den bestehenden PR #6. Ein neuer Pull Request oder ein Release wird nicht erstellt; der Merge bleibt beim Projektinhaber.
 
-## Automatisierte Prüfungen
+## Ausgangslage und Abnahme
 
-Alle folgenden lokalen Prüfungen wurden erfolgreich auf dem Feature-Branch `feat/phase-2` ausgeführt, ausgehend von `main` (`53b9a1b`):
+Die freigegebene Hausillustration bleibt bitidentisch. Überarbeitet werden nur die dynamischen Overlays, ihre Anordnung, die zentrale Sensoranzeige und die konfigurierbare maximale Ansichtsbreite. Frühere primitive SVG-Zeichnungen und deren Screenshots sind keine Stilreferenz.
+
+Ausgangspunkt ist Aufgabencommit `f243f31`. SHA-256 der Bilddatei vor Beginn:
+
+```text
+fc840fd3cdd7ec1ecbae75a475c14674eafa28e99d7c43888ce6ffef7cbbef98
+```
+
+Hash und Git-Diff wurden ausdrücklich mit diesem Stand verglichen: Das WebP ist **bitidentisch**, und der Diff für die Bilddatei ist leer.
+
+## Ausgeführte lokale Prüfungen
 
 | Prüfung | Ergebnis |
 | --- | --- |
 | `npm ci` | Installation aus dem Lockfile erfolgreich |
-| `npm run check` | TypeScript-Prüfung ohne Fehler |
-| `npm test` | 82 erfolgreiche Tests in sechs Dateien |
-| `npm run build` | Eigenständiges ES-Modul, 85.074 Bytes inklusive Lit und Lizenzhinweisen |
-| `UPDATE_SCREENSHOTS=1 npm run test:browser` | Vollständig erfolgreich in Chromium; acht tatsächliche Screenshots erzeugt |
-| Responsive Browsermatrix | 16 Fälle: sechs Breiten plus iPhone-17-Hoch-/Querformat, jeweils hell/dunkel |
-| Sections | Schmaler Kartencontainer bei 360, 480 und 1440 CSS-Pixeln Browserbreite erfolgreich |
-| Quellen und Zustand | Live-Updates, Hauptsensor, mehrere Quellen, fehlend/`unknown`/`unavailable`, Entitätsdetails und ehrliche Leerzustände erfolgreich |
-| Grafischer Editor | Sensorwahl, Alias, Hauptsensor, Sichtbarkeit, zusätzliche Räume/Außenmessorte, sichere Löschung, Duplikatprüfung und JSON-Neuladen erfolgreich |
-| Lange Werte/Einheiten | Bei 390 und 1440 Pixeln ohne überstehende SVG-Werttexte; exakte Quellenpräzision und Originaleinheit in Details erhalten |
-| `git diff --check` | Keine Whitespace-Fehler |
+| `npm run check` | TypeScript-Prüfung erfolgreich |
+| `npm test` | **126 Tests in sieben Dateien erfolgreich** |
+| `node --test scripts/next-version.test.mjs` | **Fünf Release-Regeltests erfolgreich** |
+| `npm run build` | Eigenständiges HACS-Bundle einschließlich der unveränderten Illustration erfolgreich gebaut |
+| Bildintegrität gegen `f243f31` | Gleicher SHA-256, leerer Asset-Diff; auch das im Bundle eingebettete WebP hat denselben Hash |
+| `UPDATE_SCREENSHOTS=1 npm run test:browser` | Finaler Chromium-Lauf vollständig erfolgreich; neun neue Screenshots erzeugt und grafisch geprüft |
+| Responsive Ansichten | 16 Viewport-/Theme-Fälle erfolgreich, inklusive der geforderten Panel- und mobilen Breiten sowie iPhone-17-Hoch-/Querformat |
+| Sections | Sechs Fälle mit schmalen und breiten Kartencontainern, jeweils hell/dunkel, erfolgreich |
+| Lange Werte und Einheiten | Vier zusätzliche Browserfälle erfolgreich; vollständige Einheiten, eine Nachkommastelle, kein Wert-Ersatz durch `Details` und kein Überlauf |
+| Zustände und Bedienung | Live-Updates, Leerzustände, fünf Messarten, vier unabhängige Garagen-Overlays samt Objekt-Touch-Zielen, zwei getrennte Außenmessorte und vollständige Details erfolgreich |
+| GUI und Persistenz | Deckkraft, Breite 900/1400/1600, Haupt-/Nebensensoren und vorhandene Konfiguration nach Neuladen erfolgreich geprüft |
+| Anordnung | Vollständige Messwertflächen ohne Kollisionen; drei normale Gerätepanels im Garagenvorplatz mit kurzen Zuordnungslinien |
+| `git diff --check` | Erfolgreich |
 
-Die Modell-, Karten-, Szenen- und Editortests prüfen zusätzlich unveränderte bekannte Maße und IDs, vollständige Quellenlisten auch ausgeblendeter Messarten, unbekannte Konfigurationsfelder, Keyboardbedienung und den nativen Selector-Ladevertrag. Eine eigene Regression stellt sicher, dass ein abgelehnter Entity-Duplikatwechsel nicht als falsche Auswahl im Picker stehen bleibt.
+Die abschließenden Prüfungen wurden nach dem letzten Layoutabgleich auf dem tatsächlich gebauten Bundle ausgeführt. Es gab keine JavaScript-Seitenfehler oder externen Laufzeitanfragen. Die Prüfung bestätigt sowohl die ursprünglichen Bildbytes als auch dieselben Bytes im ausgelieferten JavaScript-Bundle. Text und Symbole bleiben deckend; nur die Hintergründe verwenden die einstellbare Transparenz.
 
-Die Browsermatrix prüft alle elf Messorte der getrennten DEMO-WERTE-Konfiguration samt allen zugeordneten Quellen per Maus beziehungsweise Touch. Es gab keine JavaScript-Seitenfehler oder externen Laufzeitanfragen. Haus und Garage sind vollständig horizontal sichtbar, Raumkarten laufen nicht über, Messwertfelder überlagern sich nicht. Mobile Raumnummern sind sichtbar, stimmen mit den Raumkarten überein und behalten mindestens 11,5 CSS-Pixel tatsächliche Schriftgröße. Text, Werte und Symbole bleiben deckend; nur die Hintergründe der Messwertfelder sind transparent.
+## Vorher-/Nachher-Vergleich
 
-Die Beispielkonfigurationen wurden bereits erfolgreich als YAML eingelesen. Das Panel-Beispiel enthält genau eine `custom:hausklima-card`; die Sections-Datei enthält ein gültiges Ansichtsobjekt. Alle Installationsbeispiele kommen ohne erfundene Sensor-Entity-IDs aus.
+| Bestätigter Stand v0.1.1 | Überarbeitung v0.1.2 |
+| --- | --- |
+| Sensoranzeige mit bis zu 20 Nachkommastellen, etwa `16,8000011444092 °C` | Einheitlich eine angezeigte Nachkommastelle, etwa `16,8 °C`; Rohzustand unverändert |
+| Ab mehr als neun Zeichen ersetzte `conciseValue` den Wert durch `Details`; lange Einheiten fehlten | Vollständiger formatierter Wert und HA-Einheit mit Umbruch und kollisionsfreier Zuordnung |
+| Nur Garagenluft als Bild-Overlay, Gerätewerte nur in unteren Kacheln | Vier eigenständige Objektzuordnungen und Messwertflächen für Luft, Schrank und beide Batterien |
+| Außenmesswerte ausschließlich unterhalb des Bildes | Zusätzlich eigener Bereich oberhalb der Garage mit klarer Auswahl mehrerer Orte |
+| Starre Maximalbreite 1180 CSS-Pixel | Standard 1400, visueller Regler 900–1600; tatsächliche Breite bleibt durch Container/Grid begrenzt |
+| Browserprüfungen nur manuell | Verbindlicher Chromium-Prüfschritt in normaler PR-CI, bestehende Checks bleiben erhalten |
 
-## Nachweis der tatsächlichen Umsetzung
+## Abgedeckte Prüfmatrix
 
-Die acht [Screenshots](screenshots/README.md) wurden aus dem tatsächlich gebauten JavaScript und der getrennten lokalen Vorschau erzeugt. Sie sind keine Aufnahmen der Design-Mockups. Die Entwicklungsdaten sind ausdrücklich als **DEMO-WERTE** gekennzeichnet und nicht in den Produktionsvorgaben enthalten.
+| Bereich | Abgedeckter Nachweis |
+| --- | --- |
+| Installation, Typen, Unit-Tests und Bundle | `npm ci`, `npm run check`, `npm test`, `npm run build` |
+| Einheitliche Sensoranzeige | Genau eine Nachkommastelle für lange Dezimalwerte, ganze/negative Zahlen und Null; HA-Zahlenformate; keine Änderung der Rohdaten |
+| Ehrliche Quellen | Nicht-numerische Zustände, fehlend, `unknown`, `unavailable`, lange/fehlende Einheiten und Haupt-/Nebensensoren |
+| Raum-Overlays | Alle fünf Messarten, kein `Details`-Wert-Ersatz, keine leeren dunklen Kästen, funktionsfähige Raumdetails und HA-More-Info |
+| Garage und Außen | Garagenluft, Schaltschrank, Pylontech und LiTime separat; mehrere Außenmessorte und Quellen ohne Vermischung |
+| Konfiguration | Breitenregler 900–1600, sofortige Vorschau, Deckkraft und vollständige JSON-Persistenz inklusive bestehender Zuordnungen/Migrationsmarker |
+| Desktop | Panel 1280/1440/1920 CSS-Pixel; schmale und breite Sections-Container, jeweils hell/dunkel |
+| Mobil | 360/390/430 CSS-Pixel sowie iPhone-17-Hoch-/Querformat in Browseremulation, jeweils hell/dunkel |
+| Bildintegrität | Identischer SHA-256 und leerer Diff für `src/assets/hausklima-cutaway.webp` |
+| Automatisierung | Normale PR-CI führt Chromium-Browserprüfungen verbindlich aus; bestehende Typ-, Unit- und Buildchecks bleiben erhalten |
 
-Die verpflichtende Chromium-Matrix umfasst 360, 390, 430, 768, 1280 und 1440 CSS-Pixel Breite mit hellem und dunklem Theme sowie einen schmalen Sections-Container. Hinzu kommt Chromium-Geräteemulation mit dem tatsächlich verfügbaren Playwright-Profil **iPhone 17**: Hochformat 402 × 681 und Querformat 756 × 352 CSS-Pixel, mit Mobile-/Touch-Eigenschaften und dem Profil-User-Agent. Für reproduzierbare Screenshots wird der Device-Scale-Factor auf 1 gesetzt. Alle genannten Chromium-Fälle wurden erfolgreich ausgeführt. Desktop- sowie mobile Ansichten in hell/dunkel wurden zusätzlich grafisch kontrolliert.
+## Screenshots der tatsächlichen Karte
 
-## Reproduzierbare Prüfungen
+Die neun [neuen Screenshots](screenshots/README.md) wurden aus dem tatsächlich gebauten Bundle erzeugt und alle grafisch geöffnet: Desktop Panel, Desktop Sections und iPhone-Hoch-/Querformat jeweils mit hellem/dunklem Theme sowie der mobile Editor. Testdaten sind ausdrücklich als **DEMO-WERTE** markiert und nicht in der installierten Karte vorgegeben. Alte Aufnahmen werden nicht als neuer Nachweis ausgegeben.
+
+## Reproduktion
 
 ```sh
 npm ci
 npm run check
 npm test
+node --test scripts/next-version.test.mjs
 npm run build
-npm run test:browser
+UPDATE_SCREENSHOTS=1 npm run test:browser
+sha256sum src/assets/hausklima-cutaway.webp
+git show f243f31:src/assets/hausklima-cutaway.webp | sha256sum
+git diff f243f31 -- src/assets/hausklima-cutaway.webp
 ```
 
-CI und Release-Workflow prüfen zusätzlich mit `git diff --exit-code -- dist`, ob das eingecheckte Bundle den aktuellen Quellen entspricht.
+Die normale PR-CI enthält weiterhin Typprüfung, Unit-Tests, die fünf Release-Regeltests, Build und den Vergleich des eingecheckten Bundles mit den Quellen. Sie installiert Chromium mit seinen Systemabhängigkeiten und führt `npm run test:browser` verbindlich aus. Fehler werden nicht mit `continue-on-error` übergangen. Die CI setzt `SKIP_WEBKIT=1`, damit der verpflichtende Chromium-Lauf keine installierte Safari-Engine voraussetzt. Ein erfolgreicher lokaler Lauf ist von einem späteren GitHub-Actions-Ergebnis zu unterscheiden.
 
-## Grenzen und gezielt versuchte Prüfungen
+## Integrationsgrenzen
 
-**WebKit/Safari wurde nicht ausgeführt.** Das WebKit-Binary war in der Umgebung nicht installiert. Der anschließende Installationsversuch über Playwright scheiterte an der Netzwerkrichtlinie: Die offiziellen Download-Domains `cdn.playwright.dev` und `playwright.download.prss.microsoft.com` wurden mit HTTP 403 (`Domain forbidden`) abgewiesen. Chromium-Geräteemulation ersetzt diese Engine-Prüfung nicht.
+Lokale Browserprüfungen laufen auf der gebündelten Karte in der getrennten Entwicklungsvorschau. Die Vorschau bildet den nativen HA-Selector-Vertrag nach; sie ersetzt keinen Test in einer echten HA-/HACS-Installation. Auch Chromium-iPhone-Emulation ist kein Test auf einem physischen iPhone und keine Safari-/WebKit-Prüfung.
 
-**Kein Test auf echtem iPhone und keine echte Home-Assistant-/HACS-Installation.** Die lokale Vorschau prüft die Karte, gespeicherte JSON-Konfigurationen, wechselnde HA-Zustände und den Komponentenvertrag des grafischen Editors. Ihr Entity-Selector ist eine getrennte Testnachbildung; sie weist keine Ausführung des echten Home-Assistant-Karteneditors nach. Der native Selector-Vertrag wurde anhand der offiziellen Frontend-Quellen abgesichert. Der Installationstest in Home Assistant, reale Safari-Darstellung und die Bedienung auf einem physischen iPhone bleiben zusätzliche Integrationsprüfungen.
+WebKit ist in der Arbeitsumgebung nicht installiert; der aktuelle Aufruf konnte deshalb keine WebKit-Engine starten. In früheren Durchläufen wurde der Installationsversuch von der Netzwerkpolicy für die offiziellen Playwright-CDNs mit HTTP 403 abgewiesen. Weder der fehlgeschlagene Start noch der frühere Downloadversuch ist ein Safari-/WebKit-Test. Die Chromium-Prüfung und deren iPhone-Emulation sind hiervon klar getrennt.
 
-Für HACS muss dieser Stand nach Freigabe über den Standardbranch oder ein Release verfügbar sein. Es wurde kein Release veröffentlicht und keine Änderung in die Home-Assistant-Installation des Projektinhabers ausgerollt. Die Repository-Beschreibung und Topics sind inzwischen vorhanden; der frühere Metadaten-Offenpunkt aus Phase 1 besteht nicht mehr.
-
-Offene Maße bleiben ungeklärt. Erfolgreiche Tests bestätigen die Konfigurations- und Darstellungslogik, keine bauliche Genauigkeit. Die visuelle Abnahme und der Merge verbleiben beim Projektinhaber.
+Es wird nichts in Home Assistant ausgerollt und kein Release manuell gestartet. Nach einem vom Projektinhaber genehmigten Merge übernimmt der vorhandene Release-Workflow die Versionsvergabe. Offene reale Gebäudemaße werden durch diese Overlay-Arbeiten nicht geklärt oder ergänzt. Technische Tests ersetzen keine visuelle Abnahme.

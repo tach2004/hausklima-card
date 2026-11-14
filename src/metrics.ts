@@ -20,30 +20,40 @@ export function sensorStatusLabel(status: SensorStatus): string {
   }
 }
 
-/** Format numeric states for HA's locale without converting units or rounding data. */
+/** Format display values only: exactly one decimal, no unit/state mutation. */
 export function formatSensorValue(sensor: ResolvedSensor, hass?: HomeAssistant): string {
   if (sensor.status !== 'available' || sensor.value === null) return sensorStatusLabel(sensor.status);
   const raw = sensor.value;
-  if (raw.trim() === '' || !Number.isFinite(Number(raw))) return raw;
+  const numeric = raw.trim().match(/^([+-]?)(?:(\d+)(?:\.(\d*))?|\.(\d+))(?:[eE]([+-]?\d+))?$/);
+  if (!numeric || !Number.isFinite(Number(raw))) return raw;
+
+  // Round the decimal source string, rather than first losing integer precision
+  // through Number(). BigInt retains large, finite HA sensor values in full.
+  const integer = numeric[2] ?? '0';
+  const fraction = numeric[3] ?? numeric[4] ?? '';
+  const digits = integer + fraction;
+  const retained = integer.length + Number(numeric[5] ?? 0) + 1;
+  const isZero = !/[1-9]/.test(digits);
+  let tenths = isZero || retained <= 0 ? 0n : BigInt(digits.slice(0, retained).padEnd(retained, '0'));
+  if (!isZero && retained >= 0 && Number(digits[retained] ?? '0') >= 5) tenths += 1n;
+  const rounded = tenths.toString().padStart(2, '0');
+  const whole = rounded.slice(0, -1);
+  const decimal = rounded.slice(-1);
+  const negative = numeric[1] === '-';
   const numberFormat = hass?.locale?.number_format;
-  if (numberFormat === 'none') return raw;
-  const language = numberFormat === 'comma_decimal' ? 'en-US'
+  const language = numberFormat === 'none' || numberFormat === 'comma_decimal' ? 'en-US'
     : numberFormat === 'decimal_comma' ? 'de-DE'
     : numberFormat === 'space_comma' ? 'fr-FR'
     : numberFormat === 'system' ? undefined
     : hass?.locale?.language ?? hass?.language ?? 'de-DE';
-  try {
-    const significantDigits = raw.replace(/[eE].*$/, '').replace(/[^0-9]/g, '').replace(/^0+/, '').length;
-    const numeric = Number(raw);
-    // Preserve precision and scientific notation instead of rounding the source state.
-    if (significantDigits > 15 || /[eE]/.test(raw) || (numeric !== 0 && Math.abs(numeric) < 1e-20)) {
-      const decimal = new Intl.NumberFormat(language).formatToParts(1.1).find((part) => part.type === 'decimal')?.value ?? '.';
-      return raw.replace('.', decimal);
-    }
-    return new Intl.NumberFormat(language, { maximumFractionDigits: 20, useGrouping: false }).format(numeric);
-  } catch {
-    return raw;
-  }
+  const options = { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false };
+  let formatter: Intl.NumberFormat;
+  try { formatter = new Intl.NumberFormat(language, options); }
+  catch { formatter = new Intl.NumberFormat('de-DE', options); }
+  const signedWhole = negative && whole === '0' ? -0 : BigInt(`${negative ? '-' : ''}${whole}`);
+  const localizedDecimal = formatter.formatToParts(Number(decimal)).find((part) => part.type === 'integer')!.value;
+  return formatter.formatToParts(signedWhole)
+    .map((part) => part.type === 'fraction' ? localizedDecimal : part.value).join('');
 }
 
 function resolveSensor(sensor: SensorConfig, primary: string, hass?: HomeAssistant): ResolvedSensor {

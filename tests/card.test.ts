@@ -133,7 +133,7 @@ describe('Lovelace card integration', () => {
     const card = await createCard({ ...getDefaultConfig(), building }, { states: {} });
     const tile = find(card, '.room-tile[data-select-room="workshop"]');
     expect(tile.textContent).toContain('Entität fehlt');
-    expect(find(card, '.photo-room[data-room-id="workshop"] .photo-metric').textContent).toContain('Fehlt');
+    expect(find(card, '.photo-room[data-room-id="workshop"] .photo-metric').textContent).toContain('Entität fehlt');
     await openRoom(card, 'workshop');
     expect(find(card, '.room-detail').textContent).toContain('Entität fehlt');
 
@@ -259,7 +259,7 @@ describe('Lovelace card integration', () => {
       'sensor.test_primary': { state: 'unavailable', attributes: { unit_of_measurement: '°C' } },
       'sensor.test_unknown': { state: 'unknown', attributes: { unit_of_measurement: '°C' } },
     } });
-    expect(card.shadowRoot?.querySelector('.photo-stage [data-room-id="test_outdoor"]')).toBeNull();
+    expect(find(card, '.photo-stage .photo-outdoor[data-room-id="test_outdoor"]').textContent).toContain('Nicht verfügbar');
     expect(find(card, '.outdoor-block').querySelectorAll('.outdoor-source')).toHaveLength(3);
     const detail = await openRoom(card, 'test_outdoor');
     expect(detail.querySelectorAll('.sensor-row')).toHaveLength(3);

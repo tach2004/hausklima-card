@@ -104,6 +104,8 @@ export interface HausKlimaCardConfig {
   show_room_names?: boolean;
   /** Opacity of the dark sensor tiles, from 0.35 to 1 (inclusive). */
   chip_opacity?: number;
+  /** Maximum width of the full building scene, from 900 to 1600 CSS pixels. */
+  scene_max_width?: number;
   building?: BuildingConfig;
   /** Lovelace may attach layout/visibility properties; preserve these in editor. */
   [key: string]: unknown;

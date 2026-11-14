@@ -108,7 +108,7 @@ export class HausKlimaCardEditor extends LitElement {
     catch (error) { this._error = error instanceof Error ? error.message : 'Die Änderung konnte nicht übernommen werden.'; }
   }
 
-  private updateBase(key: 'title' | 'show_dimensions' | 'show_room_names' | 'chip_opacity', value: string | boolean | number): void {
+  private updateBase(key: 'title' | 'show_dimensions' | 'show_room_names' | 'chip_opacity' | 'scene_max_width', value: string | boolean | number): void {
     this.apply(() => ({ ...this._config, [key]: value }));
   }
 
@@ -215,6 +215,12 @@ export class HausKlimaCardEditor extends LitElement {
             <input id="chip-opacity" type="range" min="35" max="100" step="1"
               .value=${String(Math.round((this._config.chip_opacity ?? 0.72) * 100))}
               @input=${(event: Event) => this.updateBase('chip_opacity', Number((event.target as HTMLInputElement).value) / 100)} />
+          </label>
+          <label class="field scene-width" for="scene-max-width"><span>Maximale Breite der Gebäudeansicht: ${this._config.scene_max_width ?? 1400} px</span>
+            <input id="scene-max-width" type="range" min="900" max="1600" step="10"
+              .value=${String(this._config.scene_max_width ?? 1400)}
+              @input=${(event: Event) => this.updateBase('scene_max_width', Number((event.target as HTMLInputElement).value))} />
+            <small>Die Ansicht nutzt höchstens den verfügbaren Platz. Eine schmale HA-Sektion wird dadurch nicht verbreitert.</small>
           </label>
           <div class="base-options">
             <label class="check-label"><input id="show-room-names" type="checkbox" .checked=${this._config.show_room_names ?? true}
