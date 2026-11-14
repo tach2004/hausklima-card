@@ -8,7 +8,7 @@ export const cardStyles = css`
     --hk-line: var(--divider-color, #e2e6db);
     --hk-paper: var(--ha-card-background, var(--card-background-color, #fffdf8));
     --hk-accent: var(--primary-color, #527652);
-    --hk-chip: rgba(22, 26, 30, .82);
+    --hk-chip: rgba(22, 26, 30, .72);
     color: var(--hk-ink);
     font-family: var(--paper-font-body1_-_font-family, system-ui, sans-serif);
   }
@@ -84,6 +84,8 @@ export const cardStyles = css`
   .rooms-section.expanded { display: block; }
   .room-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(165px, 100%), 1fr)); gap: 10px; }
   .room-tile { display: flex; flex-direction: column; gap: 11px; min-width: 0; min-height: 112px; text-align: left; border: 1px solid #ffffff1a; border-radius: 13px; background: var(--hk-chip); color: #fff; padding: 13px; }
+  .room-tile.no-readings { background: var(--hk-paper); color: var(--hk-ink); border-color: var(--hk-line); }
+  .room-tile.no-readings .tile-arrow, .room-tile.no-readings .tile-level, .room-tile.no-readings .room-number { color: var(--hk-muted); }
   .room-tile[aria-pressed='true'] { outline: 2px solid var(--hk-accent); outline-offset: 2px; }
   .tile-heading { display: flex; gap: 7px; align-items: baseline; width: 100%; font-size: 12px; font-weight: 600; }
   .tile-heading > span:nth-last-child(2) { overflow-wrap: anywhere; }
@@ -162,6 +164,9 @@ export const cardStyles = css`
     text-align: left;
     transition: border-color .15s, transform .15s;
   }
+  .garage-zone.no-readings { background: var(--hk-paper); color: var(--hk-ink); border-color: var(--hk-line); }
+  .garage-zone.no-readings .garage-device-content > strong { color: var(--hk-ink); }
+  .garage-zone.no-readings .garage-zone-arrow { color: var(--hk-muted); }
   .garage-zone:hover, .garage-zone:focus-visible { border-color: #9dd8e1; transform: translateY(-2px); }
   .garage-device-icon {
     display: flex; flex-shrink: 0; align-items: center; justify-content: center;
