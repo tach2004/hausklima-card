@@ -10,7 +10,7 @@ export async function startPreview(port = 4173) {
     const path = new URL(request.url, 'http://localhost').pathname;
     const relative = path === '/' ? 'dev/index.html' : path.slice(1);
     const file = resolve(root, relative);
-    if (!file.startsWith(root + '/') || !['dev/index.html', 'dist/hausklima-card.js'].includes(relative)) {
+    if (!file.startsWith(root + '/') || !['dev/index.html', 'dev/fixtures.js', 'dev/ha-selector-stub.js', 'dist/hausklima-card.js'].includes(relative)) {
       response.writeHead(404).end(); return;
     }
     try { response.writeHead(200, { 'Content-Type': types[extname(file)] ?? 'text/plain' }).end(await readFile(file)); }

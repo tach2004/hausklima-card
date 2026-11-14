@@ -11,4 +11,4 @@ cards:
     title: HausKlima
     show_dimensions: false
     show_room_names: true
-# Sensoren später im visuellen Karteneditor zuordnen.
+# Räume und Sensoren anschließend im grafischen Karteneditor zuordnen.

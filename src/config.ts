@@ -64,6 +64,7 @@ function validateMeasurements(value: unknown, path: string): void {
       if (!entities.has(measurement.primary)) throw new Error(`${measurementPath}.primary muss einen konfigurierten Sensor referenzieren.`);
     }
     if (measurement.visible !== undefined) boolean(measurement.visible, `${measurementPath}.visible`);
+    if (measurement.show_in_overview !== undefined) boolean(measurement.show_in_overview, `${measurementPath}.show_in_overview`);
     if (measurement.position !== undefined) {
       const position = object(measurement.position, `${measurementPath}.position`);
       for (const axis of ['x', 'y']) {
@@ -112,6 +113,9 @@ function validateBuilding(value: unknown): asserts value is BuildingConfig {
     if (!levelIds.has(room.level_id)) throw new Error(`${path}.level_id referenziert keine vorhandene Ebene.`);
     if (room.layer_id !== undefined && !layerIds.has(room.layer_id)) throw new Error(`${path}.layer_id referenziert keine vorhandene Raumebene.`);
     boolean(room.visible, `${path}.visible`);
+    if (room.location !== undefined && room.location !== 'indoor' && room.location !== 'outdoor') {
+      throw new Error(`${path}.location muss indoor oder outdoor sein.`);
+    }
     positive(room.width_m, `${path}.width_m`, true);
     if (room.measurements !== undefined) validateMeasurements(room.measurements, `${path}.measurements`);
   });

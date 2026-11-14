@@ -1,7 +1,8 @@
+// DEMO-WERTE: Sensorzustände und Entity-IDs in dieser Testdatei sind synthetische Testdaten.
 import { describe, expect, it } from 'vitest';
 import { getDefaultConfig, normalizeConfig, resolveBuilding } from '../src/config';
 import { getDefaultBuilding } from '../src/defaults';
-import { resolveMeasurements } from '../src/metrics';
+import { formatSensorValue, resolveMeasurements, sensorStatusLabel } from '../src/metrics';
 import type { HomeAssistant, RoomConfig } from '../src/types';
 
 function configuredRoom(): RoomConfig {
@@ -155,7 +156,100 @@ describe('measurement resolution', () => {
     const values = resolveMeasurements(room, { states: { 'sensor.test_voc': { state: '15', attributes: { unit_of_measurement: 'µg/m³' } } } });
     expect(values.map((value) => value.type)).toEqual(['relative_humidity', 'absolute_humidity', 'co2', 'voc']);
     expect(values[1]!.primary.value).toBeNull();
-    expect(values[1]!.primary.unit).toBe('g/m³');
+    expect(values[1]!.primary.unit).toBe('');
     expect(values[3]!.primary.unit).toBe('µg/m³');
   });
+});
+
+
+describe('Phase 2 overview and details', () => {
+  it('prioritizes temperature and relative humidity while keeping every configured metric in details', () => {
+    const room = configuredRoom();
+    room.measurements!.relative_humidity = { sensors: [{ entity: 'sensor.test_relative' }] };
+    room.measurements!.absolute_humidity = { sensors: [{ entity: 'sensor.test_absolute' }] };
+    room.measurements!.co2 = { sensors: [{ entity: 'sensor.test_co2' }] };
+    room.measurements!.voc = { sensors: [{ entity: 'sensor.test_voc' }] };
+    expect(resolveMeasurements(room, undefined, 'overview').map((metric) => metric.type)).toEqual(['temperature', 'relative_humidity']);
+    expect(resolveMeasurements(room, undefined, 'details')).toHaveLength(5);
+    room.measurements!.co2.show_in_overview = true;
+    expect(resolveMeasurements(room, undefined, 'overview').map((metric) => metric.type)).toEqual(['temperature', 'relative_humidity', 'co2']);
+  });
+
+  it('preserves hidden metric and main-display sources in room details after dashboard reload', () => {
+    const room = configuredRoom();
+    room.measurements!.temperature!.visible = false;
+    room.measurements!.relative_humidity = {
+      sensors: [{ entity: 'sensor.test_humidity' }], show_in_overview: false,
+    };
+    const reloaded = JSON.parse(JSON.stringify(room)) as RoomConfig;
+    expect(resolveMeasurements(reloaded, undefined, 'overview')).toEqual([]);
+    expect(resolveMeasurements(reloaded, undefined, 'details')).toMatchObject([
+      { type: 'temperature', visible: false, sensors: [{ entity: 'sensor.test_primary' }, { entity: 'sensor.test_secondary' }] },
+      { type: 'relative_humidity', visible: true, show_in_overview: false },
+    ]);
+  });
+
+  it('takes units only from HA metadata and preserves source-specific VOC conventions', () => {
+    const room = configuredRoom();
+    room.measurements!.voc = { sensors: [{ entity: 'sensor.test_voc' }] };
+    const hass: HomeAssistant = { states: {
+      'sensor.test_primary': { state: '20.125', attributes: {} },
+      'sensor.test_secondary': { state: 'unknown', attributes: { unit_of_measurement: '°F' } },
+      'sensor.test_voc': { state: '120', attributes: { unit_of_measurement: 'VOC index' } },
+    } };
+    const values = resolveMeasurements(room, hass, 'details');
+    expect(values[0]!.sensors[0]!.unit).toBe('');
+    expect(values[0]!.primary).toMatchObject({ unit: '°F', value: null, status: 'unknown' });
+    expect(values[1]!.primary.unit).toBe('VOC index');
+  });
+
+  it('reflects live primary state changes without substituting a secondary reading', () => {
+    const room = configuredRoom();
+    const hass: HomeAssistant = { states: {
+      'sensor.test_primary': { state: '20.1', attributes: { unit_of_measurement: '°C' } },
+      'sensor.test_secondary': { state: '21.4', attributes: { unit_of_measurement: '°C' } },
+    } };
+    expect(resolveMeasurements(room, hass, 'overview')[0]!.primary.value).toBe('21.4');
+    hass.states['sensor.test_secondary']!.state = 'unavailable';
+    expect(resolveMeasurements(room, hass, 'overview')[0]!.primary.value).toBeNull();
+    hass.states['sensor.test_secondary']!.state = '22.15';
+    expect(resolveMeasurements(room, hass, 'overview')[0]!.primary.value).toBe('22.15');
+  });
+
+  it('validates display flags and outdoor location metadata', () => {
+    const building = getDefaultBuilding();
+    building.rooms[0] = configuredRoom();
+    Object.assign(building.rooms[0]!.measurements!.temperature!, { show_in_overview: 'true' });
+    expect(() => normalizeConfig({ ...getDefaultConfig(), building })).toThrow(/show_in_overview/);
+    building.rooms[0]!.measurements!.temperature!.show_in_overview = false;
+    Object.assign(building.rooms[0]!, { location: 'invented' });
+    expect(() => normalizeConfig({ ...getDefaultConfig(), building })).toThrow(/location/);
+    building.rooms[0]!.location = 'outdoor';
+    expect(normalizeConfig({ ...getDefaultConfig(), building }).building!.rooms[0]!.location).toBe('outdoor');
+  });
+
+  it('formats numbers for HA preferences without mutating the raw sensor state or unit', () => {
+    const sensor = resolveMeasurements(configuredRoom(), { states: {
+      'sensor.test_secondary': { state: '21.125', attributes: { unit_of_measurement: '°C' } },
+    } })[0]!.primary;
+    expect(formatSensorValue(sensor, { states: {}, locale: { language: 'de' } })).toBe('21,125');
+    expect(formatSensorValue(sensor, { states: {}, locale: { number_format: 'comma_decimal' } })).toBe('21.125');
+    expect(formatSensorValue(sensor, { states: {}, locale: { number_format: 'none' } })).toBe('21.125');
+    expect(sensor.value).toBe('21.125');
+    expect(sensor.unit).toBe('°C');
+    expect(formatSensorValue({ ...sensor, value: null, status: 'unavailable' })).toBe('Nicht verfügbar');
+    expect(sensorStatusLabel('unknown')).toBe('Unbekannt');
+    expect(sensorStatusLabel('missing')).toBe('Entität fehlt');
+  });
+
+  it.each(['21.333333333333333333', '99999999999999999999', '1e-30', '0.00000000000000000000001'])(
+    'preserves source precision for %s when localizing a numeric sensor', (raw) => {
+      const sensor = resolveMeasurements(configuredRoom(), { states: {
+        'sensor.test_secondary': { state: raw, attributes: { unit_of_measurement: '°C' } },
+      } })[0]!.primary;
+      expect(formatSensorValue(sensor, { states: {}, locale: { language: 'de' } })).toBe(raw.replace('.', ','));
+      expect(sensor.value).toBe(raw);
+    },
+  );
+
 });
