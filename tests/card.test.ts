@@ -74,7 +74,8 @@ describe('Lovelace card integration', () => {
     expect(card.shadowRoot?.querySelectorAll('.garage-block')).toHaveLength(1);
     expect(card.shadowRoot?.querySelectorAll('.photo-metric, .reading, .sensor-row')).toHaveLength(0);
     expect(building.rooms.every((room) => !room.measurements || Object.values(room.measurements).every((metric) => !metric.sensors.length))).toBe(true);
-    expect(find(card, '.house-room-list').textContent).toContain('Keine Sensoren zugeordnet');
+    expect(find(card, '.room-tile[data-select-room="workshop"]').classList.contains('no-readings')).toBe(true);
+    expect(find(card, '.house-room-list').textContent).not.toContain('Keine Sensoren zugeordnet');
     for (const room of building.rooms) {
       const detail = await openRoom(card, room.id);
       expect(detail.querySelector('h2')?.textContent).toBe(room.name);
@@ -170,7 +171,7 @@ describe('Lovelace card integration', () => {
       'sensor.test_voc': { state: '210', attributes: { unit_of_measurement: 'ppb' } },
     } });
     expect(card.shadowRoot?.querySelector('.photo-room[data-room-id="workshop"] .photo-metric')).toBeNull();
-    expect(find(card, '.room-tile[data-select-room="workshop"]').textContent).toContain('Messwerte in den Details');
+    expect(find(card, '.room-tile[data-select-room="workshop"]').classList.contains('no-readings')).toBe(true);
     const detail = await openRoom(card, 'workshop');
     expect(detail.querySelectorAll('.metric-group')).toHaveLength(3);
     expect(detail.querySelectorAll('.sensor-row')).toHaveLength(4);
@@ -181,7 +182,7 @@ describe('Lovelace card integration', () => {
     expect(detail.querySelector('[data-metric="co2"]')).toBeNull();
   });
 
-  it('shows additional overview metrics only when explicitly enabled', async () => {
+  it('shows CO2 and VOC by default when sensors are configured, with optional hiding', async () => {
     const building = getDefaultBuilding();
     building.rooms[0]!.measurements = {
       co2: { sensors: [{ entity: 'sensor.test_co2' }] },
@@ -192,10 +193,57 @@ describe('Lovelace card integration', () => {
       'sensor.test_voc': { state: '210', attributes: { unit_of_measurement: 'ppb' } },
     } });
     const tile = find(card, '.room-tile[data-select-room="workshop"]');
-    expect(tile.querySelector('[data-metric="co2"]')).toBeNull();
+    expect(tile.querySelector('[data-metric="co2"]')?.textContent).toContain('745');
     expect(tile.querySelector('[data-metric="voc"]')?.textContent).toContain('210');
     const detail = await openRoom(card, 'workshop');
     expect(detail.querySelectorAll('.metric-group')).toHaveLength(2);
+  });
+
+  it('shows no dark climate tiles without assigned entities, including all garage devices', async () => {
+    const card = await createCard();
+    expect(card.shadowRoot?.querySelectorAll('.photo-room.with-metrics, .photo-garage, .photo-metric')).toHaveLength(0);
+    expect(card.shadowRoot?.querySelectorAll('.photo-room.name-only')).toHaveLength(8);
+    expect(card.shadowRoot?.querySelectorAll('.garage-zone.no-readings')).toHaveLength(4);
+    expect(card.shadowRoot?.querySelectorAll('.garage-zone .reading')).toHaveLength(0);
+  });
+
+  it('shows five optional metric types for garage air and equipment without inventing other values', async () => {
+    const building = getDefaultBuilding();
+    const garage = building.rooms.find((room) => room.id === 'garage')!;
+    garage.measurements = {
+      temperature: { sensors: [{ entity: 'sensor.test_garage_temp' }] },
+      relative_humidity: { sensors: [{ entity: 'sensor.test_garage_rh' }] },
+      absolute_humidity: { sensors: [{ entity: 'sensor.test_garage_ah' }] },
+      co2: { sensors: [{ entity: 'sensor.test_garage_co2' }] },
+      voc: { sensors: [{ entity: 'sensor.test_garage_voc' }] },
+    };
+    const pylontech = building.rooms.find((room) => room.id === 'garage_battery_pylontech')!;
+    pylontech.measurements = { temperature: { sensors: [{ entity: 'sensor.test_battery_temp' }] } };
+    const states = {
+      'sensor.test_garage_temp': { state: '17.4', attributes: { unit_of_measurement: '°C' } },
+      'sensor.test_garage_rh': { state: '51', attributes: { unit_of_measurement: '%' } },
+      'sensor.test_garage_ah': { state: '7.6', attributes: { unit_of_measurement: 'g/m³' } },
+      'sensor.test_garage_co2': { state: '640', attributes: { unit_of_measurement: 'ppm' } },
+      'sensor.test_garage_voc': { state: '123', attributes: { unit_of_measurement: 'ppb' } },
+      'sensor.test_battery_temp': { state: '19.2', attributes: { unit_of_measurement: '°C' } },
+    };
+    const card = await createCard({ ...getDefaultConfig(), chip_opacity: 0.5, building }, { states });
+    const garageOverlay = find(card, '.photo-garage');
+    expect(garageOverlay.querySelectorAll('.photo-metric')).toHaveLength(5);
+    expect(garageOverlay.textContent).toContain('7,6');
+    expect(garageOverlay.textContent).toContain('640');
+    expect(garageOverlay.textContent).toContain('123');
+    expect(find(card, '.garage-zone[data-select-room="garage_battery_pylontech"]').textContent).toContain('19,2');
+    expect(find(card, '.garage-zone[data-select-room="garage_battery_litime"]').classList.contains('no-readings')).toBe(true);
+    expect(find<HTMLElement>(card, 'ha-card').style.getPropertyValue('--hk-chip')).toContain('0.5');
+  });
+
+  it('validates opacity input and preserves it across config normalization', () => {
+    expect(() => getDefaultConfig().chip_opacity).not.toThrow();
+    for (const value of [-1, 0, 0.349, 1.01, NaN, '80%']) {
+      expect(() => normalizeConfig({ ...getDefaultConfig(), chip_opacity: value })).toThrow(/chip_opacity/);
+    }
+    expect(normalizeConfig({ ...getDefaultConfig(), chip_opacity: 0.55 }).chip_opacity).toBe(0.55);
   });
 
   it('distinguishes unavailable, unknown and missing outdoor sources without switching the primary', async () => {
