@@ -144,6 +144,22 @@ export function normalizeConfig(input: unknown): HausKlimaCardConfig {
   return structuredClone({ ...getDefaultConfig(), ...config }) as HausKlimaCardConfig;
 }
 
+/**
+ * Migrate previously saved dashboard configurations once, retaining every
+ * existing user mapping and the ability to remove an added garage component.
+ */
 export function resolveBuilding(config: HausKlimaCardConfig): BuildingConfig {
-  return config.building ? structuredClone(config.building) : getDefaultBuilding();
+  const building = config.building ? structuredClone(config.building) : getDefaultBuilding();
+  if (!building.garage_components_initialized) {
+    const extraRooms = getDefaultBuilding().rooms.filter((room) =>
+      room.id === 'garage_battery_pylontech' ||
+      room.id === 'garage_battery_litime' ||
+      room.id === 'garage_cabinet');
+    const installed = new Set(building.rooms.map((room) => room.id));
+    for (const room of extraRooms) {
+      if (!installed.has(room.id)) building.rooms.push(room);
+    }
+    building.garage_components_initialized = true;
+  }
+  return building;
 }
