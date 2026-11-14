@@ -37,6 +37,8 @@ export interface MeasurementConfig {
   /** Entity ID of the main sensor; the first sensor is the fallback. */
   primary?: string;
   visible?: boolean;
+  /** Include the primary reading in room tiles; details retain every source. */
+  show_in_overview?: boolean;
   position?: MeasurementPosition;
 }
 
@@ -45,6 +47,8 @@ export interface RoomConfig {
   name: string;
   level_id: string;
   layer_id?: string;
+  /** Outdoor locations have no implied position in the building cross-section. */
+  location?: 'indoor' | 'outdoor';
   visible: boolean;
   /** Stated clear width, never resized to fill the facade; null means unknown. */
   width_m: number | null;
@@ -117,5 +121,7 @@ export interface ResolvedMeasurement {
   label: string;
   primary: ResolvedSensor;
   sensors: ResolvedSensor[];
+  visible: boolean;
+  show_in_overview: boolean;
   position?: MeasurementPosition;
 }

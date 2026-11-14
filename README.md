@@ -1,108 +1,124 @@
 # HausKlima Card
 
-Eine eigenständige Custom Lovelace Card für Home Assistant mit einer schematischen Gebäudeansicht. TypeScript, Lit und SVG; ohne Cloudzugriff, externe Schriftarten oder Abhängigkeit von anderen Custom Cards.
+Eine eigenständige Home-Assistant-Karte für eine räumliche Hausklimaübersicht: ein warmer SVG-Haus-Cutaway mit dunklen, leicht transparenten Messwertfeldern, freistehender Garage und einer eigenen Übersicht für Außenmessorte und weitere Räume. TypeScript und Lit; ohne Cloudzugriff, externe Schriftarten oder Abhängigkeit von anderen Custom Cards.
 
-**Stand: Phase 1.** Die Karte zeigt das Gebäude, einfache Raumdetails sowie eine Übersicht weiterer Räume. Ein grafischer Editor steuert Titel, Raumnamen und Maßangaben. Das erweiterbare Raum- und Sensormodell ist vorbereitet. Die vollständige grafische Raum- und Sensorverwaltung folgt in Phase 2.
+**Stand: Phase 2.** Räume und Sensoren lassen sich im grafischen Lovelace-Karteneditor einrichten. Temperatur und relative Luftfeuchtigkeit stehen in der Übersicht im Vordergrund; Raumdetails zeigen sämtliche zugeordneten Quellen und Messarten. Die installierte Karte enthält keine erfundenen Sensoren oder Messwerte.
 
 ## Installation
 
 ### Mit HACS
 
-Nach Übernahme dieses Entwicklungsstands in den Standardbranch oder Veröffentlichung eines Releases:
-
-1. In HACS im Menü **Benutzerdefinierte Repositories** `https://github.com/tach2004/hausklima-card` hinzufügen; Typ **Dashboard** wählen.
+1. In HACS unter **Benutzerdefinierte Repositories** `https://github.com/tach2004/hausklima-card` hinzufügen; Typ **Dashboard** wählen.
 2. **HausKlima Card** herunterladen.
 3. Unter **Einstellungen → Dashboards → Ressourcen** prüfen, ob `/hacsfiles/hausklima-card/hausklima-card.js` als **JavaScript-Modul** eingetragen ist; andernfalls hinzufügen.
-4. Die Browserseite neu laden und im Dashboard eine Karte **HausKlima Card** hinzufügen.
+4. Die Browserseite neu laden und **HausKlima Card** im Dashboard hinzufügen.
 
-Das Repository muss für HACS öffentlich zugänglich sein. Es ist als benutzerdefiniertes Repository vorbereitet; eine Aufnahme in den HACS-Standardkatalog erfolgt dadurch nicht automatisch. HACS berücksichtigt die gebaute Datei im `dist`-Verzeichnis beziehungsweise passende Release-Dateien. Siehe die [offiziellen Dashboard-Anforderungen](https://www.hacs.xyz/docs/publish/plugin/).
-
-**Noch offene Repository-Einstellung:** Die [allgemeinen HACS-Anforderungen](https://www.hacs.xyz/docs/publish/start/) verlangen außerdem Beschreibung und Topics auf GitHub. Beide sind derzeit leer. Unter **About → Einstellungen** am Repository ergänzen, beispielsweise die Beschreibung „Eigenständige Home-Assistant-Dashboardkarte für eine räumliche Hausklimaübersicht.“ und die Topics `home-assistant`, `hacs`, `lovelace`, `custom-card`, `typescript`. Der Änderungsversuch über die verbundene GitHub-Integration wurde mit HTTP 403 (`Resource not accessible by integration`) abgelehnt; die Dateien und der Build sind davon unabhängig vorbereitet.
+HACS lädt den verfügbaren Stand des Standardbranches beziehungsweise eines Releases. Änderungen eines offenen Pull Requests werden dadurch noch nicht installiert. Das Repository ist für die Installation als benutzerdefiniertes HACS-Repository eingerichtet; die Aufnahme in den HACS-Standardkatalog ist ein separater Vorgang. Siehe die [offiziellen Dashboard-Anforderungen](https://www.hacs.xyz/docs/publish/plugin/).
 
 ### Manuell
 
-1. `dist/hausklima-card.js` aus dem Repository oder `hausklima-card.js` aus einem Release herunterladen.
+1. `dist/hausklima-card.js` aus dem gewünschten Repository-Stand oder `hausklima-card.js` aus einem Release herunterladen.
 2. Als `<HA-Konfigurationsverzeichnis>/www/hausklima-card.js` ablegen. Wurde `www` neu angelegt, Home Assistant einmal neu starten.
 3. Die Ressource `/local/hausklima-card.js` als **JavaScript-Modul** registrieren und den Browser neu laden.
 
-Die [Home-Assistant-Dokumentation zur Ressourcenregistrierung](https://contributors.home-assistant.io/frontend/custom-ui/resources/) beschreibt auch die Verwaltung über YAML. Nach Aktualisierungen kann eine Versionskennung in der Ressourcen-URL den Browsercache erneuern, beispielsweise `?v=0.1.0`.
+Die [Home-Assistant-Dokumentation zur Ressourcenregistrierung](https://contributors.home-assistant.io/frontend/custom-ui/resources/) beschreibt auch die Verwaltung über YAML. Nach Aktualisierungen kann eine Versionskennung in der Ressourcen-URL den Browsercache erneuern.
 
-## Konfiguration
+## Einrichtung im grafischen Editor
 
-Der grafische Karteneditor unterstützt in Phase 1 alle Basisoptionen. Eine Konfiguration ohne Sensoren ist vollständig lauffähig:
+Empfohlen ist eine eigene **Panel-Ansicht mit genau einer HausKlima Card**. So erhält die Hausgrafik am Desktop ausreichend Platz. Die Karte passt sich auch schmalen Sections-Karten an. [Ansichten einrichten](examples/views/README.md)
+
+1. Im bearbeitbaren Dashboard eine Panel-Ansicht anlegen und die Karte **HausKlima Card** hinzufügen.
+2. Im grafischen Karteneditor unter **Raum auswählen** einen vorhandenen Raum wählen, etwa Wohnzimmer, Werkstatt oder Garage.
+3. Unter **Messart** Temperatur, relative Feuchte, absolute Feuchte, CO₂ oder VOC wählen.
+4. Die gewünschte HA-Entität über **Sensor auswählen** beziehungsweise **Weiteren Sensor auswählen** zuordnen. Weitere Sensoren derselben Messart können beliebig ergänzt, benannt, entfernt und als Hauptsensor ausgewählt werden.
+5. Die Schalter **Messart in Übersichten aktiv** und **Hauptwert im Raum anzeigen** nach Bedarf einstellen. Temperatur und relative Feuchte erscheinen standardmäßig in der Übersicht; weitere Messarten erst nach ausdrücklicher Aktivierung der Hauptanzeige. Ausgeblendete Zuordnungen bleiben in den Raumdetails erreichbar.
+6. Bei Bedarf **Raum oder Außenmessort hinzufügen** öffnen, Art, Name und für Innenräume die Gebäudeebene wählen; dann **Messort hinzufügen** betätigen. Zusätzliche Räume erhalten keine erfundene Position im Gebäude und bleiben über die Raumübersicht erreichbar. Die Garage ist bereits ein eigener Messort und wird über die vorhandene Raumwahl eingerichtet.
+7. Zum Löschen eines Messorts **Raum entfernen** wählen und die Nachfrage mit **Entfernen bestätigen** bestätigen; **Abbrechen** erhält ihn. Anschließend Änderungen im Dashboard speichern. Zuordnungen, Anzeigenamen und Hauptsensorwahl gehören zur Kartenkonfiguration und bleiben nach erneutem Laden erhalten.
+
+Auf einen Raum in der Grafik oder in der Raumübersicht tippen beziehungsweise klicken, um seine Details zu öffnen. Dort sind alle zugeordneten Sensoren mit Anzeigename, Entity-ID, Hauptsensor-Kennzeichnung, Status, Wert und tatsächlicher Einheit aufgeführt. Die Auswahl einer Quelle öffnet Home Assistants übliche Entitätsdetails. Die Raumwahl funktioniert auch per Tastatur.
+
+Nicht konfigurierte Messarten erzeugen keine leeren Werte. Eine konfigurierte fehlende Entität, `unknown` und `unavailable` bleiben als unterscheidbare Zustände sichtbar. Fällt ein Hauptsensor aus, wird er entsprechend gekennzeichnet; die Karte ersetzt ihn nicht stillschweigend durch eine andere Quelle. Es werden keine Einheiten umgerechnet und keine absoluten Feuchtewerte berechnet.
+
+## Darstellung auf Desktop und Smartphone
+
+Die Hauptansicht zeigt die 12-m-Traufseite mit geöffnetem Dachgeschoss. Die warmen Räume, Möbel, Materialeffekte und perspektivischen Versätze sind eine dekorative SVG-Darstellung, keine bestätigte Ausstattung oder baulich genaue Konstruktion. Der First läuft parallel zur sichtbaren Fassade.
+
+Auf breiten Karten stehen Haus und freistehende Garage vollständig im sichtbaren Bereich. Bei weniger Platz wird die Anordnung umgebaut: eine kompakte Gebäudeansicht dient der Raumauswahl, große Raumkarten und Details zeigen die lesbaren Werte darunter. Garage, Außenmessorte und verdeckte Räume bleiben erreichbar. Es ist keine andere YAML-Konfiguration für das Smartphone nötig; eine erzwungene horizontale Bildlaufleiste entfällt.
+
+Die dunklen Messwertfelder haben nur im Hintergrund Transparenz; Beschriftungen, Werte und Symbole bleiben deckend. Light- und Dark-Theme werden unterstützt. Bei schmalen Räumen oder zu wenig Platz verweist die kompakte Darstellung auf die vollständigen Raumdetails.
+
+[Tatsächliche Desktop- und Mobile-Screenshots](docs/screenshots/README.md) zeigen die implementierte Karte. Werte in diesen Entwicklungsscreenshots sind ausdrücklich **DEMO-WERTE** aus getrennten Testdaten; sie sind kein Bestandteil der Produktionsvorgaben und keine echten HA-Messungen.
+
+## Optionale YAML-Konfiguration
+
+Der grafische Editor ist der normale Einrichtungsweg. Diese minimale **Kartenkonfiguration** funktioniert ohne Sensoren:
 
 ```yaml
 type: custom:hausklima-card
 title: HausKlima
-show_dimensions: true
+show_dimensions: false
 show_room_names: true
 ```
 
 | Option | Standard | Bedeutung |
 | --- | --- | --- |
 | `type` | erforderlich | `custom:hausklima-card` |
-| `title` | `HausKlima` | Titel der Karte |
-| `show_dimensions` | `true` | Bekannte Maßangaben anzeigen |
+| `title` | `HausKlima` | Kompakter Kartentitel |
+| `show_dimensions` | `true` | Aufklappbare Gebäudedetails mit bekannten Maßen und offenen Punkten anbieten |
 | `show_room_names` | `true` | Raumnamen in der Gebäudeansicht anzeigen |
-| `building` | Vorgabegebäude | Vollständiges Gebäudemodell für Entwicklung und spätere Editor-Erweiterungen |
+| `building` | Vorgabegebäude | Gebäudemodell einschließlich der im Editor gespeicherten Raum- und Sensorzuordnungen |
 
-Die [Beispielkonfiguration](examples/basic.yaml) enthält keine Sensor-Entity-IDs. Es werden keine Messwerte simuliert. Das Modell unterstützt optionale Messarten und mehrere Sensoren je Messart; die komfortable Auswahl über HA-Entity-Selektoren ist noch nicht Teil des Editors.
+Ältere Phase-1-Konfigurationen bleiben gültig. Die bekannten Gebäude- und Raumvorgaben mit ihren stabilen IDs bleiben erhalten. Die [minimale Karten-YAML](examples/basic.yaml) enthält keine Sensor-Entity-IDs. Die Beispiele [Panel](examples/views/panel.yaml) und [Sections](examples/views/sections.yaml) sind dagegen jeweils **ein Ansichtsobjekt**: in den YAML-Editor einer Ansicht oder als eingerücktes Listenelement unter `views:` einfügen, nicht in den Karten-YAML-Editor und nicht als vollständiges Dashboard. HACS legt keine Dashboard-Ansicht automatisch an.
 
 ## Gebäude und offene Maße
 
-Die Ansicht zeigt die **12 m breite Traufseite** eines Hauses mit 10 m Tiefe. Der First verläuft parallel dazu. Ein schematischer Dachausschnitt macht das Dachgeschoss sichtbar; ein dreieckiger Giebel auf dieser Seite wäre falsch.
+Die lichte Raumfolge und sämtliche bestätigten Maße bleiben unverändert. Die verbleibenden Breiten bis 12 m werden nicht als neue Räume ausgegeben und nicht stillschweigend durch angepasste Raum- oder Wandmaße aufgefüllt. Wandzuordnung, Dachneigung, Deckendicken und endgültige Schnittgeometrie sind weiterhin offen. Die Garage steht schematisch rechts mit ungefähr 5 m Abstand und hat keine bauliche Verbindung zum Haus. [Architektur und Maßprüfung](docs/architecture.md)
 
-Die vorgegebenen lichten Raumbreiten und Höhen bleiben unverändert gespeichert. Wandzuordnung und verbleibende Breiten werden nicht automatisch auf 12 m umgerechnet. Die Garage steht rechts mit einem ungefähren Abstand von 5 m. Dachneigung, Wandaufbau und endgültige Schnittgeometrie bleiben offen. Die Zeichnung ist eine Übersicht und kein Bauplan. Details und die Maßprüfung stehen in [docs/architecture.md](docs/architecture.md).
+## Entwicklung und Prüfung
 
-## Entwicklung
-
-Voraussetzung: Node.js ab Version 22 und npm; die CI verwendet Node.js 24. Die Laufzeitkarte benötigt weder Node.js noch einen Build auf dem Home-Assistant-System.
+Voraussetzung: Node.js ab Version 22 und npm; die CI verwendet Node.js 24. Das Home-Assistant-System benötigt keinen eigenen Node.js-Build.
 
 ```sh
 npm ci
 npm run check
 npm test
 npm run build
+npm run test:browser
 npm run dev
 ```
 
-`npm run build` erzeugt die eigenständig installierbare Datei `dist/hausklima-card.js` einschließlich Lit. Diese Datei wird mitversioniert. Die lokale Vorschau dient der Entwicklung; sie ersetzt keine Home-Assistant-Installation. Die beim Build entstehenden Lizenzhinweise müssen zusammen mit dem Bundle ausgeliefert werden.
+`npm run build` erzeugt die eigenständig installierbare Datei `dist/hausklima-card.js` einschließlich Lit und Lizenzhinweisen. Das Bundle wird mitversioniert. CI und Release-Workflow prüfen Typen, Tests, Build und die Übereinstimmung des eingecheckten Bundles mit den Quellen.
 
-`npm run dev` startet den Vorschau-Server unter `http://127.0.0.1:4173`. Nach Quellcodeänderungen den Befehl erneut starten. `npm run test:browser` prüft die gebaute Karte in Chromium; zuerst `npm run build` ausführen. Falls Chromium fehlt, über `npx playwright install chromium` bereitstellen oder einen bestehenden Browserpfad mit `CHROMIUM_PATH` angeben. Screenshots liegen anschließend unter `work/screenshots/`.
+`npm run dev` startet die lokale Vorschau unter `http://127.0.0.1:4173`. Ohne zusätzliche Auswahl bleibt sie ohne Sensorzuordnungen. Getrennte, ausdrücklich als **DEMO-WERTE** gekennzeichnete Entwicklungsdaten sind über `?demo=1` verfügbar; `?layout=sections` prüft einen schmalen Kartencontainer. Der native HA-Entity-Selector wird ausschließlich in der lokalen Vorschau durch eine Testkomponente nachgebildet. Die Produktionskarte verwendet die Home-Assistant-Komponente und enthält diesen Ersatz nicht.
+
+Die Browserprüfungen benötigen eine Playwright-Engine oder einen vorhandenen Chromium-Pfad über `CHROMIUM_PATH`. Fehlende Browser können mit `npx playwright install chromium` beziehungsweise `npx playwright install webkit` installiert werden; Systemabhängigkeiten können je nach Plattform zusätzlich nötig sein. Screenshots und Prüfgrenzen sind unter [Validierung](docs/validation.md) dokumentiert.
 
 | Bereich | Dateien |
 | --- | --- |
-| Karte und SVG | `src/hausklima-card.ts` und zugehörige Ansichtsdateien |
-| Visueller Editor | `src/hausklima-card-editor.ts` |
+| Karte und räumliche SVG-Ansicht | `src/hausklima-card.ts`, `src/house-scene.ts`, `src/styles.ts` |
+| Visueller Editor und unveränderliche Konfigurationsänderungen | `src/hausklima-card-editor.ts`, `src/editor-model.ts` |
 | Modell, Vorgaben, Validierung | `src/types.ts`, `src/defaults.ts`, `src/config.ts` |
-| Messwertauflösung | `src/metrics.ts` |
-| Tests | `tests/` |
+| Messwertauflösung und Formatierung | `src/metrics.ts` |
+| Tests und getrennte Entwicklungsvorschau | `tests/`, `scripts/browser-test.mjs`, `dev/` |
 | HACS und Auslieferung | `hacs.json`, `dist/`, `.github/workflows/` |
 
-Die CI führt Typprüfung, Tests und Build aus und prüft, ob das eingecheckte Bundle aktuell ist. Ein gepushter Tag `v*` startet den Release-Workflow: Er prüft dieselben Schritte und veröffentlicht das Bundle als GitHub-Release-Datei. Ein Tag allein ist laut [HACS-Versionsdokumentation](https://www.hacs.xyz/docs/publish/start/#versions) noch kein Release. Dieser Entwicklungsstand erstellt weder einen Release-Tag noch einen Release automatisch.
+Ein gepushter Tag `v*` startet den Release-Workflow und veröffentlicht nach erfolgreichen Prüfungen das Bundle als GitHub-Release-Datei. Ein Tag allein ist laut [HACS-Versionsdokumentation](https://www.hacs.xyz/docs/publish/start/#versions) noch kein Release. Für Phase 2 wird kein Release automatisch erstellt.
 
-## Prüfstand und nächste Phase
+## Grenzen und nächste Phase
 
-Ausgeführte Prüfungen und Grenzen der Validierung werden in [docs/validation.md](docs/validation.md) festgehalten.
+Die [Validierung](docs/validation.md) unterscheidet lokale Tests, Browser-Emulation und echte Home-Assistant-/iPhone-Prüfungen. Visuelle Abnahme und Merge bleiben beim Projektinhaber.
 
-Für Phase 2 sind vorgesehen:
-
-- Wandstärken und Dachgeometrie gemeinsam klären und die Gebäudeansicht verfeinern.
-- Räume grafisch verwalten und Sensoren über Home-Assistant-Entity-Selektoren zuordnen.
-- Hauptsensoren, weitere Sensoren, Messwertpositionen und Sichtbarkeit grafisch konfigurieren.
-- Die vorhandene Übersicht weiterer Räume ausbauen und einen Umschalter für alternative Raumebenen ergänzen.
-
-Komplexe Animationen, aufwendige Popups und automatische Berechnung der absoluten Luftfeuchtigkeit sind in Phase 1 nicht enthalten.
+Für Phase 3 sind ein optionaler Vorne-/Hinten-Umschalter, eine abgestimmte Verfeinerung der offenen Gebäudegeometrie und eine grafische Messwertpositionierung vorgesehen. Automatische Feuchteberechnung, historische Charts und automatische Dashboard-Erstellung sind nicht Bestandteil dieser Phase.
 
 ## Offizielle Grundlagen
 
 - [Home Assistant: Custom cards](https://contributors.home-assistant.io/frontend/custom-ui/card/)
 - [Home Assistant: Card editor and picker](https://contributors.home-assistant.io/frontend/custom-ui/card-editor/)
 - [Home Assistant: Register resources](https://contributors.home-assistant.io/frontend/custom-ui/resources/)
+- [Home Assistant Frontend: native Selector-Komponente](https://github.com/home-assistant/frontend/blob/dev/src/components/ha-selector/ha-selector.ts)
+- [Home Assistant Frontend: Entity-Selector](https://github.com/home-assistant/frontend/blob/dev/src/components/ha-selector/ha-selector-entity.ts)
 - [HACS: Dashboard repositories](https://www.hacs.xyz/docs/publish/plugin/)
 - [HACS: Repository manifest und allgemeine Anforderungen](https://www.hacs.xyz/docs/publish/start/)
-
-Die Quellen wurden am 13. November 2026 geprüft. Die frühere Entwickler-URL für Custom Cards leitet auf die aktuelle Home-Assistant-Contributors-Dokumentation weiter.
 
 ## Lizenz
 

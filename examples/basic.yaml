@@ -1,4 +1,5 @@
+# Minimale KARTEN-Konfiguration; Sensoren im grafischen Karteneditor zuordnen.
 type: custom:hausklima-card
 title: HausKlima
-show_dimensions: true
+show_dimensions: false
 show_room_names: true

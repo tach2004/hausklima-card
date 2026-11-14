@@ -16,4 +16,4 @@ sections:
           columns: full
           rows: auto
 # Je nach HA-Layout ggf. Sektion in der UI auf mehr Spalten verbreitern.
-# Sensoren anschließend über den visuellen Karteneditor zuordnen.
+# Räume und Sensoren anschließend im grafischen Karteneditor zuordnen.

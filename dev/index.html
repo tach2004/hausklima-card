@@ -5,38 +5,72 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>HausKlima Card · lokale Vorschau</title>
   <style>
-    :root { color-scheme: light; --primary-color: #26766b; --primary-text-color: #293d42; --secondary-text-color: #6b7d80; --card-background-color: #fff; --divider-color: #dce5e4; }
-    body { margin: 0; background: #f0f4f3; color: var(--primary-text-color); font-family: system-ui, sans-serif; padding: 32px; }
-    main { max-width: 1080px; margin: auto; }
-    nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; font-size: 13px; }
-    nav button { background: var(--card-background-color); color: inherit; border: 1px solid var(--divider-color); border-radius: 8px; padding: 9px 14px; cursor: pointer; }
-    body.dark { color-scheme: dark; --primary-color: #82cabe; --primary-text-color: #e0e9e8; --secondary-text-color: #a0b4b1; --card-background-color: #202d30; --divider-color: #3a4c4d; background: #142023; }
-    details { margin-top: 24px; padding: 18px; border: 1px solid var(--divider-color); border-radius: 14px; background: var(--card-background-color); }
-    summary { cursor: pointer; margin-bottom: 16px; }
-    @media(max-width:600px) { body { padding: 14px; } }
+    :root { color-scheme: light; --primary-color: #46745c; --primary-text-color: #29382f; --secondary-text-color: #6d7a70; --card-background-color: #fffdf9; --divider-color: #e3e5dc; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #edf0e8; color: var(--primary-text-color); font-family: system-ui, sans-serif; padding: 20px; }
+    main { max-width: 1440px; margin: auto; min-width: 0; }
+    main.sections { max-width: 480px; }
+    nav { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 12px; }
+    nav .tools { display: flex; align-items: center; gap: 8px; }
+    nav button { min-height: 42px; background: var(--card-background-color); color: inherit; border: 1px solid var(--divider-color); border-radius: 10px; padding: 8px 12px; cursor: pointer; font: inherit; }
+    .demo-label { color: #745823; font-weight: 700; letter-spacing: .05em; }
+    body.dark { color-scheme: dark; --primary-color: #9ac1a2; --primary-text-color: #e8e9e0; --secondary-text-color: #aeb9ad; --card-background-color: #202b26; --divider-color: #3d4a40; background: #141d18; }
+    body.dark .demo-label { color: #e2c38b; }
+    details { margin-top: 20px; padding: 16px; border: 1px solid var(--divider-color); border-radius: 14px; background: var(--card-background-color); }
+    summary { cursor: pointer; min-height: 32px; font-size: 13px; }
+    details[open] summary { margin-bottom: 16px; }
+    @media(max-width:600px) { body { padding: 10px; } nav .preview-title { font-size: 11px; } nav { gap: 6px; } }
   </style>
 </head>
 <body>
   <main>
-    <nav><span>HausKlima Card · lokale Entwicklungsvorschau</span><button id="theme">Dunkles Theme</button></nav>
+    <nav><span class="preview-title">HausKlima · lokale Vorschau <span id="mode-label"></span></span><span class="tools"><button id="reset">Zurücksetzen</button><button id="theme">Dunkles Theme</button></span></nav>
     <hausklima-card></hausklima-card>
-    <details><summary>Basiskonfiguration bearbeiten</summary><div id="editor"></div></details>
+    <details id="editor-panel"><summary>Grafischen Karteneditor öffnen</summary><div id="editor"></div></details>
   </main>
   <script type="module">
+    import '/dev/ha-selector-stub.js';
     import '/dist/hausklima-card.js';
+    import { demoConfig, demoStates } from '/dev/fixtures.js';
+    const params = new URLSearchParams(location.search);
+    const demo = params.get('demo') === '1';
+    const storageKey = `hausklima-preview-${demo ? 'demo' : 'empty'}`;
     const card = document.querySelector('hausklima-card');
-    const config = {type: 'custom:hausklima-card', title: 'HausKlima'};
-    card.hass = { states: {} };
+    const base = demo ? demoConfig : { type: 'custom:hausklima-card', title: 'HausKlima', show_dimensions: false };
+    let config;
+    try { config = JSON.parse(localStorage.getItem(storageKey)) ?? structuredClone(base); } catch { config = structuredClone(base); }
+    const hass = { states: demo ? structuredClone(demoStates) : {}, locale: { language: 'de', number_format: 'language' }, language: 'de' };
+    document.querySelector('#mode-label').textContent = demo ? '· DEMO-WERTE' : '· ohne Sensorzuordnung';
+    document.querySelector('#mode-label').className = demo ? 'demo-label' : '';
+    if (params.get('layout') === 'sections') document.querySelector('main').classList.add('sections');
+    const themeButton = document.querySelector('#theme');
+    function setTheme(dark) {
+      document.body.classList.toggle('dark', dark);
+      themeButton.textContent = dark ? 'Helles Theme' : 'Dunkles Theme';
+      card.hass = { ...card.hass, themes: { darkMode: dark } };
+    }
+    card.hass = hass;
     card.setConfig(config);
     const editor = await card.constructor.getConfigElement();
     editor.hass = card.hass;
     editor.setConfig(config);
-    editor.addEventListener('config-changed', (event) => card.setConfig(event.detail.config));
-    document.querySelector('#editor').append(editor);
-    document.querySelector('#theme').addEventListener('click', (event) => {
-      const dark = document.body.classList.toggle('dark');
-      event.target.textContent = dark ? 'Helles Theme' : 'Dunkles Theme';
+    editor.addEventListener('config-changed', (event) => {
+      config = structuredClone(event.detail.config);
+      localStorage.setItem(storageKey, JSON.stringify(config));
+      card.setConfig(config);
     });
+    document.querySelector('#editor').append(editor);
+    themeButton.addEventListener('click', () => { setTheme(!document.body.classList.contains('dark')); editor.hass = card.hass; });
+    document.querySelector('#reset').addEventListener('click', () => { localStorage.removeItem(storageKey); location.reload(); });
+    setTheme(params.get('theme') === 'dark');
+    window.hausklimaPreview = {
+      card, editor,
+      getConfig: () => structuredClone(config),
+      setConfig: (next) => { config = structuredClone(next); card.setConfig(config); editor.setConfig(config); },
+      setStates: (states) => { card.hass = { ...card.hass, states: structuredClone(states) }; editor.hass = card.hass; },
+      setTheme,
+    };
+    window.previewReady = true;
   </script>
 </body>
 </html>

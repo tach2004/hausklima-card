@@ -35,7 +35,7 @@ export function createLayout(building: BuildingConfig) {
   ];
   const bands = floors.map((floor) => {
     let cursor = 0;
-    for (const room of building.rooms.filter((candidate) => candidate.level_id === floor.id && candidate.visible && (!candidate.layer_id || candidate.layer_id === layer))) {
+    for (const room of building.rooms.filter((candidate) => candidate.level_id === floor.id && candidate.location !== 'outdoor' && candidate.visible && (!candidate.layer_id || candidate.layer_id === layer))) {
       const level = building.levels.find((entry) => entry.id === floor.id);
       if (level?.building_id !== floor.building) break;
       const width = (room.width_m ?? 0) * scale;

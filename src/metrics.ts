@@ -1,5 +1,5 @@
 import { METRIC_TYPES } from './types';
-import type { HomeAssistant, MetricType, ResolvedMeasurement, ResolvedSensor, RoomConfig, SensorConfig } from './types';
+import type { HomeAssistant, MetricType, ResolvedMeasurement, ResolvedSensor, RoomConfig, SensorConfig, SensorStatus } from './types';
 
 export const METRIC_LABELS: Record<MetricType, string> = {
   temperature: 'Temperatur',
@@ -9,15 +9,44 @@ export const METRIC_LABELS: Record<MetricType, string> = {
   voc: 'VOC',
 };
 
-const DEFAULT_UNITS: Record<MetricType, string> = {
-  temperature: '°C',
-  relative_humidity: '%',
-  absolute_humidity: 'g/m³',
-  co2: 'ppm',
-  voc: '',
-};
+export type MeasurementScope = 'visible' | 'overview' | 'details';
 
-function resolveSensor(sensor: SensorConfig, type: MetricType, primary: string, hass?: HomeAssistant): ResolvedSensor {
+export function sensorStatusLabel(status: SensorStatus): string {
+  switch (status) {
+    case 'missing': return 'Entität fehlt';
+    case 'unknown': return 'Unbekannt';
+    case 'unavailable': return 'Nicht verfügbar';
+    case 'available': return 'Verfügbar';
+  }
+}
+
+/** Format numeric states for HA's locale without converting units or rounding data. */
+export function formatSensorValue(sensor: ResolvedSensor, hass?: HomeAssistant): string {
+  if (sensor.status !== 'available' || sensor.value === null) return sensorStatusLabel(sensor.status);
+  const raw = sensor.value;
+  if (raw.trim() === '' || !Number.isFinite(Number(raw))) return raw;
+  const numberFormat = hass?.locale?.number_format;
+  if (numberFormat === 'none') return raw;
+  const language = numberFormat === 'comma_decimal' ? 'en-US'
+    : numberFormat === 'decimal_comma' ? 'de-DE'
+    : numberFormat === 'space_comma' ? 'fr-FR'
+    : numberFormat === 'system' ? undefined
+    : hass?.locale?.language ?? hass?.language ?? 'de-DE';
+  try {
+    const significantDigits = raw.replace(/[eE].*$/, '').replace(/[^0-9]/g, '').replace(/^0+/, '').length;
+    const numeric = Number(raw);
+    // Preserve precision and scientific notation instead of rounding the source state.
+    if (significantDigits > 15 || /[eE]/.test(raw) || (numeric !== 0 && Math.abs(numeric) < 1e-20)) {
+      const decimal = new Intl.NumberFormat(language).formatToParts(1.1).find((part) => part.type === 'decimal')?.value ?? '.';
+      return raw.replace('.', decimal);
+    }
+    return new Intl.NumberFormat(language, { maximumFractionDigits: 20, useGrouping: false }).format(numeric);
+  } catch {
+    return raw;
+  }
+}
+
+function resolveSensor(sensor: SensorConfig, primary: string, hass?: HomeAssistant): ResolvedSensor {
   const state = hass?.states[sensor.entity];
   const status = !state ? 'missing' : state.state === 'unavailable' ? 'unavailable' : state.state === 'unknown' ? 'unknown' : 'available';
   const friendlyName = state?.attributes.friendly_name;
@@ -26,21 +55,31 @@ function resolveSensor(sensor: SensorConfig, type: MetricType, primary: string, 
     entity: sensor.entity,
     name: sensor.name ?? (typeof friendlyName === 'string' ? friendlyName : sensor.entity),
     value: status === 'available' ? state!.state : null,
-    // Preserve source units: Phase 1 does not silently convert measurements.
-    unit: typeof unit === 'string' ? unit : DEFAULT_UNITS[type],
+    // An absent unit is unknown. In particular VOC units must never be inferred.
+    unit: typeof unit === 'string' ? unit : '',
     status,
     is_primary: sensor.entity === primary,
   };
 }
 
-/** No placeholders for absent metrics; configured unavailable sensors stay present. */
-export function resolveMeasurements(room: RoomConfig, hass?: HomeAssistant): ResolvedMeasurement[] {
+/**
+ * The default retains Phase-1 callers. Overview prioritizes temperature/RH;
+ * details always retain every configured source, including hidden metrics.
+ */
+export function resolveMeasurements(room: RoomConfig, hass?: HomeAssistant, scope: MeasurementScope = 'visible'): ResolvedMeasurement[] {
   return METRIC_TYPES.flatMap((type) => {
     const measurement = room.measurements?.[type];
-    if (!measurement || measurement.visible === false || measurement.sensors.length === 0) return [];
+    if (!measurement || measurement.sensors.length === 0) return [];
+    const visible = measurement.visible !== false;
+    const showInOverview = measurement.show_in_overview ?? (type === 'temperature' || type === 'relative_humidity');
+    if (scope !== 'details' && (!visible || (scope === 'overview' && !showInOverview))) return [];
     const primaryId = measurement.primary ?? measurement.sensors[0]!.entity;
-    const sensors = measurement.sensors.map((sensor) => resolveSensor(sensor, type, primaryId, hass));
+    const sensors = measurement.sensors.map((sensor) => resolveSensor(sensor, primaryId, hass));
     const primary = sensors.find((sensor) => sensor.is_primary) ?? sensors[0]!;
-    return [{ type, label: METRIC_LABELS[type], primary, sensors, ...(measurement.position ? { position: measurement.position } : {}) }];
+    return [{
+      type, label: METRIC_LABELS[type], primary, sensors,
+      visible, show_in_overview: showInOverview,
+      ...(measurement.position ? { position: measurement.position } : {}),
+    }];
   });
 }
