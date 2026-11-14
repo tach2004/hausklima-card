@@ -7,6 +7,7 @@ export async function buildCard() {
     entryPoints: ['src/index.ts'],
     outfile: 'dist/hausklima-card.js',
     bundle: true,
+    loader: { '.webp': 'dataurl' },
     format: 'esm',
     target: ['es2022'],
     minify: true,
