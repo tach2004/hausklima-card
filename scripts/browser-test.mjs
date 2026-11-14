@@ -130,6 +130,11 @@ async function checkStates(browser) {
   const empty = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });
   const initial = await ready(empty, '/');
   assert.equal(await initial.card.locator('.photo-metric').count(), 0);
+  assert.equal(await initial.card.locator('.photo-room.with-metrics, .photo-garage').count(), 0, 'unconfigured sensors create no dark photo panel');
+  assert.equal(await initial.card.locator('.garage-zone.no-readings').count(), 4, 'unconfigured garage devices use light navigation tiles');
+  const emptyBackground = await initial.card.locator('.photo-room.name-only').first().evaluate((element) => getComputedStyle(element).backgroundColor);
+  assert.equal(emptyBackground, 'rgba(0, 0, 0, 0)', 'unconfigured room has no dark overlay');
+
   assert.equal(await initial.card.locator('.sensor-row').count(), 0);
   assert.doesNotMatch(await initial.card.evaluate((element) => element.shadowRoot.textContent), /19[,.]8|21[,.]3|745/);
   await assertLayout(empty, initial.card, 'empty-state/mobile');
@@ -171,6 +176,16 @@ async function checkEditor(browser) {
   const page = await browser.newPage({ viewport: { width: 390, height: 900 }, hasTouch: true });
   const { card, editor, errors, external } = await ready(page);
   await page.locator('#editor-panel > summary').click();
+  const opacity = editor.locator('#chip-opacity');
+  assert.equal(await opacity.inputValue(), '72', 'default translucent background is 72 percent opaque');
+  await opacity.evaluate((element) => {
+    element.value = '55';
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  assert.equal((await page.evaluate(() => window.hausklimaPreview.getConfig())).chip_opacity, 0.55);
+  assert.match(await card.locator('ha-card').getAttribute('style'), /0\\.55/, 'opacity propagated to all dark panels');
+  // The editor panel is already open.
+
   await editor.locator('#room-select').selectOption('workshop');
   await editor.locator('#metric-select').selectOption('temperature');
   await editor.locator('#new-sensor select').selectOption('sensor.demo_additional_temperature');
