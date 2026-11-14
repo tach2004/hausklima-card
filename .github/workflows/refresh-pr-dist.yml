@@ -23,6 +23,10 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
+      - name: Install Chromium for responsive browser checks
+        run: npx playwright install --with-deps chromium
+      - name: Run responsive browser checks (desktop + phone emulation)
+        run: npm run test:browser
       - name: Commit only the rebuilt distribution (without merging PR)
         shell: bash
         run: |
