@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import '../src/index';
 import { HausKlimaCard } from '../src/hausklima-card';
-import { getDefaultConfig } from '../src/config';
+import { getDefaultConfig, normalizeConfig } from '../src/config';
 import { getDefaultBuilding } from '../src/defaults';
 import type { HausKlimaCardEditor } from '../src/hausklima-card-editor';
 import type { HausKlimaCardConfig, HomeAssistant } from '../src/types';
