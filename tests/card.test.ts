@@ -162,7 +162,7 @@ describe('Lovelace card integration', () => {
         sensors: [{ entity: 'sensor.test_temperature' }, { entity: 'sensor.test_secondary', name: 'Zweite Quelle' }],
       },
       absolute_humidity: { show_in_overview: false, sensors: [{ entity: 'sensor.test_absolute' }] },
-      voc: { sensors: [{ entity: 'sensor.test_voc' }] },
+      voc: { show_in_overview: false, sensors: [{ entity: 'sensor.test_voc' }] },
     };
     const card = await createCard({ ...getDefaultConfig(), building }, { states: {
       'sensor.test_temperature': { state: '20.4', attributes: { unit_of_measurement: '°C' } },
