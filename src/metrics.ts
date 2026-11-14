@@ -63,7 +63,7 @@ function resolveSensor(sensor: SensorConfig, primary: string, hass?: HomeAssista
 }
 
 /**
- * The default retains Phase-1 callers. Overview prioritizes temperature/RH;
+ * The default retains Phase-1 callers. Every configured metric is shown by default;
  * details always retain every configured source, including hidden metrics.
  */
 export function resolveMeasurements(room: RoomConfig, hass?: HomeAssistant, scope: MeasurementScope = 'visible'): ResolvedMeasurement[] {
@@ -71,7 +71,7 @@ export function resolveMeasurements(room: RoomConfig, hass?: HomeAssistant, scop
     const measurement = room.measurements?.[type];
     if (!measurement || measurement.sensors.length === 0) return [];
     const visible = measurement.visible !== false;
-    const showInOverview = measurement.show_in_overview ?? (type === 'temperature' || type === 'relative_humidity');
+    const showInOverview = measurement.show_in_overview ?? true;
     if (scope !== 'details' && (!visible || (scope === 'overview' && !showInOverview))) return [];
     const primaryId = measurement.primary ?? measurement.sensors[0]!.entity;
     const sensors = measurement.sensors.map((sensor) => resolveSensor(sensor, primaryId, hass));
