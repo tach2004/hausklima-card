@@ -50,6 +50,41 @@ describe('building model', () => {
   });
 });
 
+describe('garage equipment migration', () => {
+  it('includes garage air, both batteries, and cabinet without dummy sensor readings', () => {
+    const building = resolveBuilding(getDefaultConfig());
+    const ids = ['garage', 'garage_battery_pylontech', 'garage_battery_litime', 'garage_cabinet'];
+    for (const id of ids) {
+      const room = building.rooms.find((item) => item.id === id);
+      expect(room).toBeDefined();
+      expect(room?.measurements).toBeUndefined();
+      expect(room?.level_id).toBe('garage');
+    }
+    expect(building.garage_components_initialized).toBe(true);
+  });
+
+  it('migrates saved phase 2 configs without losing room/sensor mappings and only once', () => {
+    const legacy = getDefaultBuilding();
+    legacy.rooms = legacy.rooms.filter((room) =>
+      !['garage_battery_pylontech', 'garage_battery_litime', 'garage_cabinet'].includes(room.id));
+    delete legacy.garage_components_initialized;
+    legacy.rooms.find((room) => room.id === 'garage')!.measurements = {
+      temperature: { sensors: [{ entity: 'sensor.test_garage_temperature' }] },
+    };
+    const first = resolveBuilding({ ...getDefaultConfig(), building: legacy });
+    expect(first.rooms.filter((room) => room.level_id === 'garage')).toHaveLength(4);
+    expect(first.rooms.find((room) => room.id === 'garage')?.measurements?.temperature?.sensors[0]?.entity)
+      .toBe('sensor.test_garage_temperature');
+    const second = resolveBuilding({ ...getDefaultConfig(), building: first });
+    expect(second.rooms.filter((room) => room.level_id === 'garage')).toHaveLength(4);
+
+    // After migration, an intentionally removed component stays removed.
+    second.rooms = second.rooms.filter((room) => room.id !== 'garage_battery_litime');
+    expect(resolveBuilding({ ...getDefaultConfig(), building: second }).rooms.some((room) =>
+      room.id === 'garage_battery_litime')).toBe(false);
+  });
+});
+
 describe('configuration boundary', () => {
   it('defaults only omitted basic settings and preserves Lovelace metadata', () => {
     expect(normalizeConfig({ type: 'custom:hausklima-card', show_dimensions: false, view_layout: { grid_area: 'house' } })).toEqual({
