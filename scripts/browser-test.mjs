@@ -183,7 +183,7 @@ async function checkEditor(browser) {
     element.dispatchEvent(new Event('input', { bubbles: true }));
   });
   assert.equal((await page.evaluate(() => window.hausklimaPreview.getConfig())).chip_opacity, 0.55);
-  assert.match(await card.locator('ha-card').getAttribute('style'), /0\\.55/, 'opacity propagated to all dark panels');
+  assert.ok((await card.locator('ha-card').getAttribute('style')).includes('0.55'), 'opacity propagated to all dark panels');
   // The editor panel is already open.
 
   await editor.locator('#room-select').selectOption('workshop');
