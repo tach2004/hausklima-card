@@ -130,7 +130,7 @@ export const cardStyles = css`
 
   /* Photo-backed architectural scene; keep the panel view modestly sized. */
   .photo-main { min-width: 0; padding: 10px 24px 12px; }
-  .photo-lower { width: 100%; max-width: 1180px; margin: auto; padding: 0 0 20px; }
+  .photo-lower { width: 100%; max-width: var(--hk-scene-max-width, 1400px); margin: auto; padding: 0 0 20px; }
   .photo-lower .location-column {
     display: grid;
     grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr);
@@ -144,7 +144,7 @@ export const cardStyles = css`
     padding: 16px;
     background: color-mix(in srgb, var(--hk-paper) 95%, #d5e6e3);
   }
-  .photo-main .room-detail { margin: 14px auto; max-width: 1180px; }
+  .photo-main .room-detail { margin: 14px auto; max-width: var(--hk-scene-max-width, 1400px); }
   .garage-title { display: flex; align-items: center; margin-bottom: 12px; }
   .garage-title strong { font-size: 15px; }
   .garage-title p { margin: 3px 0 0; color: var(--hk-muted); font-size: 11px; }

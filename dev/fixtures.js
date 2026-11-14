@@ -37,27 +37,34 @@ export const demoConfig = {
       room('bedroom', 'Schlafzimmer', 'attic', 7.6),
       room('storage', 'Abstellraum', 'attic', 3.6),
       room('garage', 'Garage', 'garage', 6),
+      { ...room('garage_cabinet', 'Schaltschrank', 'garage', null), visible: false },
+      { ...room('garage_battery_pylontech', 'Pylontech', 'garage', null), visible: false },
+      { ...room('garage_battery_litime', 'LiTime', 'garage', null), visible: false },
       { id: 'demo_outdoor', name: 'Außen', location: 'outdoor', level_id: 'ground_floor', visible: false, width_m: null,
         measurements: {
           temperature: { sensors: [{ entity: 'sensor.demo_outdoor_homematic_temperature', name: 'Homematic' }, { entity: 'sensor.demo_outdoor_ecowitt_temperature', name: 'Ecowitt' }], primary: 'sensor.demo_outdoor_ecowitt_temperature' },
           relative_humidity: { sensors: [{ entity: 'sensor.demo_outdoor_homematic_humidity', name: 'Homematic' }, { entity: 'sensor.demo_outdoor_ecowitt_humidity', name: 'Ecowitt' }], primary: 'sensor.demo_outdoor_ecowitt_humidity' },
         },
       },
+      { id: 'demo_outdoor_north', name: 'Außen Nord', location: 'outdoor', level_id: 'ground_floor', visible: false, width_m: null,
+        measurements: { temperature: temperature('outdoor_north'), relative_humidity: humidity('outdoor_north') },
+      },
       { id: 'demo_study', name: 'Arbeitszimmer', location: 'indoor', level_id: 'ground_floor', visible: false, width_m: null,
         measurements: { temperature: temperature('study'), relative_humidity: humidity('study') },
       },
     ],
+    garage_components_initialized: true,
     notes: ['DEMO-WERTE: ausschließlich synthetische Zustände für Entwicklung und Tests.'],
   },
 };
 const bedroom = demoConfig.building.rooms.find((entry) => entry.id === 'bedroom');
 bedroom.measurements.co2 = { sensors: [{ entity: 'sensor.demo_bedroom_co2', name: 'CO₂' }], show_in_overview: true };
-bedroom.measurements.voc = { sensors: [{ entity: 'sensor.demo_bedroom_voc', name: 'VOC-Index' }], show_in_overview: false };
-bedroom.measurements.absolute_humidity = { sensors: [{ entity: 'sensor.demo_bedroom_absolute_humidity', name: 'Absolute Feuchte' }], show_in_overview: false };
+bedroom.measurements.voc = { sensors: [{ entity: 'sensor.demo_bedroom_voc', name: 'VOC-Index' }], show_in_overview: true };
+bedroom.measurements.absolute_humidity = { sensors: [{ entity: 'sensor.demo_bedroom_absolute_humidity', name: 'Absolute Feuchte' }], show_in_overview: true };
 
 const values = {
-  workshop: [19.8, 50], basement_hall: [20.9, 51], laundry: [21.1, 52], living_room: [21.8, 47],
-  ground_hall: [21.4, 49], kitchen: [21.2, 48], bedroom: [21.3, 48], storage: [20.8, 49], garage: [18.9, 55], study: [22.1, 46],
+  workshop: [19.8, 50], basement_hall: [20.9, 51], laundry: [16.8000011444092, 52], living_room: [21.8, 47],
+  ground_hall: [21.4, 49], kitchen: [21.2, 48], bedroom: [21.3, 48], storage: [20.8, 49], garage: [18.9, 55], garage_cabinet: [25.4321, 42], garage_battery_pylontech: [23.8, 45], garage_battery_litime: [24.1, 46], outdoor_north: [2.8, 90.5], study: [22.1, 46],
 };
 export const demoStates = {};
 for (const [id, [temp, rh]] of Object.entries(values)) {

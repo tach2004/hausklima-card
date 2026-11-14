@@ -310,3 +310,33 @@ describe('Native HA selector loading', () => {
     }
   });
 });
+
+
+describe('scene width visual setting', () => {
+  it('updates width immediately on input and preserves v0.1.1 mappings, names, opacity and unknown fields on reload', async () => {
+    const building = getDefaultBuilding();
+    building.rooms.find((room) => room.id === 'garage_battery_pylontech')!.name = 'Eigene Batterie';
+    building.rooms[0]!.measurements = { temperature: {
+      sensors: [{ entity: 'sensor.test_first', name: 'Quelle' }, { entity: 'sensor.test_second' }],
+      primary: 'sensor.test_second', visible: true, show_in_overview: false,
+    } };
+    const original: HausKlimaCardConfig = { ...getDefaultConfig(), chip_opacity: 0.57, building,
+      future_setting: { untouched: true }, grid_options: { columns: 'full', rows: 'auto' } };
+    const before = structuredClone(original);
+    const editor = await createEditor(original);
+    const configs = capture(editor);
+    const slider = input(editor, 'scene-max-width');
+    expect(slider.type).toBe('range');
+    expect([slider.min, slider.max, slider.step, slider.value]).toEqual(['900', '1600', '10', '1400']);
+    slider.value = '1590';
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    await editor.updateComplete;
+    expect(configs).toHaveLength(1);
+    expect(latest(configs)).toEqual({ ...before, scene_max_width: 1590 });
+    expect(original).toEqual(before);
+    expect(editor.shadowRoot?.textContent).toContain('1590 px');
+    const reloaded = await createEditor(JSON.parse(JSON.stringify(latest(configs))) as HausKlimaCardConfig);
+    expect(input(reloaded, 'scene-max-width').value).toBe('1590');
+    expect(reloaded.shadowRoot?.textContent).toContain('1590 px');
+  });
+});

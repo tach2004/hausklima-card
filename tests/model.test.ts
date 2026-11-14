@@ -268,9 +268,9 @@ describe('Phase 2 overview and details', () => {
     const sensor = resolveMeasurements(configuredRoom(), { states: {
       'sensor.test_secondary': { state: '21.125', attributes: { unit_of_measurement: '°C' } },
     } })[0]!.primary;
-    expect(formatSensorValue(sensor, { states: {}, locale: { language: 'de' } })).toBe('21,125');
-    expect(formatSensorValue(sensor, { states: {}, locale: { number_format: 'comma_decimal' } })).toBe('21.125');
-    expect(formatSensorValue(sensor, { states: {}, locale: { number_format: 'none' } })).toBe('21.125');
+    expect(formatSensorValue(sensor, { states: {}, locale: { language: 'de' } })).toBe('21,1');
+    expect(formatSensorValue(sensor, { states: {}, locale: { number_format: 'comma_decimal' } })).toBe('21.1');
+    expect(formatSensorValue(sensor, { states: {}, locale: { number_format: 'none' } })).toBe('21.1');
     expect(sensor.value).toBe('21.125');
     expect(sensor.unit).toBe('°C');
     expect(formatSensorValue({ ...sensor, value: null, status: 'unavailable' })).toBe('Nicht verfügbar');
@@ -278,14 +278,65 @@ describe('Phase 2 overview and details', () => {
     expect(sensorStatusLabel('missing')).toBe('Entität fehlt');
   });
 
-  it.each(['21.333333333333333333', '99999999999999999999', '1e-30', '0.00000000000000000000001'])(
-    'preserves source precision for %s when localizing a numeric sensor', (raw) => {
-      const sensor = resolveMeasurements(configuredRoom(), { states: {
-        'sensor.test_secondary': { state: raw, attributes: { unit_of_measurement: '°C' } },
-      } })[0]!.primary;
-      expect(formatSensorValue(sensor, { states: {}, locale: { language: 'de' } })).toBe(raw.replace('.', ','));
-      expect(sensor.value).toBe(raw);
-    },
-  );
+  it.each([
+    ['16.8000011444092', '16,8'], ['5', '5,0'], ['68.5', '68,5'], ['745', '745,0'],
+    ['-3.4512345678912', '-3,5'], ['0', '0,0'], ['-0.01', '-0,0'], ['0.05', '0,1'],
+    ['21.333333333333333333', '21,3'], ['99999999999999999999', '99999999999999999999,0'],
+    ['1e3', '1000,0'], ['0e999999999999999999999', '0,0'], ['1e-30', '0,0'], ['0.00000000000000000000001', '0,0'],
+  ])('rounds only the display of %s to exactly one decimal (%s)', (raw, expected) => {
+    const hass: HomeAssistant = { states: {
+      'sensor.test_secondary': { state: raw, attributes: { unit_of_measurement: 'a deliberately long sensor unit' } },
+    } };
+    const original = structuredClone(hass);
+    const sensor = resolveMeasurements(configuredRoom(), hass)[0]!.primary;
+    expect(formatSensorValue(sensor, { ...hass, locale: { language: 'de' } })).toBe(expected);
+    expect(sensor.value).toBe(raw);
+    expect(sensor.unit).toBe('a deliberately long sensor unit');
+    expect(hass).toEqual(original);
+  });
 
+  it.each([
+    ['comma_decimal', '16.8'], ['decimal_comma', '16,8'], ['space_comma', '16,8'],
+    ['none', '16.8'], ['language', '16,8'],
+  ])('honors HA number format %s with one decimal', (number_format, expected) => {
+    const sensor = resolveMeasurements(configuredRoom(), { states: {
+      'sensor.test_secondary': { state: '16.8000011444092', attributes: {} },
+    } })[0]!.primary;
+    expect(formatSensorValue(sensor, { states: {}, locale: { language: 'de', number_format } })).toBe(expected);
+    expect(sensor.unit).toBe('');
+  });
+
+  it('uses system/language locale, a safe invalid-locale fallback, and honest nonnumeric/status values', () => {
+    const sensor = resolveMeasurements(configuredRoom(), { states: {
+      'sensor.test_secondary': { state: '5', attributes: {} },
+    } })[0]!.primary;
+    expect(formatSensorValue(sensor, { states: {}, locale: { language: 'en' } })).toBe('5.0');
+    expect(formatSensorValue(sensor, { states: {}, locale: { language: 'invalid_locale' } })).toBe('5,0');
+    expect(formatSensorValue(sensor, { states: {}, locale: { number_format: 'system' } }))
+      .toBe(new Intl.NumberFormat(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false }).format(5));
+    for (const raw of ['on', '', ' ', 'NaN', 'Infinity', '0x10']) {
+      expect(formatSensorValue({ ...sensor, value: raw })).toBe(raw);
+    }
+    expect(formatSensorValue({ ...sensor, status: 'unknown', value: null })).toBe('Unbekannt');
+    expect(formatSensorValue({ ...sensor, status: 'missing', value: null })).toBe('Entität fehlt');
+    expect(formatSensorValue({ ...sensor, status: 'unavailable', value: null })).toBe('Nicht verfügbar');
+  });
+
+});
+
+
+describe('building scene width', () => {
+  it('defaults legacy cards to 1400 px and preserves saved width through reload', () => {
+    const config = normalizeConfig({ type: 'custom:hausklima-card', scene_max_width: 1530, chip_opacity: 0.57, custom: { retained: true } });
+    expect(normalizeConfig({ type: 'custom:hausklima-card' }).scene_max_width).toBe(1400);
+    expect(normalizeConfig(JSON.parse(JSON.stringify(config)))).toEqual(config);
+  });
+
+  it.each([900, 1250, 1400, 1600])('accepts a scene width of %s px', (scene_max_width) => {
+    expect(normalizeConfig({ ...getDefaultConfig(), scene_max_width }).scene_max_width).toBe(scene_max_width);
+  });
+
+  it.each([899, 1601, 0, -1, NaN, Infinity, '1400', null])('rejects invalid scene width %s', (scene_max_width) => {
+    expect(() => normalizeConfig({ ...getDefaultConfig(), scene_max_width })).toThrow(/scene_max_width/);
+  });
 });

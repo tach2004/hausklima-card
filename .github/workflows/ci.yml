@@ -21,6 +21,13 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
+      - run: node --test scripts/next-version.test.mjs
       - run: npm run build
       - name: Verify committed distribution
         run: git diff --exit-code -- dist
+      - name: Install Chromium and system dependencies
+        run: npx playwright install --with-deps chromium
+      - name: Required Chromium browser tests
+        env:
+          SKIP_WEBKIT: "1"
+        run: npm run test:browser

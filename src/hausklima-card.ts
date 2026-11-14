@@ -2,6 +2,7 @@ import { LitElement, html, nothing } from 'lit';
 import { getDefaultConfig, normalizeConfig, resolveBuilding } from './config';
 import { renderPhotoView, photoStyles } from './photo-view';
 import { createLayout } from './layout';
+import { layoutPhotoOverlays } from './overlay-layout';
 import { formatSensorValue, resolveMeasurements, sensorStatusLabel } from './metrics';
 import type { BuildingConfig, HausKlimaCardConfig, HomeAssistant, MetricType, ResolvedMeasurement, ResolvedSensor, RoomConfig } from './types';
 import { cardStyles } from './styles';
@@ -18,11 +19,43 @@ export class HausKlimaCard extends LitElement {
     _config: { state: true },
     _selected: { state: true },
     _showRooms: { state: true },
+    _outdoorId: { state: true },
   };
   declare hass?: HomeAssistant;
   private _config?: HausKlimaCardConfig;
   private _selected?: string;
   private _showRooms = false;
+  private _outdoorId?: string;
+  private photoResize?: ResizeObserver;
+  private photoImage?: HTMLImageElement;
+  private photoFrame?: number;
+
+  protected updated(): void {
+    const image = this.renderRoot.querySelector<HTMLImageElement>('.photo-image');
+    if (image && image !== this.photoImage && typeof ResizeObserver !== 'undefined') {
+      this.photoResize?.disconnect();
+      this.photoImage = image;
+      this.photoResize = new ResizeObserver(() => this.queuePhotoLayout());
+      this.photoResize.observe(image);
+    }
+    this.queuePhotoLayout();
+  }
+
+  private queuePhotoLayout(): void {
+    if (this.photoFrame !== undefined) cancelAnimationFrame(this.photoFrame);
+    this.photoFrame = requestAnimationFrame(() => {
+      this.photoFrame = undefined;
+      const stage = this.renderRoot.querySelector<HTMLElement>('.photo-stage');
+      if (stage) layoutPhotoOverlays(stage);
+    });
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.photoResize?.disconnect();
+    this.photoImage = undefined;
+    if (this.photoFrame !== undefined) cancelAnimationFrame(this.photoFrame);
+  }
 
   setConfig(config: unknown): void {
     this._config = normalizeConfig(config);
@@ -112,16 +145,16 @@ export class HausKlimaCard extends LitElement {
   }
 
   /** Garage air, two batteries and control cabinet each have their own HA sensors. */
-  private renderGarage(room: RoomConfig, equipment: RoomConfig[]) {
+  private renderGarage(room: RoomConfig | undefined, equipment: RoomConfig[]) {
     return html`<section class="garage-block location-block" aria-label="Garage und Batterietechnik">
       <div class="garage-title">
         <div><span class="location-icon" aria-hidden="true">▣</span>
           <strong>Garage und Batterietechnik</strong>
-          <p>Vier unabhängig konfigurierbare Klimamessstellen</p>
+          <p>Unabhängig konfigurierbare Klimamessstellen</p>
         </div>
       </div>
       <div class="garage-zones">
-        ${[room, ...equipment].map((device) => html`<button type="button"
+        ${[...(room ? [room] : []), ...equipment].map((device) => html`<button type="button"
           class="garage-zone ${resolveMeasurements(device, this.hass, 'overview').length ? '' : 'no-readings'}" data-select-room=${device.id}
           @click=${() => this.selectRoom(device)}
           aria-label=${`${device.name} – Messwerte und Sensorquellen öffnen`}>
@@ -170,11 +203,11 @@ export class HausKlimaCard extends LitElement {
     const garageEquipment = garages.filter((room) => room.id !== 'garage');
     const others = building.rooms.filter((room) => !drawnIds.has(room.id) && !garageIds.has(room.id) && room.location !== 'outdoor');
     const selected = building.rooms.find((room) => room.id === this._selected);
-    return html`<ha-card style=${`--hk-chip: rgba(22, 26, 30, ${config.chip_opacity ?? 0.72});`}>
+    return html`<ha-card style=${`--hk-chip: rgba(22, 26, 30, ${config.chip_opacity ?? 0.72}); --hk-scene-max-width: ${config.scene_max_width ?? 1400}px;`}>
       <header class="card-header"><div class="card-title"><span class="home-icon" aria-hidden="true">⌂</span>${config.title ? html`<h1>${config.title}</h1>` : nothing}</div>
         <button class="overview-toggle" aria-expanded=${String(this._showRooms)} @click=${() => { this._showRooms = !this._showRooms; }}>Räume <span>${building.rooms.length}</span></button></header>
       <div class="photo-main">
-        ${renderPhotoView(building, this.hass, config.show_room_names ?? true, (room) => this.selectRoom(room), this._selected)}
+        ${renderPhotoView(building, this.hass, config.show_room_names ?? true, (room) => this.selectRoom(room), this._selected, { outdoorId: this._outdoorId, onOutdoorChange: (id) => { this._outdoorId = id; } })}
         ${selected ? this.renderDetails(selected, building) : nothing}
       </div>
       <div class="photo-lower">
@@ -182,9 +215,9 @@ export class HausKlimaCard extends LitElement {
           <div class="section-title"><h2>Räume</h2><span>Antippen für alle Sensorquellen</span></div>
           <div class="room-list house-room-list">${shapes.map((shape, index) => this.renderRoomTile(shape.room, building, index + 1))}</div>
         </section>
-        ${outdoor.length || garage ? html`<aside class="location-column" aria-label="Außen und Garage">
+        ${outdoor.length || garages.length ? html`<aside class="location-column" aria-label="Außen und Garage">
           ${outdoor.map((room) => this.renderOutdoor(room))}
-          ${garage ? this.renderGarage(garage, garageEquipment) : nothing}
+          ${garage || garageEquipment.length ? this.renderGarage(garage, garageEquipment) : nothing}
         </aside>` : nothing}
       </div>
       ${others.length ? html`<section class="other-rooms" aria-label="Weitere Räume"><div class="section-title"><h2>Weitere Räume</h2><span>Alle Messorte, auch außerhalb der Hausansicht</span></div>

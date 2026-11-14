@@ -2,7 +2,7 @@
 
 Eine eigenständige Home-Assistant-Karte für eine räumliche Hausklimaübersicht: eine lokal gebündelte, hochwertige Architekturillustration mit dunklen, leicht transparenten Messwertfeldern, freistehender Garage und einer eigenen Übersicht für Außenmessorte und weitere Räume. TypeScript und Lit; ohne Cloudzugriff, externe Schriftarten oder Abhängigkeit von anderen Custom Cards.
 
-**Stand: Phase 2.** Räume und Sensoren lassen sich im grafischen Lovelace-Karteneditor einrichten. Alle fünf Messarten (Temperatur, relative und absolute Luftfeuchtigkeit, CO₂, VOC) können einzeln in der Übersicht erscheinen; Raumdetails zeigen sämtliche zugeordneten Quellen. Die installierte Karte enthält keine erfundenen Sensoren oder Messwerte.
+**Stand: Overlay-Überarbeitung für v0.1.2.** Räume und Sensoren lassen sich im grafischen Lovelace-Karteneditor einrichten. Alle fünf Messarten (Temperatur, relative und absolute Luftfeuchtigkeit, CO₂, VOC) können einzeln in der Übersicht erscheinen; Raumdetails zeigen sämtliche zugeordneten Quellen. Die installierte Karte enthält keine erfundenen Sensoren oder Messwerte.
 
 ## Installation
 
@@ -31,21 +31,21 @@ Empfohlen ist eine eigene **Panel-Ansicht mit genau einer HausKlima Card**. So e
 2. Im grafischen Karteneditor unter **Raum auswählen** einen vorhandenen Raum wählen, etwa Wohnzimmer, Werkstatt oder Garage.
 3. Unter **Messart** Temperatur, relative Feuchte, absolute Feuchte, CO₂ oder VOC wählen.
 4. Die gewünschte HA-Entität über **Sensor auswählen** beziehungsweise **Weiteren Sensor auswählen** zuordnen. Weitere Sensoren derselben Messart können beliebig ergänzt, benannt, entfernt und als Hauptsensor ausgewählt werden.
-5. Im Abschnitt **Darstellung** kannst du die Deckkraft der dunklen Messwert-Kästchen stufenlos zwischen 35 und 100 % einstellen (Standard 72 %). Nur der Hintergrund wird transparenter, nicht der Text. Die Schalter **Messart in Übersichten aktiv** und **Hauptwert im Raum anzeigen** nach Bedarf einstellen. Alle konfigurierten Messarten erscheinen standardmäßig in der Übersicht, sofern sie nicht ausdrücklich mit **Hauptwert im Raum anzeigen** ausgeblendet werden. Ausgeblendete Zuordnungen bleiben in den Raumdetails erreichbar.
+5. Im Abschnitt **Darstellung** kannst du die Deckkraft der dunklen Messwert-Kästchen stufenlos zwischen 35 und 100 % einstellen (Standard 72 %). Nur der Hintergrund wird transparenter, nicht der Text. Der zusätzliche Breitenregler **Maximale Breite der Gebäudeansicht** verändert die Vorschau unmittelbar und wird zusammen mit der Deckkraft gespeichert. Die Schalter **Messart in Übersichten aktiv** und **Hauptwert im Raum anzeigen** nach Bedarf einstellen. Alle konfigurierten Messarten erscheinen standardmäßig in der Übersicht, sofern sie nicht ausdrücklich mit **Hauptwert im Raum anzeigen** ausgeblendet werden. Ausgeblendete Zuordnungen bleiben in den Raumdetails erreichbar.
 6. Bei Bedarf **Raum oder Außenmessort hinzufügen** öffnen, Art, Name und für Innenräume die Gebäudeebene wählen; dann **Messort hinzufügen** betätigen. Zusätzliche Räume erhalten keine erfundene Position im Gebäude und bleiben über die Raumübersicht erreichbar. Die Garage ist bereits ein eigener Messort und wird über die vorhandene Raumwahl eingerichtet.
 7. Zum Löschen eines Messorts **Raum entfernen** wählen und die Nachfrage mit **Entfernen bestätigen** bestätigen; **Abbrechen** erhält ihn. Anschließend Änderungen im Dashboard speichern. Zuordnungen, Anzeigenamen und Hauptsensorwahl gehören zur Kartenkonfiguration und bleiben nach erneutem Laden erhalten.
 
 Auf einen Raum in der Grafik oder in der Raumübersicht tippen beziehungsweise klicken, um seine Details zu öffnen. Dort sind alle zugeordneten Sensoren mit Anzeigename, Entity-ID, Hauptsensor-Kennzeichnung, Status, Wert und tatsächlicher Einheit aufgeführt. Die Auswahl einer Quelle öffnet Home Assistants übliche Entitätsdetails. Die Raumwahl funktioniert auch per Tastatur.
 
-Nicht konfigurierte Messarten erzeugen keine leeren Werte. Eine konfigurierte fehlende Entität, `unknown` und `unavailable` bleiben als unterscheidbare Zustände sichtbar. Fällt ein Hauptsensor aus, wird er entsprechend gekennzeichnet; die Karte ersetzt ihn nicht stillschweigend durch eine andere Quelle. Es werden keine Einheiten umgerechnet und keine absoluten Feuchtewerte berechnet.
+Nicht konfigurierte Messarten erzeugen keine leeren Werte. Eine konfigurierte fehlende Entität, `unknown` und `unavailable` bleiben als unterscheidbare Zustände sichtbar. Fällt ein Hauptsensor aus, wird er entsprechend gekennzeichnet; die Karte ersetzt ihn nicht stillschweigend durch eine andere Quelle. Alle numerischen Sensorwerte werden überall mit **genau einer Nachkommastelle** nach HA-Zahlenformat angezeigt: etwa `16.8000011444092 → 16,8`, `5 → 5,0`, `745 → 745,0`. Nur die Anzeige wird gerundet; HA-Zustände und gespeicherte Daten bleiben unverändert. Nicht-numerische Werte bleiben Text. Baumaße, Entity-IDs und Versionen fallen nicht unter diese Regel. Es werden keine Einheiten umgerechnet oder gekürzt und keine absoluten Feuchtewerte berechnet.
 
 ## Darstellung auf Desktop und Smartphone
 
-Die Hauptansicht zeigt die 12-m-Traufseite mit geöffnetem Dachgeschoss. Die warmen Räume, Möbel, Materialeffekte und perspektivischen Versätze sind eine dekorative SVG-Darstellung, keine bestätigte Ausstattung oder baulich genaue Konstruktion. Der First läuft parallel zur sichtbaren Fassade.
+Die Hauptansicht verwendet die freigegebene, unveränderte lokale Architekturillustration `src/assets/hausklima-cutaway.webp`. Räume, Möbel, Materialeffekte und perspektivische Tiefe sind dekorativ, keine bestätigte Ausstattung oder baulich genaue Konstruktion. Nur dynamische HTML-/CSS-Overlays mit tatsächlichen HA-Werten liegen über dem Bild. Das vollständige Bild wird proportional skaliert und weder zugeschnitten noch verzerrt.
 
 Auf breiten Karten stehen Haus und freistehende Garage vollständig im sichtbaren Bereich. Bei weniger Platz wird die Anordnung umgebaut: eine kompakte Gebäudeansicht dient der Raumauswahl, große Raumkarten und Details zeigen die lesbaren Werte darunter. Garage, Außenmessorte und verdeckte Räume bleiben erreichbar. Es ist keine andere YAML-Konfiguration für das Smartphone nötig; eine erzwungene horizontale Bildlaufleiste entfällt.
 
-Die dunklen Messwertfelder haben nur im Hintergrund die konfigurierbare Transparenz (standardmäßig 72 % Deckkraft); Beschriftungen, Werte und Symbole bleiben deckend. **Ohne konfigurierte Hauptwerte erscheint kein schwarzer Kasten**, nur der Raumname als unaufdringliche Beschriftung bzw. der Raum bleibt über die Raumübersicht auswählbar. Light- und Dark-Theme werden unterstützt. Bei schmalen Räumen oder zu wenig Platz verweist die kompakte Darstellung auf die vollständigen Raumdetails.
+Die dunklen Messwertfelder haben nur im Hintergrund die konfigurierbare Transparenz (standardmäßig 72 % Deckkraft); Beschriftungen, Werte und Symbole bleiben deckend. **Ohne konfigurierte Hauptwerte erscheint kein schwarzer Kasten**, nur der Raumname als unaufdringliche Beschriftung bzw. der Raum bleibt über die Raumübersicht auswählbar. Light- und Dark-Theme werden unterstützt. Lange Werte und Einheiten werden umgebrochen; die Anordnung misst die tatsächliche Größe bei Zustands- und Breitenänderungen. Passt eine Messwertfläche nicht kollisionsfrei an ihren Bild-Anker, dockt dieselbe vollständige Fläche im erweiterten Bildbereich unter der unveränderten Illustration an. Verbindungslinien und eigene Touch-Ziele an den Objekten erhalten die eindeutige Zuordnung. Werte werden nie durch einen `Details`-Platzhalter ersetzt. Bei Kartenbreiten bis 1000 CSS-Pixeln werden zu kleine Bild-Badges und Verbindungslinien ausgeblendet; die darunterliegenden Raum-, Außen- und Gerätekarten zeigen dann automatisch alle aktiven Hauptwerte ohne Zusatzklick.
 
 [Tatsächliche Desktop- und Mobile-Screenshots](docs/screenshots/README.md) zeigen die implementierte Karte. Werte in diesen Entwicklungsscreenshots sind ausdrücklich **DEMO-WERTE** aus getrennten Testdaten; sie sind kein Bestandteil der Produktionsvorgaben und keine echten HA-Messungen.
 
@@ -67,6 +67,7 @@ show_room_names: true
 | `show_dimensions` | `true` | Aufklappbare Gebäudedetails mit bekannten Maßen und offenen Punkten anbieten |
 | `show_room_names` | `true` | Raumnamen in der Gebäudeansicht anzeigen |
 | `chip_opacity` | `0.72` | Deckkraft aller schwarzen Messwertflächen von `0.35` bis `1` (auch im visuellen Editor) |
+| `scene_max_width` | `1400` | Maximale Breite der vollständigen Gebäudeansicht in CSS-Pixeln, gültig von `900` bis `1600` |
 | `building` | Vorgabegebäude | Gebäudemodell einschließlich der im Editor gespeicherten Raum- und Sensorzuordnungen |
 
 Ältere Phase-1-Konfigurationen bleiben gültig. Die bekannten Gebäude- und Raumvorgaben mit ihren stabilen IDs bleiben erhalten. Die [minimale Karten-YAML](examples/basic.yaml) enthält keine Sensor-Entity-IDs. Die Beispiele [Panel](examples/views/panel.yaml) und [Sections](examples/views/sections.yaml) sind dagegen jeweils **ein Ansichtsobjekt**: in den YAML-Editor einer Ansicht oder als eingerücktes Listenelement unter `views:` einfügen, nicht in den Karten-YAML-Editor und nicht als vollständiges Dashboard. HACS legt keine Dashboard-Ansicht automatisch an.
@@ -76,9 +77,9 @@ show_room_names: true
 Die lichte Raumfolge und sämtliche bestätigten Maße bleiben unverändert. Die verbleibenden Breiten bis 12 m werden nicht als neue Räume ausgegeben und nicht stillschweigend durch angepasste Raum- oder Wandmaße aufgefüllt. Wandzuordnung, Dachneigung, Deckendicken und endgültige Schnittgeometrie sind weiterhin offen. Die Garage steht schematisch rechts mit ungefähr 5 m Abstand und hat keine bauliche Verbindung zum Haus. [Architektur und Maßprüfung](docs/architecture.md)
 
 
-## Neue visuelle Hausansicht und Garagen-Klimamessstellen
+## Unverändertes Hausbild und getrennte Garagen-Klimamessstellen
 
-Ab der nächsten Version wird eine **eigenständige, lokale Hausillustration** in `src/assets/hausklima-cutaway.webp` zusammen mit dem Kartencode ausgeliefert. Über der Illustration zeigt die Karte **dynamische, leicht transparente Messwert-Panels** aus den tatsächlich konfigurierten Home-Assistant-Sensoren. Die Illustration enthält **keine** vorgegebenen Sensorwerte. Möbel, Fenster und Dachdetails sind gestalterisch, nicht als maßstäbliche reale Hauseigenschaften zu verstehen.
+Die **freigegebene lokale Hausillustration** `src/assets/hausklima-cutaway.webp` wird unverändert zusammen mit dem Kartencode ausgeliefert. Über der Illustration zeigt die Karte **dynamische, leicht transparente Messwert-Panels** aus den tatsächlich konfigurierten Home-Assistant-Sensoren. Die Illustration enthält **keine** vorgegebenen Sensorwerte. Möbel, Fenster und Dachdetails sind gestalterisch, nicht als maßstäbliche reale Hauseigenschaften zu verstehen.
 
 Für die Garage gibt es nun vier unabhängige Messorte im visuellen Editor:
 
@@ -87,9 +88,13 @@ Für die Garage gibt es nun vier unabhängige Messorte im visuellen Editor:
 - **LiTime** – zweite Batterie
 - **Schaltschrank** – elektrische Ausrüstung
 
-Jeder Messort unterstützt Temperatur, relative und absolute Luftfeuchtigkeit, CO₂ und VOC. **Nur tatsächlich zugewiesene Messwerte** werden angezeigt. Die Garage hat zusätzlich ein eigenes, dynamisches schwarzes Klimafeld direkt auf dem Bild, sobald ihr wenigstens ein Hauptwert zugeordnet ist. Die zwei Batterien und der Schaltschrank haben separat auswählbare Messwertfelder im Garagenbereich darunter; unkonfigurierte Einträge bleiben als neutrale, helle Navigationselemente sichtbar. Die angezeigten Namen sind über den GUI-Editor änderbar, ebenso können mehrere Sensoren einer Messart zugeordnet werden. Die neuen Messorte werden einmalig zu älteren gespeicherten Konfigurationen hinzugefügt, ohne deren vorhandene Sensor-Entity-IDs zu ersetzen.
+Jeder Messort unterstützt Temperatur, relative und absolute Luftfeuchtigkeit, CO₂ und VOC. **Nur tatsächlich zugewiesene Messwerte** werden angezeigt. Garage, Schaltschrank und beide Batterien haben jeweils eigene, zu den sichtbaren Objekten zugeordnete Messwertflächen und Touch-Ziele auf beziehungsweise am Bild. Bei Platzmangel halten versetzte oder angedockte Karten die Werte getrennt lesbar. Die Gerätekarten darunter bleiben eine zusätzliche Bedienmöglichkeit. Unkonfigurierte Einträge bleiben neutral; es erscheinen keine leeren schwarzen Kästchen. Die angezeigten Namen sind über den GUI-Editor änderbar, ebenso können mehrere Sensoren einer Messart zugeordnet werden. Die neuen Messorte werden einmalig zu älteren gespeicherten Konfigurationen hinzugefügt, ohne deren vorhandene Sensor-Entity-IDs zu ersetzen.
 
-Die Architekturillustration ist auf Desktop/Panel **auf maximal 1180 px Breite begrenzt**, damit das Haus nicht überdimensioniert wirkt. Auf iPhone 17 (Hoch-/Querformat) wird dieselbe Gesamtansicht zur Orientierung verwendet und eine darunterliegende, größere Raum-/Geräteauswahl angeboten. Eine eigene zweite YAML-Konfiguration fürs iPhone ist nicht erforderlich.
+Die Architekturillustration ist auf Desktop/Panel zentriert und standardmäßig **maximal 1400 CSS-Pixel breit**. Im grafischen Editor bestimmt **Maximale Breite der Gebäudeansicht** (`scene_max_width`) die Obergrenze zwischen **900 und 1600 Pixeln in Zehnerschritten**, mit sofortiger Vorschau. Auf iPhone 17 (Hoch-/Querformat) wird dieselbe vollständige Gesamtansicht zur Orientierung verwendet; darunter sind die aktiven Hauptwerte in großen Raum-/Gerätekarten unmittelbar lesbar. Eine zweite YAML-Konfiguration fürs iPhone ist nicht nötig.
+
+In **Sections** bleibt die vom Home-Assistant-Grid bereitgestellte Breite maßgeblich. Eine größere Obergrenze macht eine schmale Sektion nicht automatisch breiter. Bei Bedarf Karte über `grid_options: { columns: full, rows: auto }` auf volle verfügbare Breite setzen und die Sektion im HA-Editor verbreitern; siehe [Ansichtsbeispiele](examples/views/README.md).
+
+Außenmessorte mit aktiven Hauptwerten erscheinen zusätzlich in einem eigenen dunklen Panel oberhalb der Garage. Bei mehreren Orten bietet **Außenmessort im Bild** alle aktiven Orte in ihrer gespeicherten Konfigurationsreihenfolge an. Anfangs wird der erste angezeigt; die Auswahl betrifft nur diese Ansicht und beginnt nach Neuladen wieder beim ersten Ort. Ein Klick auf das Panel öffnet genau dessen Quellen. Sensoren verschiedener Orte sowie Garage und Außenmessort bleiben getrennt. Orte ohne aktive Hauptwerte erzeugen kein schwarzes Panel und bleiben in der normalen Außenübersicht erreichbar.
 
 **Hinweis zur Installation:** Die Bilddatei wird über esbuild in `dist/hausklima-card.js` eingebettet; die übliche einzelne HACS-JavaScript-Datei genügt. Beim ersten Öffnen nach einem Update eventuell den Browsercache aktualisieren.
 
@@ -106,7 +111,7 @@ npm run test:browser
 npm run dev
 ```
 
-`npm run build` erzeugt die eigenständig installierbare Datei `dist/hausklima-card.js` einschließlich Lit und Lizenzhinweisen. Das Bundle wird mitversioniert. CI und Release-Workflow prüfen Typen, Tests, Build und die Übereinstimmung des eingecheckten Bundles mit den Quellen.
+`npm run build` erzeugt die eigenständig installierbare Datei `dist/hausklima-card.js` einschließlich Lit und Lizenzhinweisen. Das Bundle wird mitversioniert. CI und Release-Workflow prüfen Typen, Tests, Build und die Übereinstimmung des eingecheckten Bundles mit den Quellen. Die normale PR-CI führt zusätzlich verbindlich die Chromium-Browserprüfungen aus; ein Fehler lässt den Check fehlschlagen.
 
 `npm run dev` startet die lokale Vorschau unter `http://127.0.0.1:4173`. Ohne zusätzliche Auswahl bleibt sie ohne Sensorzuordnungen. Getrennte, ausdrücklich als **DEMO-WERTE** gekennzeichnete Entwicklungsdaten sind über `?demo=1` verfügbar; `?layout=sections` prüft einen schmalen Kartencontainer. Der native HA-Entity-Selector wird ausschließlich in der lokalen Vorschau durch eine Testkomponente nachgebildet. Die Produktionskarte verwendet die Home-Assistant-Komponente und enthält diesen Ersatz nicht.
 
@@ -114,7 +119,7 @@ Die Browserprüfungen benötigen eine Playwright-Engine oder einen vorhandenen C
 
 | Bereich | Dateien |
 | --- | --- |
-| Karte und räumliche SVG-Ansicht | `src/hausklima-card.ts`, `src/house-scene.ts`, `src/styles.ts` |
+| Karte, unveränderte Illustration und dynamische Overlays | `src/hausklima-card.ts`, `src/photo-view.ts`, `src/scene-photo.ts`, `src/styles.ts` |
 | Visueller Editor und unveränderliche Konfigurationsänderungen | `src/hausklima-card-editor.ts`, `src/editor-model.ts` |
 | Modell, Vorgaben, Validierung | `src/types.ts`, `src/defaults.ts`, `src/config.ts` |
 | Messwertauflösung und Formatierung | `src/metrics.ts` |
