@@ -130,6 +130,7 @@ export function getDefaultConfig(): HausKlimaCardConfig {
     title: 'HausKlima',
     show_dimensions: true,
     show_room_names: true,
+    chip_opacity: 0.72,
   };
 }
 
@@ -140,6 +141,9 @@ export function normalizeConfig(input: unknown): HausKlimaCardConfig {
   if (config.title !== undefined && typeof config.title !== 'string') throw new Error('title muss eine Zeichenfolge sein.');
   if (config.show_dimensions !== undefined) boolean(config.show_dimensions, 'show_dimensions');
   if (config.show_room_names !== undefined) boolean(config.show_room_names, 'show_room_names');
+  if (config.chip_opacity !== undefined && (typeof config.chip_opacity !== 'number' || !Number.isFinite(config.chip_opacity) || config.chip_opacity < 0.35 || config.chip_opacity > 1)) {
+    throw new Error('chip_opacity muss zwischen 0.35 und 1 liegen.');
+  }
   if (config.building !== undefined) validateBuilding(config.building);
   return structuredClone({ ...getDefaultConfig(), ...config }) as HausKlimaCardConfig;
 }
