@@ -132,7 +132,7 @@ describe('Lovelace card integration', () => {
     const card = await createCard({ ...getDefaultConfig(), building }, { states: {} });
     const tile = find(card, '.room-tile[data-select-room="workshop"]');
     expect(tile.textContent).toContain('Entität fehlt');
-    expect(find(card, '.photo-room[data-room-id="workshop"] .photo-metric').textContent).toContain('Entität fehlt');
+    expect(find(card, '.photo-room[data-room-id="workshop"] .photo-metric').textContent).toContain('Fehlt');
     await openRoom(card, 'workshop');
     expect(find(card, '.room-detail').textContent).toContain('Entität fehlt');
 
