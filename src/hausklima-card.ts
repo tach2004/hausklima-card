@@ -3,9 +3,12 @@ import { getDefaultConfig, normalizeConfig, resolveBuilding } from './config';
 import { renderPhotoView, photoStyles } from './photo-view';
 import { createLayout } from './layout';
 import { formatSensorValue, resolveMeasurements, sensorStatusLabel } from './metrics';
-import type { BuildingConfig, HausKlimaCardConfig, HomeAssistant, ResolvedMeasurement, ResolvedSensor, RoomConfig } from './types';
+import type { BuildingConfig, HausKlimaCardConfig, HomeAssistant, MetricType, ResolvedMeasurement, ResolvedSensor, RoomConfig } from './types';
 import { cardStyles } from './styles';
 
+const metricSymbols: Record<MetricType, string> = {
+  temperature: 'T', relative_humidity: '%', absolute_humidity: 'AH', co2: 'CO₂', voc: 'VOC',
+};
 const formatDimension = (value: number) => value.toLocaleString('de-DE', { maximumFractionDigits: 2 });
 const arrowIcon = () => html`<svg class="arrow-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M 4 12 12 4 M 4 4 h 8 v 8" /></svg>`;
 
