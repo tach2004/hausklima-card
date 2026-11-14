@@ -17,6 +17,8 @@ export const METRIC_TYPES = [
   'absolute_humidity',
   'co2',
   'voc',
+  'pressure_relative',
+  'pressure_absolute',
 ] as const;
 
 export type MetricType = (typeof METRIC_TYPES)[number];
@@ -24,6 +26,10 @@ export type MetricType = (typeof METRIC_TYPES)[number];
 export interface SensorConfig {
   entity: string;
   name?: string;
+  /** Include this source in the overview; omitted retains the legacy primary. */
+  show_in_overview?: boolean;
+  /** Same names join readings into one source group within this location. */
+  overview_group?: string;
 }
 
 /** Coordinates are relative to the room, from 0 to 1. Layout UI follows later. */
@@ -104,7 +110,7 @@ export interface HausKlimaCardConfig {
   show_room_names?: boolean;
   /** Opacity of the dark sensor tiles, from 0.35 to 1 (inclusive). */
   chip_opacity?: number;
-  /** Maximum width of the full building scene, from 900 to 1600 CSS pixels. */
+  /** Maximum width of the full building scene, from 900 to 3200 CSS pixels. */
   scene_max_width?: number;
   building?: BuildingConfig;
   /** Lovelace may attach layout/visibility properties; preserve these in editor. */
@@ -114,12 +120,26 @@ export interface HausKlimaCardConfig {
 export type SensorStatus = 'available' | 'unavailable' | 'unknown' | 'missing';
 
 export interface ResolvedSensor {
+  metric_type: MetricType;
   entity: string;
   name: string;
   value: string | null;
   unit: string;
   status: SensorStatus;
   is_primary: boolean;
+  show_in_overview: boolean;
+  overview_group?: string;
+}
+
+export interface OverviewReading {
+  type: MetricType;
+  label: string;
+  sensor: ResolvedSensor;
+}
+
+export interface OverviewGroup {
+  name: string;
+  readings: OverviewReading[];
 }
 
 export interface ResolvedMeasurement {

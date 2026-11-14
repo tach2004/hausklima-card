@@ -8,7 +8,7 @@
     :root { color-scheme: light; --primary-color: #46745c; --primary-text-color: #29382f; --secondary-text-color: #6d7a70; --card-background-color: #fffdf9; --divider-color: #e3e5dc; }
     * { box-sizing: border-box; }
     body { margin: 0; background: #edf0e8; color: var(--primary-text-color); font-family: system-ui, sans-serif; padding: 20px; }
-    main { max-width: 1800px; margin: auto; min-width: 0; }
+    main { max-width: 3360px; margin: auto; min-width: 0; }
     main.sections { max-width: 480px; }
     nav { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 12px; }
     nav .tools { display: flex; align-items: center; gap: 8px; }
@@ -26,7 +26,7 @@
   <main>
     <nav><span class="preview-title">HausKlima · lokale Vorschau <span id="mode-label"></span></span><span class="tools"><button id="reset">Zurücksetzen</button><button id="theme">Dunkles Theme</button></span></nav>
     <hausklima-card></hausklima-card>
-    <details id="editor-panel"><summary>Grafischen Karteneditor öffnen</summary><div id="editor"></div></details>
+    <details id="editor-panel"><summary>Grafischen Karteneditor öffnen</summary><p id="editor-demo-label" class="demo-label" hidden>DEMO-WERTE · lokaler Karteneditor</p><div id="editor"></div></details>
   </main>
   <script type="module">
     import '/dev/ha-selector-stub.js';
@@ -42,6 +42,7 @@
     const hass = { states: demo ? structuredClone(demoStates) : {}, locale: { language: 'de', number_format: 'language' }, language: 'de' };
     document.querySelector('#mode-label').textContent = demo ? '· DEMO-WERTE' : '· ohne Sensorzuordnung';
     document.querySelector('#mode-label').className = demo ? 'demo-label' : '';
+    document.querySelector('#editor-demo-label').hidden = !demo;
     if (params.get('layout') === 'sections') {
       const main = document.querySelector('main');
       main.classList.add('sections');

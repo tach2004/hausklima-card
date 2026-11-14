@@ -1,14 +1,15 @@
-# Screenshots der aktuellen Overlay-Umsetzung
+# Screenshots der adaptiven Messwertfelder und Sensorgruppen
 
-Die neun neu erzeugten und grafisch geprüften Aufnahmen unter `v0.1.2/` zeigen die tatsächlich gebaute Karte mit der **unveränderten freigegebenen Hausillustration** und den dynamischen Messwertflächen. Die Daten stammen ausschließlich aus der getrennten Entwicklungsvorschau und sind sichtbar als **DEMO-WERTE** gekennzeichnet. Es sind erfundene Testdaten, keine Messungen aus der Home-Assistant-Installation des Projektinhabers und keine Produktionsvorgaben.
+Die zehn neu erzeugten und grafisch geprüften Aufnahmen unter `adaptive-groups/` zeigen die tatsächlich gebaute Karte mit der **unveränderten freigegebenen Hausillustration**, inhaltsabhängig schmalen Messwertfeldern, Raum-/Messart-Icons und ausgewählten Sensorgruppen. Außen sind Homematic, Ecowitt und Vitodens getrennt sichtbar; Ecowitt enthält auch relativen und absoluten Luftdruck. Die Daten stammen ausschließlich aus der getrennten Entwicklungsvorschau und sind sichtbar als **DEMO-WERTE** gekennzeichnet. Es sind erfundene Testdaten, keine Messungen aus der Home-Assistant-Installation des Projektinhabers und keine Produktionsvorgaben.
 
 | Ansicht | Helles Theme | Dunkles Theme |
 | --- | --- | --- |
-| Desktop Panel | [Panel hell](v0.1.2/panel-light.png) | [Panel dunkel](v0.1.2/panel-dark.png) |
-| Desktop Sections | [Sections hell](v0.1.2/sections-light.png) | [Sections dunkel](v0.1.2/sections-dark.png) |
-| iPhone Hochformat in Chromium-Emulation | [Hochformat hell](v0.1.2/iphone-portrait-light.png) | [Hochformat dunkel](v0.1.2/iphone-portrait-dark.png) |
-| iPhone Querformat in Chromium-Emulation | [Querformat hell](v0.1.2/iphone-landscape-light.png) | [Querformat dunkel](v0.1.2/iphone-landscape-dark.png) |
-| Grafischer Editor auf schmalem Bildschirm | [Editor mobil](v0.1.2/editor-mobile.png) | — |
+| Desktop Panel | [Panel hell](adaptive-groups/panel-light.png) | [Panel dunkel](adaptive-groups/panel-dark.png) |
+| Desktop Sections | [Sections hell](adaptive-groups/sections-light.png) | [Sections dunkel](adaptive-groups/sections-dark.png) |
+| iPhone Hochformat in Chromium-Emulation | [Hochformat hell](adaptive-groups/iphone-portrait-light.png) | [Hochformat dunkel](adaptive-groups/iphone-portrait-dark.png) |
+| iPhone Querformat in Chromium-Emulation | [Querformat hell](adaptive-groups/iphone-landscape-light.png) | [Querformat dunkel](adaptive-groups/iphone-landscape-dark.png) |
+| Grafischer Editor mit mehreren Hauptsensoren/Gruppennamen | [Editor mobil](adaptive-groups/editor-mobile.png) | — |
+| Ultrawide Panel mit 2560 CSS-Pixel breiter Szene | [2560-px-Ansicht](adaptive-groups/panel-ultrawide.png) | — |
 
 ## Reproduktion
 
@@ -23,4 +24,4 @@ Die Browserprüfung muss künftig auch in der normalen PR-CI erfolgreich sein. K
 
 ## Historische Aufnahmen
 
-`phase-2/` enthält die früheren, später abgelehnten SVG-Ansichten; sie sind **keine Designreferenz und kein Nachweis dieser Überarbeitung**. `phase-3/` hält den früheren Stand mit der bereits freigegebenen Illustration fest. Die neuen Aufnahmen unter `v0.1.2/` ersetzen diese als aktueller technischer Umsetzungsnachweis. Die endgültige visuelle Abnahme bleibt beim Projektinhaber.
+`phase-2/` enthält die früheren, später abgelehnten SVG-Ansichten; sie sind **keine Designreferenz und kein Nachweis dieser Überarbeitung**. `phase-3/` hält den früheren Stand mit der bereits freigegebenen Illustration fest; `v0.1.2/` zeigt die vorherigen Overlays mit festen Breiten. Die neuen Aufnahmen unter `adaptive-groups/` ersetzen diese als aktueller technischer Umsetzungsnachweis. Die endgültige visuelle Abnahme bleibt beim Projektinhaber.

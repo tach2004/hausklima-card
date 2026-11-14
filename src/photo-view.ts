@@ -1,11 +1,9 @@
 import { css, html, nothing } from 'lit';
 import { houseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS } from './scene-photo';
-import { formatSensorValue, resolveMeasurements } from './metrics';
-import type { BuildingConfig, HomeAssistant, MetricType, RoomConfig } from './types';
-
-const symbols: Record<MetricType, string> = {
-  temperature: 'T', relative_humidity: '%', absolute_humidity: 'AH', co2: 'CO₂', voc: 'VOC',
-};
+import { resolveOverviewGroups } from './metrics';
+import { roomIcon } from './icons';
+import { renderReadingGroups } from './reading-view';
+import type { BuildingConfig, HomeAssistant, RoomConfig } from './types';
 export interface PhotoViewOptions {
   outdoorId?: string;
   onOutdoorChange?: (id: string) => void;
@@ -22,27 +20,23 @@ export function renderPhotoView(
 ) {
   const rooms = building.rooms.filter((room) => ROOM_ART_POSITIONS[room.id] && room.visible && room.location !== 'outdoor');
   const devices = building.rooms.filter((room) => GARAGE_ART_POSITIONS[room.id] && room.location !== 'outdoor');
-  const outdoors = building.rooms.filter((room) => room.location === 'outdoor' && resolveMeasurements(room, hass, 'overview').length);
+  const outdoors = building.rooms.filter((room) => room.location === 'outdoor' && resolveOverviewGroups(room, hass).length);
   const outdoor = outdoors.find((room) => room.id === options.outdoorId) ?? outdoors[0];
   const renderBadge = (room: RoomConfig, category: string) => {
-    const metrics = resolveMeasurements(room, hass, 'overview');
-    return html`<button class="photo-badge ${category} ${metrics.length ? 'with-metrics' : 'name-only'}"
+    const groups = resolveOverviewGroups(room, hass);
+    return html`<button class="photo-badge ${category} ${groups.length ? 'with-metrics' : 'name-only'}"
       data-room-id=${room.id} data-select-room=${room.id} type="button"
       aria-pressed=${String(selectedRoomId === room.id)} aria-label=${`${room.name}: Details öffnen`}
       @click=${() => onSelect(room)}>
-      ${showNames ? html`<span class="photo-room-name">${room.name}</span>` : nothing}
-      ${metrics.map((metric) => html`<span class="photo-metric" data-metric=${metric.type} title=${metric.label}>
-        <span class="photo-metric-icon ${metric.type}" aria-label=${metric.label}>${symbols[metric.type]}</span>
-        <strong>${formatSensorValue(metric.primary, hass)}</strong>
-        ${metric.primary.status === 'available' && metric.primary.unit ? html`<small>${metric.primary.unit}</small>` : nothing}
-      </span>`)}
+      ${showNames ? html`<span class="photo-room-name">${roomIcon(room)}<span>${room.name}</span></span>` : nothing}
+      ${renderReadingGroups(room, hass, true)}
     </button>`;
   };
-  const placement = (room: RoomConfig, position: { x: number; y: number; anchorX?: number; anchorY?: number; width?: number }, category: string) => html`
+  const placement = (room: RoomConfig, position: { x: number; y: number; anchorX?: number; anchorY?: number }, category: string) => html`
     <div class="photo-placement" data-overlay-id=${room.id}
       data-anchor-x=${position.anchorX ?? position.x} data-anchor-y=${position.anchorY ?? position.y}
-      data-preferred-x=${position.x} data-preferred-y=${position.y} data-width=${position.width ?? 13.5}
-      style=${`left:${position.x}%;top:${position.y}%;width:${position.width ?? 13.5}%;`}>
+      data-preferred-x=${position.x} data-preferred-y=${position.y}
+      style=${`left:${position.x}%;top:${position.y}%;`}>
       ${renderBadge(room, category)}
     </div>`;
   return html`<div class="photo-overview"><div class="photo-stage">
@@ -51,7 +45,7 @@ export function renderPhotoView(
     <svg class="photo-leaders" aria-hidden="true"></svg>
     ${rooms.map((room) => placement(room, ROOM_ART_POSITIONS[room.id]!, 'photo-room'))}
     ${devices.map((room) => placement(room, GARAGE_ART_POSITIONS[room.id]!, room.id === 'garage'
-      ? `photo-air ${resolveMeasurements(room, hass, 'overview').length ? 'photo-garage' : ''}` : 'photo-device'))}
+      ? `photo-air ${resolveOverviewGroups(room, hass).length ? 'photo-garage' : ''}` : 'photo-device'))}
     ${devices.map((room) => {
       const point = GARAGE_ART_POSITIONS[room.id]!;
       return html`<button class="photo-object-target" type="button" data-select-room=${room.id} data-anchor-x=${point.anchorX} data-anchor-y=${point.anchorY}
@@ -59,8 +53,8 @@ export function renderPhotoView(
         aria-label=${`${room.name}: Messwerte und Sensorquellen öffnen`} @click=${() => onSelect(room)}><span></span></button>`;
     })}
     ${outdoor ? html`<div class="photo-placement photo-outdoor-group" data-overlay-id=${outdoor.id}
-      data-anchor-x="86" data-anchor-y="20" data-preferred-x="86" data-preferred-y="20" data-width="23"
-      style="left:86%;top:20%;width:23%;">
+      data-anchor-x="86" data-anchor-y="20" data-preferred-x="86" data-preferred-y="20"
+      style="left:86%;top:20%;">
       ${outdoors.length > 1 ? html`<label class="photo-outdoor-choice"><span>Außenmessort im Bild</span>
         <select id="photo-outdoor-select" data-outdoor-selector .value=${outdoor.id} aria-label="Außenmessort im Bild"
           @change=${(event: Event) => options.onOutdoorChange?.((event.target as HTMLSelectElement).value)}>
@@ -76,17 +70,19 @@ export const photoStyles = css`
   .photo-overview { width: 100%; max-width: var(--hk-scene-max-width, 1400px); margin: 0 auto; min-width: 0; }
   .photo-stage { position: relative; width: 100%; isolation: isolate; border-radius: 17px; background: var(--hk-paper, #e6e6e0); box-shadow: 0 8px 30px #1b39401c; line-height: 1.2; }
   .photo-image { display: block; width: 100%; height: auto; aspect-ratio: 1300 / 732; object-fit: contain; border-radius: 17px; pointer-events: none; user-select: none; }
-  .photo-placement { position: absolute; transform: translate(-50%, -50%); min-width: 0; z-index: 2; }
-  .photo-badge { width: 100%; min-width: 0; min-height: 36px; border-radius: 9px; border: 1px solid #ffffff45;
+  .photo-placement { position: absolute; transform: translate(-50%, -50%); width: max-content; max-width: 220px; min-width: 0; z-index: 2; }
+  .photo-placement:has(.has-named-groups) { max-width: 360px; }
+  .photo-badge { width: max-content; max-width: 100%; min-width: 0; min-height: 36px; border-radius: 9px; border: 1px solid #ffffff45;
     background: var(--hk-chip, rgba(22, 26, 30, .72)); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
     box-shadow: 0 3px 12px #0d172554; padding: 7px 9px; text-align: left; color: #fff; cursor: pointer;
     display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
   .photo-badge:hover, .photo-badge:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
-  .photo-room-name { display: block; color: #fff; font-size: 12px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; width: 100%; }
+  .photo-room-name { display: flex; align-items: center; gap: 5px; color: #fff; font-size: 12px; font-weight: 700; line-height: 1.3; max-width: 100%; }
+  .photo-room-name > span { min-width: 0; overflow-wrap: anywhere; }
   .photo-metric { display: flex; gap: 3px 5px; flex-wrap: wrap; align-items: baseline; min-width: 0; max-width: 100%; color: #fff; font-size: 13px; line-height: 1.35; }
   .photo-metric strong { font-weight: 750; font-size: inherit; color: #fff; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
   .photo-metric small { color: #eef4f7; font-size: 11px; font-weight: 500; max-width: 100%; overflow-wrap: anywhere; }
-  .photo-metric-icon { color: #ffc095; font-size: 9px; font-weight: 700; min-width: 12px; }
+  .photo-metric-icon { display: inline-flex; align-self: center; flex-shrink: 0; color: #ffc095; width: 16px; }
   .photo-metric-icon.relative_humidity { color: #8dd6ee; }
   .photo-metric-icon.absolute_humidity { color: #9bdad0; }
   .photo-metric-icon.co2 { color: #b5d998; }
@@ -97,6 +93,7 @@ export const photoStyles = css`
   .photo-device .photo-metric { font-size: 12px; }
   .photo-device .photo-metric small { font-size: 10px; }
   .photo-device .photo-room-name { font-size: 11px; }
+  .photo-outdoor { width: 100%; }
   .photo-outdoor-choice { display: grid; gap: 4px; background: var(--hk-chip, rgba(22, 26, 30, .72)); color: #fff; border-radius: 9px 9px 0 0; padding: 7px 9px; font-size: 10px; }
   .photo-outdoor-choice select { min-height: 30px; width: 100%; min-width: 0; color: #fff; color-scheme: dark; background: #263039; border: 1px solid #ffffff60; border-radius: 5px; font: inherit; font-size: 12px; }
   .photo-outdoor-choice + .photo-outdoor { border-top-left-radius: 0; border-top-right-radius: 0; }

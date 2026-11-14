@@ -148,6 +148,38 @@ function latest(configs: HausKlimaCardConfig[]) {
 }
 
 describe('Phase 2 native sensor and room editor', () => {
+  it('selects multiple overview sources, names shared groups and persists both pressure mappings', async () => {
+    const editor = await createEditor();
+    const configs = capture(editor);
+    await pick(editor, 'sensor.test_homematic_temperature');
+    await pick(editor, 'sensor.test_ecowitt_temperature');
+    expect(element<HTMLInputElement>(editor, '[data-action="sensor-overview"][data-entity="sensor.test_homematic_temperature"]').checked).toBe(true);
+    expect(element<HTMLInputElement>(editor, '[data-action="sensor-overview"][data-entity="sensor.test_ecowitt_temperature"]').checked).toBe(false);
+    await check(editor, '[data-action="sensor-overview"][data-entity="sensor.test_ecowitt_temperature"]', true);
+    await change(editor, '[data-action="sensor-group"][data-entity="sensor.test_homematic_temperature"]', 'Homematic');
+    await change(editor, '[data-action="sensor-group"][data-entity="sensor.test_ecowitt_temperature"]', 'Ecowitt');
+    for (const type of ['pressure_relative', 'pressure_absolute']) {
+      await change(editor, '#metric-select', type);
+      await pick(editor, `sensor.test_${type}`);
+      await change(editor, `[data-action="sensor-group"][data-entity="sensor.test_${type}"]`, 'Ecowitt');
+    }
+    const saved = JSON.parse(JSON.stringify(latest(configs))) as HausKlimaCardConfig;
+    const reloaded = await createEditor(saved);
+    const afterReload = capture(reloaded);
+    expect(reloaded.shadowRoot?.textContent).toContain('Standardquelle');
+    expect(reloaded.shadowRoot?.textContent).toContain('Gruppe in der Übersicht');
+    expect(element<HTMLInputElement>(reloaded, '[data-action="sensor-overview"][data-entity="sensor.test_ecowitt_temperature"]').checked).toBe(true);
+    expect(element<HTMLInputElement>(reloaded, '[data-action="sensor-group"][data-entity="sensor.test_ecowitt_temperature"]').value).toBe('Ecowitt');
+    await check(reloaded, '[data-action="sensor-overview"][data-entity="sensor.test_homematic_temperature"]', false);
+    expect(latest(afterReload).building!.rooms[0]!.measurements!.temperature!.sensors[0]).toMatchObject({ show_in_overview: false, overview_group: 'Homematic' });
+    expect(latest(afterReload).building!.rooms[0]!.measurements!.temperature!.primary).toBe('sensor.test_homematic_temperature');
+    expect(saved.building!.rooms[0]!.measurements!.temperature!.sensors[0]!.show_in_overview).toBeUndefined();
+    for (const type of ['pressure_relative', 'pressure_absolute'] as const) {
+      await change(reloaded, '#metric-select', type);
+      expect(element<HTMLInputElement>(reloaded, `[data-action="sensor-group"][data-entity="sensor.test_${type}"]`).value).toBe('Ecowitt');
+    }
+  });
+
   it('uses the HA selector contract and can add unlimited sources, select primary and remove it safely', async () => {
     const editor = await createEditor();
     editor.hass = { states: {} };
@@ -327,16 +359,16 @@ describe('scene width visual setting', () => {
     const configs = capture(editor);
     const slider = input(editor, 'scene-max-width');
     expect(slider.type).toBe('range');
-    expect([slider.min, slider.max, slider.step, slider.value]).toEqual(['900', '1600', '10', '1400']);
-    slider.value = '1590';
+    expect([slider.min, slider.max, slider.step, slider.value]).toEqual(['900', '3200', '10', '1400']);
+    slider.value = '3190';
     slider.dispatchEvent(new Event('input', { bubbles: true }));
     await editor.updateComplete;
     expect(configs).toHaveLength(1);
-    expect(latest(configs)).toEqual({ ...before, scene_max_width: 1590 });
+    expect(latest(configs)).toEqual({ ...before, scene_max_width: 3190 });
     expect(original).toEqual(before);
-    expect(editor.shadowRoot?.textContent).toContain('1590 px');
+    expect(editor.shadowRoot?.textContent).toContain('3190 px');
     const reloaded = await createEditor(JSON.parse(JSON.stringify(latest(configs))) as HausKlimaCardConfig);
-    expect(input(reloaded, 'scene-max-width').value).toBe('1590');
-    expect(reloaded.shadowRoot?.textContent).toContain('1590 px');
+    expect(input(reloaded, 'scene-max-width').value).toBe('3190');
+    expect(reloaded.shadowRoot?.textContent).toContain('3190 px');
   });
 });

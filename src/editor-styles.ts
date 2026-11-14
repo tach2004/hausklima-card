@@ -10,8 +10,8 @@ export const editorStyles = css`
   .field small { font-size: 11px; color: var(--secondary-text-color, #687b81); font-weight: 400; }
   input[type='text'], select { width: 100%; min-width: 0; min-height: 46px; border: 1px solid var(--divider-color, #dce4e5); border-radius: 9px; padding: 10px 12px; background: var(--input-fill-color, var(--card-background-color, #fff)); color: inherit; font: inherit; }
   button, input, select { font: inherit; }
-  .chip-opacity { gap: 10px; }
-  .chip-opacity input[type='range'] { display: block; width: 100%; min-height: 44px; margin: 0; cursor: pointer; accent-color: var(--primary-color, #2b8279); touch-action: pan-y; }
+  .chip-opacity, .scene-width { gap: 10px; }
+  .chip-opacity input[type='range'], .scene-width input[type='range'] { display: block; width: 100%; min-height: 44px; margin: 0; cursor: pointer; accent-color: var(--primary-color, #2b8279); touch-action: pan-y; }
 
   button { min-height: 44px; border: 1px solid var(--divider-color, #dce4e5); border-radius: 9px; padding: 9px 13px; background: var(--card-background-color, #fff); color: inherit; cursor: pointer; }
   input:focus-visible, button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--primary-color, #2b8279); outline-offset: 3px; }
@@ -33,7 +33,7 @@ export const editorStyles = css`
   .sensor-entry { display: grid; gap: 12px; border: 1px solid var(--divider-color, #dce4e5); border-radius: 12px; padding: 14px; min-width: 0; }
   .sensor-topline { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; font-weight: 600; }
   .sensor-status { font-weight: 400; color: var(--secondary-text-color, #687b81); }
-  .sensor-actions { display: flex; justify-content: space-between; gap: 12px; }
+  .sensor-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
   ha-selector { display: block; min-width: 0; width: 100%; }
   .add-sensor { margin-top: 16px; }
   .confirmation, .error { border: 1px solid color-mix(in srgb, var(--error-color, #b04336) 35%, transparent); border-radius: 10px; background: color-mix(in srgb, var(--error-color, #b04336) 6%, var(--card-background-color, #fff)); padding: 14px; font-size: 13px; line-height: 1.6; margin-top: 12px; }

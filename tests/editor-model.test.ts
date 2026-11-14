@@ -12,6 +12,7 @@ import {
   updateMeasurement,
 } from '../src/editor-model';
 import type { HausKlimaCardConfig, RoomConfig } from '../src/types';
+import { resolveOverviewGroups } from '../src/metrics';
 
 // DEMO-WERTE: All entity IDs in this file are isolated synthetic test fixtures.
 const firstEntity = 'sensor.test_temperature_one';
@@ -208,5 +209,18 @@ describe('sensor lists and primary selection', () => {
     expect(room(disabled).measurements!.temperature).toMatchObject({ visible: false });
     expect(room(hidden).measurements!.temperature).toMatchObject({ visible: true, show_in_overview: false });
     expect(room(hidden).measurements!.temperature!.sensors).toEqual(room(original).measurements!.temperature!.sensors);
+  });
+
+  it('preserves explicit source visibility and groups through entity edits and primary removal', () => {
+    let config = editSensor(withTwoSensors(), 'workshop', 'temperature', firstEntity, { overview_group: '  Homematic  ', show_in_overview: true });
+    config = editSensor(config, 'workshop', 'temperature', secondEntity, { overview_group: 'Ecowitt', show_in_overview: false });
+    const renamed = editSensor(config, 'workshop', 'temperature', firstEntity, { entity: replacementEntity });
+    expect(room(renamed).measurements!.temperature!.sensors[0]).toMatchObject({ entity: replacementEntity, overview_group: 'Homematic', show_in_overview: true });
+    const removed = removeSensor(renamed, 'workshop', 'temperature', replacementEntity);
+    expect(room(removed).measurements!.temperature!.primary).toBe(secondEntity);
+    expect(resolveOverviewGroups(room(removed))).toEqual([]);
+    expect(room(removed).measurements!.temperature!.sensors[0]).toMatchObject({ overview_group: 'Ecowitt', show_in_overview: false });
+    const cleared = editSensor(removed, 'workshop', 'temperature', secondEntity, { overview_group: ' ' });
+    expect(room(cleared).measurements!.temperature!.sensors[0]).not.toHaveProperty('overview_group');
   });
 });

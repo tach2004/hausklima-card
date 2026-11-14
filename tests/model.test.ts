@@ -2,8 +2,8 @@
 import { describe, expect, it } from 'vitest';
 import { getDefaultConfig, normalizeConfig, resolveBuilding } from '../src/config';
 import { getDefaultBuilding } from '../src/defaults';
-import { formatSensorValue, resolveMeasurements, sensorStatusLabel } from '../src/metrics';
-import type { HomeAssistant, RoomConfig } from '../src/types';
+import { formatSensorValue, resolveMeasurements, resolveOverviewGroups, sensorStatusLabel } from '../src/metrics';
+import type { HomeAssistant, MetricType, RoomConfig } from '../src/types';
 
 function configuredRoom(): RoomConfig {
   return {
@@ -332,11 +332,126 @@ describe('building scene width', () => {
     expect(normalizeConfig(JSON.parse(JSON.stringify(config)))).toEqual(config);
   });
 
-  it.each([900, 1250, 1400, 1600])('accepts a scene width of %s px', (scene_max_width) => {
+  it.each([900, 1250, 1400, 1600, 2400, 3200])('accepts a scene width of %s px', (scene_max_width) => {
     expect(normalizeConfig({ ...getDefaultConfig(), scene_max_width }).scene_max_width).toBe(scene_max_width);
   });
 
-  it.each([899, 1601, 0, -1, NaN, Infinity, '1400', null])('rejects invalid scene width %s', (scene_max_width) => {
+  it.each([899, 3201, 0, -1, NaN, Infinity, '1400', null])('rejects invalid scene width %s', (scene_max_width) => {
     expect(() => normalizeConfig({ ...getDefaultConfig(), scene_max_width })).toThrow(/scene_max_width/);
+  });
+});
+
+describe('metric precision and optional pressure', () => {
+  it.each<[MetricType, string, string]>([
+    ['temperature', '21.66666666666', '21,7'],
+    ['relative_humidity', '48.125', '48,1'],
+    ['absolute_humidity', '8.75', '8,8'],
+    ['co2', '612.8', '613'], ['voc', '120.49', '120'],
+    ['pressure_relative', '1013.625', '1014'], ['pressure_absolute', '985.1', '985'],
+    ['co2', '99999999999999999999.6', '100000000000000000000'],
+    ['voc', '-2.5', '-3'], ['pressure_absolute', '0', '0'],
+  ])('formats %s according to metric without changing source %s', (type, raw, expected) => {
+    const room = configuredRoom();
+    room.measurements = { [type]: { sensors: [{ entity: 'sensor.test_precision' }] } };
+    const hass: HomeAssistant = { states: {
+      'sensor.test_precision': { state: raw, attributes: { unit_of_measurement: 'arbitrary source unit' } },
+    } };
+    const snapshot = structuredClone(hass);
+    const sensor = resolveMeasurements(room, hass)[0]!.primary;
+    expect(formatSensorValue(sensor, { ...hass, locale: { language: 'de' } })).toBe(expected);
+    expect(sensor.unit).toBe('arbitrary source unit');
+    expect(hass).toEqual(snapshot);
+  });
+
+  it('keeps relative/absolute pressure distinct and never computes either', () => {
+    const room = configuredRoom();
+    room.measurements = {
+      pressure_relative: { sensors: [{ entity: 'sensor.test_relative_pressure' }] },
+      pressure_absolute: { sensors: [{ entity: 'sensor.test_absolute_pressure' }] },
+    };
+    const values = resolveMeasurements(room, { states: {
+      'sensor.test_relative_pressure': { state: '1013.2', attributes: { unit_of_measurement: 'hPa' } },
+      'sensor.test_absolute_pressure': { state: '29.78', attributes: { unit_of_measurement: 'inHg' } },
+    } });
+    expect(values.map((value) => [value.type, value.primary.value, value.primary.unit])).toEqual([
+      ['pressure_relative', '1013.2', 'hPa'], ['pressure_absolute', '29.78', 'inHg'],
+    ]);
+    expect(values.map((value) => value.label)).toEqual(['Luftdruck relativ', 'Luftdruck absolut']);
+  });
+});
+
+describe('selected overview sources and groups', () => {
+  it('retains the saved single primary in one compact unnamed group', () => {
+    const groups = resolveOverviewGroups(configuredRoom());
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ name: '', readings: [{ type: 'temperature', sensor: { entity: 'sensor.test_secondary', is_primary: true } }] });
+  });
+
+  it('groups independently selected sources across metrics and keeps other sources in details', () => {
+    const room = configuredRoom();
+    room.measurements = {
+      temperature: { primary: 'sensor.test_homematic_t', sensors: [
+        { entity: 'sensor.test_homematic_t', overview_group: 'Homematic' },
+        { entity: 'sensor.test_ecowitt_t', show_in_overview: true, overview_group: 'Ecowitt' },
+        { entity: 'sensor.test_vitodens_t', show_in_overview: true, overview_group: 'Vitodens' },
+        { entity: 'sensor.test_hidden_t', show_in_overview: false },
+      ] },
+      relative_humidity: { sensors: [
+        { entity: 'sensor.test_homematic_h', overview_group: 'Homematic' },
+        { entity: 'sensor.test_ecowitt_h', show_in_overview: true, overview_group: 'Ecowitt' },
+      ] },
+      pressure_relative: { sensors: [{ entity: 'sensor.test_pressure', overview_group: 'Ecowitt' }] },
+    };
+    const reloaded = JSON.parse(JSON.stringify(room)) as RoomConfig;
+    const groups = resolveOverviewGroups(reloaded);
+    expect(groups.map((group) => group.name)).toEqual(['Homematic', 'Ecowitt', 'Vitodens']);
+    expect(groups.map((group) => group.readings.map((reading) => reading.type))).toEqual([
+      ['temperature', 'relative_humidity'], ['temperature', 'relative_humidity', 'pressure_relative'], ['temperature'],
+    ]);
+    expect(groups.flatMap((group) => group.readings).map((reading) => reading.sensor.entity)).not.toContain('sensor.test_hidden_t');
+    expect(resolveMeasurements(reloaded, undefined, 'details')[0]!.sensors).toHaveLength(4);
+    expect(resolveMeasurements(reloaded, undefined, 'details')[0]!.primary.entity).toBe('sensor.test_homematic_t');
+    expect(groups[1]!.readings[0]!.sensor.status).toBe('missing');
+  });
+
+  it('can deselect the legacy primary and hide the last overview source without a fallback', () => {
+    const room = configuredRoom();
+    room.measurements!.temperature!.sensors[1]!.show_in_overview = false;
+    expect(resolveOverviewGroups(room)).toEqual([]);
+    expect(resolveMeasurements(room, undefined, 'details')[0]!.sensors).toHaveLength(2);
+    room.measurements!.temperature!.sensors[0]!.show_in_overview = true;
+    expect(resolveOverviewGroups(room)[0]!.readings[0]!.sensor.entity).toBe('sensor.test_primary');
+    room.measurements!.temperature!.show_in_overview = false;
+    expect(resolveOverviewGroups(room)).toEqual([]);
+    room.measurements!.temperature!.show_in_overview = true;
+    room.measurements!.temperature!.visible = false;
+    expect(resolveOverviewGroups(room)).toEqual([]);
+  });
+
+  it('labels multiple ungrouped sources honestly and never merges different locations', () => {
+    const room = configuredRoom();
+    room.measurements!.temperature!.sensors[0]!.show_in_overview = true;
+    room.measurements!.temperature!.sensors[0]!.name = 'Quelle eins';
+    room.measurements!.temperature!.sensors[1]!.name = 'Quelle zwei';
+    const otherRoom = structuredClone(room);
+    otherRoom.id = 'other';
+    otherRoom.measurements!.temperature!.sensors[0]!.name = 'Anderer Ort';
+    expect(resolveOverviewGroups(room).map((group) => group.name)).toEqual(['Quelle eins', 'Quelle zwei']);
+    expect(resolveOverviewGroups(otherRoom).map((group) => group.name)).toEqual(['Anderer Ort', 'Quelle zwei']);
+  });
+
+  it('validates per-source flags/group names and preserves unknown sensor fields', () => {
+    const building = getDefaultBuilding();
+    building.rooms[0] = configuredRoom();
+    const sensor = building.rooms[0]!.measurements!.temperature!.sensors[0]!;
+    Object.assign(sensor, { show_in_overview: 'yes' });
+    expect(() => normalizeConfig({ ...getDefaultConfig(), building })).toThrow(/show_in_overview/);
+    sensor.show_in_overview = true;
+    Object.assign(sensor, { overview_group: '   ' });
+    expect(() => normalizeConfig({ ...getDefaultConfig(), building })).toThrow(/overview_group/);
+    sensor.overview_group = 'Homematic';
+    Object.assign(sensor, { future: { retained: true } });
+    expect(normalizeConfig({ ...getDefaultConfig(), building }).building!.rooms[0]!.measurements!.temperature!.sensors[0])
+      .toMatchObject({ overview_group: 'Homematic', show_in_overview: true, future: { retained: true } });
   });
 });
