@@ -171,7 +171,7 @@ export class HausKlimaCard extends LitElement {
       <header class="card-header"><div class="card-title"><span class="home-icon" aria-hidden="true">⌂</span>${config.title ? html`<h1>${config.title}</h1>` : nothing}</div>
         <button class="overview-toggle" aria-expanded=${String(this._showRooms)} @click=${() => { this._showRooms = !this._showRooms; }}>Räume <span>${building.rooms.length}</span></button></header>
       <div class="photo-main">
-        ${renderPhotoView(building, this.hass, config.show_room_names ?? true, (room) => this.selectRoom(room))}
+        ${renderPhotoView(building, this.hass, config.show_room_names ?? true, (room) => this.selectRoom(room), this._selected)}
         ${selected ? this.renderDetails(selected, building) : nothing}
       </div>
       <div class="photo-lower">
