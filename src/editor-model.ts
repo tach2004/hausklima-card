@@ -44,6 +44,16 @@ export function editRoom(config: HausKlimaCardConfig, id: string, patch: RoomEdi
   });
 }
 
+/** Per-room mobile photo switches do not alter desktop or full details. */
+export function setMobileOverview(config: HausKlimaCardConfig, roomId: string,
+  metric: 'temperature' | 'relative_humidity', shown: boolean): HausKlimaCardConfig {
+  return changeBuilding(config, (building) => {
+    const room = requireRoom(building, roomId);
+    room.mobile_overview ??= {};
+    room.mobile_overview[metric] = shown;
+  });
+}
+
 export function addRoom(config: HausKlimaCardConfig, input: NewRoom): HausKlimaCardConfig {
   return changeBuilding(config, (building) => {
     const roomName = name(input.name);

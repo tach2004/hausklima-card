@@ -4,7 +4,7 @@ import { keyed } from 'lit/directives/keyed.js';
 import { getDefaultConfig, normalizeConfig, resolveBuilding } from './config';
 import {
   addRoom, addSensor, deleteRoom, editRoom, editSensor, removeSensor,
-  setPrimarySensor, updateMeasurement,
+  setPrimarySensor, setMobileOverview, updateMeasurement,
 } from './editor-model';
 import { METRIC_LABELS } from './metrics';
 import { METRIC_TYPES } from './types';
@@ -108,7 +108,7 @@ export class HausKlimaCardEditor extends LitElement {
     catch (error) { this._error = error instanceof Error ? error.message : 'Die Änderung konnte nicht übernommen werden.'; }
   }
 
-  private updateBase(key: 'title' | 'show_dimensions' | 'show_room_names' | 'chip_opacity' | 'scene_max_width' | 'theme_mode', value: string | boolean | number): void {
+  private updateBase(key: 'title' | 'show_dimensions' | 'show_room_names' | 'chip_opacity' | 'scene_max_width' | 'theme_mode' | 'badge_font_desktop' | 'badge_font_mobile', value: string | boolean | number): void {
     this.apply(() => ({ ...this._config, [key]: value }));
   }
 
@@ -241,6 +241,17 @@ export class HausKlimaCardEditor extends LitElement {
               @input=${(event: Event) => this.updateBase('scene_max_width', Number((event.target as HTMLInputElement).value))} />
             <small>Die Ansicht nutzt höchstens den verfügbaren Platz. Eine schmale HA-Sektion wird dadurch nicht verbreitert.</small>
           </label>
+          <label class="field badge-font" for="badge-font-desktop"><span>Schriftgröße der Kästchen – Desktop: ${this._config.badge_font_desktop ?? 12} px</span>
+            <input id="badge-font-desktop" type="range" min="9" max="20" step="1"
+              .value=${String(this._config.badge_font_desktop ?? 12)}
+              @change=${(event: Event) => this.updateBase('badge_font_desktop', Number((event.target as HTMLInputElement).value))} />
+          </label>
+          <label class="field badge-font" for="badge-font-mobile"><span>Schriftgröße der Kästchen – Handy: ${this._config.badge_font_mobile ?? 9} px</span>
+            <input id="badge-font-mobile" type="range" min="8" max="16" step="1"
+              .value=${String(this._config.badge_font_mobile ?? 9)}
+              @change=${(event: Event) => this.updateBase('badge_font_mobile', Number((event.target as HTMLInputElement).value))} />
+            <small>Gilt nur für das Hausbild. Die Detailansicht bleibt gleich; Kästchen passen sich weiterhin dynamisch an.</small>
+          </label>
           <div class="base-options">
             <label class="check-label"><input id="show-room-names" type="checkbox" .checked=${this._config.show_room_names ?? true}
               @change=${(event: Event) => this.updateBase('show_room_names', (event.target as HTMLInputElement).checked)} /> Raumnamen anzeigen</label>
@@ -286,6 +297,16 @@ export class HausKlimaCardEditor extends LitElement {
               <label class="check-label"><input id="metric-overview" type="checkbox" .checked=${overview}
                 @change=${(event: Event) => this.apply(() => updateMeasurement(this._config, room.id, this._metric, { show_in_overview: (event.target as HTMLInputElement).checked }))} /> Hauptwert im Raum anzeigen</label>
             </div>
+            ${this._metric === 'temperature' || this._metric === 'relative_humidity' ? html`
+              <div class="measurement-options mobile-overview-setting">
+                <label class="check-label"><input type="checkbox" id="mobile-metric-visible" data-mobile-metric=${this._metric}
+                  .checked=${room.mobile_overview?.[this._metric] !== false}
+                  @change=${(event: Event) => this.apply(() => setMobileOverview(this._config, room.id,
+                    this._metric as 'temperature' | 'relative_humidity', (event.target as HTMLInputElement).checked))} />
+                  Diesen Messwert im Handy-Kästchen anzeigen</label>
+              </div>
+              <p class="hint">Nur fürs Handy. Desktop und alle Sensorquellen in den Details bleiben unverändert.</p>
+            ` : nothing}
             <p class="hint">Mit „Haupt – in Übersicht“ können mehrere Quellen sichtbar sein. Gleiche Gruppennamen bündeln Werte unter einem gemeinsamen Namen, z. B. Temperatur und Feuchte von „Homematic“. Ohne Gruppe bleiben einzelne Hauptwerte schmal untereinander; mehrere Quellen derselben Messart erhalten ihren Anzeigenamen. „Standardquelle“ bestimmt die Hauptanzeige nur, solange der jeweilige Haupt-Haken nicht ausdrücklich gesetzt oder entfernt wurde. Alle Quellen bleiben in den Details erreichbar.</p>
             <div class="sensor-list">${measurement?.sensors.map((sensor, index) => this.renderSensor(room, sensor, index, measurement.primary))}</div>
             ${!measurement?.sensors.length ? html`<p class="empty-hint">Noch kein Sensor für diese Messart zugeordnet.</p>` : nothing}

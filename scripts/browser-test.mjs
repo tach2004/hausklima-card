@@ -102,10 +102,12 @@ async function checkResponsive(browser, engine) {
         assert.ok(await mobileBadges.count() > 0, `${name}: named black climate badges visible on the picture`);
         const roomBadge = card.locator('.photo-room[data-room-id="laundry"]');
         assert.equal(await roomBadge.locator('.photo-mobile-name:visible').innerText(), 'Waschküche');
+        assert.equal(await roomBadge.locator('.photo-mobile-name:visible .room-icon').count(), 1,
+          `${name}: mobile has the same room icon as desktop`);
         assert.deepEqual(await roomBadge.locator('.photo-mobile-reading:visible').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-metric'))),
           ['temperature', 'relative_humidity'], `${name}: only temperature and humidity with separate icons on mobile`);
         assert.equal(await roomBadge.locator('.photo-mobile-reading:visible svg').count(), 2, `${name}: proper colored SVG climate symbols`);
-        assert.ok(await card.locator('.photo-leaders path').count() >= 3, `${name}: cabinet and both batteries retain connector lines`);
+        assert.equal(await card.locator('.photo-leaders path').count(), 0, `${name}: no crossing connector lines on mobile`);
         assert.equal(await card.locator('.photo-lower .location-column, .outdoor-block, .garage-block').count(), 0,
           `${name}: no permanent outdoor or garage summary below the illustration on mobile`);
         const outdoorSelector = card.locator('#photo-outdoor-select');
@@ -428,6 +430,23 @@ async function checkEditor(browser) {
   });
   assert.equal((await page.evaluate(() => window.hausklimaPreview.getConfig())).chip_opacity, 0.55);
   assert.ok((await card.locator('ha-card').getAttribute('style')).includes('0.55'), 'opacity propagated to all dark panels');
+  const desktopSize = editor.locator('#badge-font-desktop');
+  const mobileSize = editor.locator('#badge-font-mobile');
+  assert.equal(await desktopSize.inputValue(), '12');
+  assert.equal(await mobileSize.inputValue(), '9');
+  await desktopSize.evaluate((el) => { el.value = '14'; el.dispatchEvent(new Event('change', { bubbles: true })); });
+  await mobileSize.evaluate((el) => { el.value = '9'; el.dispatchEvent(new Event('change', { bubbles: true })); });
+  assert.equal((await page.evaluate(() => window.hausklimaPreview.getConfig())).badge_font_desktop, 14);
+  assert.equal((await page.evaluate(() => window.hausklimaPreview.getConfig())).badge_font_mobile, 9);
+  const phoneToggle = editor.locator('#mobile-metric-visible');
+  await editor.locator('#room-select').selectOption('laundry');
+  await editor.locator('#metric-select').selectOption('temperature');
+  await phoneToggle.uncheck();
+  assert.equal((await page.evaluate(() => window.hausklimaPreview.getConfig()))
+    .building.rooms.find((room) => room.id === 'laundry').mobile_overview.temperature, false);
+  const bedroom = card.locator('.photo-room[data-room-id="bedroom"]');
+  assert.ok(await bedroom.locator('.photo-metric').count() > 0, 'desktop values unaffected by phone switches');
+  await phoneToggle.check();
   const theme = editor.locator('#theme-mode');
   assert.equal(await theme.inputValue(), 'auto', 'theme follows Home Assistant by default');
   await theme.selectOption('dark');
@@ -499,6 +518,8 @@ async function checkEditor(browser) {
   assert.equal(config.scene_max_width, 1600);
   assert.equal(config.chip_opacity, 0.55);
   assert.equal(config.theme_mode, 'auto');
+  assert.equal(config.badge_font_desktop, 14);
+  assert.equal(config.badge_font_mobile, 9);
   assert.equal(config.building.garage_components_initialized, true);
   measurement = config.building.rooms.find((room) => room.id === 'workshop').measurements.temperature;
   assert.equal(measurement.primary, 'sensor.demo_additional_temperature');

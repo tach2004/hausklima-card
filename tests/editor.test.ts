@@ -87,6 +87,35 @@ describe('Lovelace editor', () => {
     }
   });
 
+  it('persists independent phone metric switches and photo font sizes', async () => {
+    const building = getDefaultBuilding();
+    const editor = await createEditor({ ...getDefaultConfig(), building });
+    const changes: HausKlimaCardConfig[] = [];
+    editor.addEventListener('config-changed', (event) => changes.push((event as CustomEvent<{config:HausKlimaCardConfig}>).detail.config));
+    const roomSelect = editor.shadowRoot!.querySelector<HTMLSelectElement>('#room-select')!;
+    roomSelect.value = 'laundry'; roomSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await editor.updateComplete;
+    const phone = input(editor, 'mobile-metric-visible');
+    phone.checked = false; phone.dispatchEvent(new Event('change', { bubbles: true }));
+    await editor.updateComplete;
+    const latestConfig = () => changes[changes.length - 1]!;
+    expect(latestConfig().building!.rooms.find((room) => room.id === 'laundry')!.mobile_overview?.temperature).toBe(false);
+    const metricSelect = editor.shadowRoot!.querySelector<HTMLSelectElement>('#metric-select')!;
+    metricSelect.value = 'relative_humidity'; metricSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await editor.updateComplete;
+    expect(input(editor, 'mobile-metric-visible').checked).toBe(true);
+    const fontMobile = input(editor, 'badge-font-mobile');
+    fontMobile.value = '9'; fontMobile.dispatchEvent(new Event('change', { bubbles: true }));
+    const fontDesktop = input(editor, 'badge-font-desktop');
+    fontDesktop.value = '14'; fontDesktop.dispatchEvent(new Event('change', { bubbles: true }));
+    await editor.updateComplete;
+    expect(latestConfig().badge_font_mobile).toBe(9);
+    expect(latestConfig().badge_font_desktop).toBe(14);
+    const restored = await createEditor(latestConfig());
+    expect(input(restored, 'badge-font-mobile').value).toBe('9');
+    expect(latestConfig().building!.rooms.find((room) => room.id === 'laundry')!.mobile_overview?.temperature).toBe(false);
+  });
+
   it('edits and persists auto/light/dark with config-changed', async () => {
     const editor = await createEditor();
     const configs = capture(editor);

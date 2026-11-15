@@ -59,6 +59,8 @@ export interface RoomConfig {
   /** Stated clear width, never resized to fill the facade; null means unknown. */
   width_m: number | null;
   measurements?: Partial<Record<MetricType, MeasurementConfig>>;
+  /** Separate per-room phone visibility, never affects desktop or details. */
+  mobile_overview?: Partial<Record<'temperature' | 'relative_humidity', boolean>>;
 }
 
 export interface LevelConfig {
@@ -112,6 +114,9 @@ export interface HausKlimaCardConfig {
   chip_opacity?: number;
   /** Maximum width of the full building scene, from 900 to 3200 CSS pixels. */
   scene_max_width?: number;
+  /** Photo badge font sizes in CSS pixels, separate from detail panels. */
+  badge_font_desktop?: number;
+  badge_font_mobile?: number;
   /** Visual theme of this card; auto follows Home Assistant's active theme. */
   theme_mode?: 'auto' | 'light' | 'dark';
   building?: BuildingConfig;

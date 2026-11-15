@@ -75,6 +75,35 @@ describe('Lovelace card integration', () => {
     expect(() => normalizeConfig({ ...getDefaultConfig(), theme_mode: 'blue' })).toThrow(/theme_mode/);
   });
 
+  it('keeps phone metric choices separate from desktop and validates font size limits', async () => {
+    const building = getDefaultBuilding();
+    const laundry = building.rooms.find((room) => room.id === 'laundry')!;
+    laundry.measurements = {
+      temperature: { sensors: [{ entity: 'sensor.test_laundry_temp' }] },
+      relative_humidity: { sensors: [{ entity: 'sensor.test_laundry_rh' }] },
+    };
+    laundry.mobile_overview = { temperature: false, relative_humidity: true };
+    const config = normalizeConfig({ ...getDefaultConfig(), building, badge_font_mobile: 9, badge_font_desktop: 15 });
+    const card = await createCard(config, { states: {
+      'sensor.test_laundry_temp': { state: '19.2', attributes: { unit_of_measurement: '°C' } },
+      'sensor.test_laundry_rh': { state: '56.1', attributes: { unit_of_measurement: '%' } },
+    } });
+    const overlay = find(card, '.photo-room[data-room-id="laundry"]');
+    expect(overlay.querySelectorAll('.photo-metric')).toHaveLength(2);
+    expect(overlay.querySelector('.photo-mobile-reading[data-metric="temperature"]')).toBeNull();
+    expect(overlay.querySelector('.photo-mobile-reading[data-metric="relative_humidity"]')).not.toBeNull();
+    expect(overlay.querySelector('.photo-mobile-name .room-icon')).not.toBeNull();
+    expect(find<HTMLElement>(card, 'ha-card').style.getPropertyValue('--hk-badge-font-desktop')).toContain('15px');
+    expect(find<HTMLElement>(card, 'ha-card').style.getPropertyValue('--hk-badge-font-mobile')).toContain('9px');
+    for (const [key, value] of [['badge_font_desktop', 8], ['badge_font_desktop', 21],
+      ['badge_font_mobile', 7], ['badge_font_mobile', 17], ['badge_font_mobile', NaN]] as const) {
+      expect(() => normalizeConfig({ ...config, [key]: value })).toThrow(/badge_font/);
+    }
+    const bad = structuredClone(building);
+    bad.rooms.find((room) => room.id === 'laundry')!.mobile_overview = { temperature: 'no' as unknown as boolean };
+    expect(() => normalizeConfig({ ...config, building: bad })).toThrow(/mobile_overview/);
+  });
+
   it('rejects invalid incoming configurations', () => {
     const card = document.createElement('hausklima-card') as HausKlimaCard;
     expect(() => card.setConfig(null)).toThrow();

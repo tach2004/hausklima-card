@@ -168,3 +168,14 @@ Das **originale Hausbild** bleibt auf Desktop, iPhone und Tablets exakt dasselbe
 - **Raumdetails:** Sensorquellen, Status, Messarten und Zahlen sind größer gesetzt und somit auch auf großen Panel-Ansichten lesbar. Die technische Entity-ID bleibt weiterhin nur über die HA-Entitätsinformationen erreichbar.
 
 Neue Konfigurationsoption: `theme_mode: auto | light | dark` (Default `auto`). Alte YAML-Konfigurationen und sämtliche gespeicherten Sensor- und Gebäudedaten bleiben ohne Migration gültig.
+
+
+## Feinabstimmung der Messwertfelder und iPhone-Anzeige
+
+Die **Architekturillustration ist auf allen Geräten dieselbe** und wird nicht bearbeitet. Die mobilen Raumkästchen verwenden nun dieselben Raum- und Messart-Icons sowie dunkle, individuell transparente Hintergründe wie auf dem Desktop. Die Mobilansicht ordnet die Kästchen bevorzugt nahe der Desktop-Position im passenden Raum an. Die drei dichten Garagen-Gerätekästchen können aus Platzgründen unmittelbar am unteren Bildrand in einer kompakten Reihe stehen – **ohne kreuz und quer durch das Haus führende Linien**. Die Darstellung benötigt weder eine andere Bilddatei noch eine neue HACS-Integration.
+
+Im grafischen Karteneditor stehen zwei unabhängige Regler bereit: **Schriftgröße Kästchen – Desktop** (`badge_font_desktop`, 9–20 px, Standard 12) und **Handy** (`badge_font_mobile`, 8–16 px, Standard 9). Es geht ausschließlich um die dunklen Messwertfelder auf dem Hausbild; Größe und Typografie der Detailansicht werden nicht geändert. Die Kästchengröße bleibt inhaltsabhängig.
+
+Für jeden Raum bzw. Garagenmessort lässt sich unter **Messwerte zuordnen** bei *Temperatur* und *relativer Luftfeuchte* getrennt die neue Option **Diesen Messwert im Handy-Kästchen anzeigen** abschalten. Die Einstellung `building.rooms[].mobile_overview.temperature/relative_humidity` ist optional und standardmäßig aktiviert; sie wirkt **nur in der kompakten Mobilansicht**. Am Desktop erscheinen weiterhin alle dort konfigurierten und aktivierten Sensoren. Alle Quellen bleiben in der Detailansicht erhalten. Ohne aktive mobile Klimawerte wird kein mobiles schwarzes Kästchen erzeugt. Bei mehr Messarten bleiben diese im mobilen Raumlistenbereich und in den Details sichtbar.
+
+Eine zusätzliche Funktion zum **freien Verschieben und separaten Speichern der Kästchenpositionen** wird bewusst als **eigener PR** umgesetzt, damit die Positionierungslogik unabhängig geprüft werden kann.
