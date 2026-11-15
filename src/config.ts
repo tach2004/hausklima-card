@@ -160,7 +160,7 @@ export function normalizeConfig(input: unknown): HausKlimaCardConfig {
   if (config.scene_max_width !== undefined && (typeof config.scene_max_width !== 'number' || !Number.isFinite(config.scene_max_width) || config.scene_max_width < 900 || config.scene_max_width > 3200)) {
     throw new Error('scene_max_width muss zwischen 900 und 3200 CSS-Pixeln liegen.');
   }
-  for (const [key, min, max] of [['badge_font_desktop', 9, 20], ['badge_font_mobile', 8, 16]] as const) {
+  for (const [key, min, max] of [['badge_font_desktop', 9, 20], ['badge_font_mobile', 5, 16]] as const) {
     const value = config[key];
     if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max))
       throw new Error(`${key} muss zwischen ${min} und ${max} Pixeln liegen.`);

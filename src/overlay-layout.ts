@@ -4,6 +4,46 @@ const overlaps = (a: Rectangle, b: Rectangle, gap = 7) =>
   a.x < b.x + b.width + gap && a.x + a.width + gap > b.x &&
   a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
 
+/** Draw device-anchor to badge-edge connectors after every responsive reflow.
+ *  No static coordinates: manually moved badges are measured in their new location.
+ */
+function drawLeaders(
+  svg: SVGSVGElement | null,
+  lines: { element: HTMLElement; rect: Rectangle }[],
+  width: number, imageHeight: number, stageHeight: number,
+): void {
+  if (!svg) return;
+  svg.setAttribute('viewBox', `0 0 ${width} ${stageHeight}`);
+  const namespace = 'http://www.w3.org/2000/svg';
+  svg.replaceChildren(...lines.flatMap(({ element, rect }) => {
+    const x = width * Number(element.dataset.anchorX) / 100;
+    const y = imageHeight * Number(element.dataset.anchorY) / 100;
+    // Connect to the nearest badge edge (not its centre). This also works
+    // when a user drags a garage badge from the dock back onto the photo.
+    let endX = Math.max(rect.x, Math.min(rect.x + rect.width, x));
+    let endY = Math.max(rect.y, Math.min(rect.y + rect.height, y));
+    if (endX === x && endY === y) {
+      const sides = [
+        { distance: x - rect.x, x: rect.x, y },
+        { distance: rect.x + rect.width - x, x: rect.x + rect.width, y },
+        { distance: y - rect.y, x, y: rect.y },
+        { distance: rect.y + rect.height - y, x, y: rect.y + rect.height },
+      ];
+      const nearest = sides.sort((a, b) => a.distance - b.distance)[0]!;
+      endX = nearest.x;
+      endY = nearest.y;
+    }
+    const path = document.createElementNS(namespace, 'path');
+    path.setAttribute('data-leader-room', element.dataset.overlayId ?? '');
+    path.setAttribute('d', `M ${x} ${y} L ${endX} ${endY}`);
+    const circle = document.createElementNS(namespace, 'circle');
+    circle.setAttribute('cx', String(x));
+    circle.setAttribute('cy', String(y));
+    circle.setAttribute('r', '3');
+    return [path, circle];
+  }));
+}
+
 /** Reflow complete HTML panels, never abbreviate their data or modify the artwork. */
 export function layoutPhotoOverlays(stage: HTMLElement): void {
   const image = stage.querySelector<HTMLImageElement>('.photo-image');
@@ -24,6 +64,7 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
     const mobileCenters = MOBILE_ROOM_ART_POSITIONS;
     const occupied: Rectangle[] = [];
     const dock: HTMLElement[] = [];
+    const lines: { element: HTMLElement; rect: Rectangle }[] = [];
     const svg = stage.querySelector<SVGSVGElement>('.photo-leaders');
     svg?.replaceChildren();
     const note = stage.querySelector<HTMLElement>('.photo-dock-note');
@@ -34,14 +75,18 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
     for (const element of mobileEntries) {
       element.classList.remove('is-docked');
       const id = element.dataset.overlayId ?? '';
-      const badge = element.querySelector<HTMLElement>('.photo-badge.mobile-climate');
+      const isGarageEquipment = id === 'garage_cabinet' || id === 'garage_battery_pylontech' || id === 'garage_battery_litime';
+      // Match desktop: an unconfigured garage device keeps its lightweight
+      // name label and corresponding connector (never an empty dark badge).
+      const badge = element.querySelector<HTMLElement>('.photo-badge.mobile-climate')
+        ?? (isGarageEquipment ? element.querySelector<HTMLElement>('.photo-badge') : null);
       if (!badge) {
         element.style.width = '0px';
         element.style.maxWidth = '0px';
         continue;
       }
       const manuallyPlaced = element.dataset.manualMobileX !== undefined && element.dataset.manualMobileY !== undefined;
-      if (!manuallyPlaced && (id.startsWith('garage_battery_') || id === 'garage_cabinet')) {
+      if (!manuallyPlaced && isGarageEquipment) {
         dock.push(element);
         continue;
       }
@@ -72,6 +117,9 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
       element.style.left = `${placed.x + w / 2}px`;
       element.style.top = `${placed.y + h / 2}px`;
       occupied.push(placed);
+      if (isGarageEquipment) {
+        lines.push({ element, rect: placed });
+      }
     }
     let maxBottom = imageHeight;
     for (const [index, element] of dock.entries()) {
@@ -85,8 +133,13 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
       element.style.left = `${x}px`;
       element.style.top = `${y}px`;
       maxBottom = Math.max(maxBottom, y + h / 2 + 8);
+      const id = element.dataset.overlayId;
+      if (id === 'garage_cabinet' || id === 'garage_battery_pylontech' || id === 'garage_battery_litime') {
+        lines.push({ element, rect: { x: x - element.offsetWidth / 2, y: y - h / 2, width: element.offsetWidth, height: h } });
+      }
     }
     stage.style.height = `${maxBottom}px`;
+    drawLeaders(svg, lines, width, imageHeight, maxBottom);
     return;
   }
   const occupied: Rectangle[] = [];
@@ -151,19 +204,5 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
   if (note) { note.hidden = dock.length === 0; note.style.top = `${imageHeight + 10}px`; note.style.left = '4px'; }
   const totalHeight = docked.length ? Math.max(...docked.map((rect) => rect.y + rect.height)) + 8 : imageHeight;
   stage.style.height = `${totalHeight}px`;
-  const svg = stage.querySelector<SVGSVGElement>('.photo-leaders');
-  if (!svg) return;
-  svg.setAttribute('viewBox', `0 0 ${width} ${totalHeight}`);
-  const namespace = 'http://www.w3.org/2000/svg';
-  svg.replaceChildren(...lines.flatMap(({ element, rect }) => {
-    const x = width * Number(element.dataset.anchorX) / 100;
-    const y = imageHeight * Number(element.dataset.anchorY) / 100;
-    const endX = Math.max(rect.x, Math.min(rect.x + rect.width, x));
-    const endY = Math.max(rect.y, Math.min(rect.y + rect.height, y));
-    const path = document.createElementNS(namespace, 'path');
-    path.setAttribute('d', `M ${x} ${y} L ${endX} ${endY}`);
-    const circle = document.createElementNS(namespace, 'circle');
-    circle.setAttribute('cx', String(x)); circle.setAttribute('cy', String(y)); circle.setAttribute('r', '3');
-    return [path, circle];
-  }));
+  drawLeaders(stage.querySelector<SVGSVGElement>('.photo-leaders'), lines, width, imageHeight, totalHeight);
 }
