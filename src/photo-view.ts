@@ -23,7 +23,7 @@ export function renderPhotoView(
   const outdoors = building.rooms.filter((room) => room.location === 'outdoor' && resolveOverviewGroups(room, hass).length);
   const outdoor = outdoors.find((room) => room.id === options.outdoorId) ?? outdoors[0];
   const mobileClimateReadings = (room: RoomConfig) => resolveMeasurements(room, hass, 'overview')
-    .filter((metric) => metric.type === 'temperature' || metric.type === 'relative_humidity')
+    .filter((metric) => (metric.type === 'temperature' || metric.type === 'relative_humidity') && room.mobile_overview?.[metric.type] !== false)
     .map((metric) => ({ type: metric.type, sensor: metric.primary }));
 
   // Desktop retains every configured reading and all selected sources. On a
@@ -38,7 +38,7 @@ export function renderPhotoView(
       ${showNames ? html`<span class="photo-room-name">${roomIcon(room)}<span>${room.name}</span></span>` : nothing}
       ${renderReadingGroups(room, hass, true)}
       ${climate.length ? html`<span class="photo-mobile-climate">
-        ${showNames ? html`<span class="photo-mobile-name">${room.name}</span>` : nothing}
+        ${showNames ? html`<span class="photo-mobile-name">${roomIcon(room)}<span>${room.name}</span></span>` : nothing}
         ${climate.map(({ type, sensor }) => html`
           <span class="photo-mobile-reading" data-metric=${type} data-reading-entity=${sensor.entity}>
             <span class="mobile-reading-icon ${type}" aria-hidden="true">${metricIcon(type)}</span>
@@ -93,11 +93,11 @@ export const photoStyles = css`
     box-shadow: 0 3px 12px #0d172554; padding: 7px 9px; text-align: left; color: #fff; cursor: pointer;
     display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
   .photo-badge:hover, .photo-badge:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
-  .photo-room-name { display: flex; align-items: center; gap: 5px; color: #fff; font-size: 12px; font-weight: 700; line-height: 1.3; max-width: 100%; }
+  .photo-room-name { display: flex; align-items: center; gap: 5px; color: #fff; font-size: var(--hk-badge-font-desktop, 12px); font-weight: 700; line-height: 1.3; max-width: 100%; }
   .photo-room-name > span { min-width: 0; overflow-wrap: anywhere; }
-  .photo-metric { display: flex; gap: 3px 5px; flex-wrap: wrap; align-items: baseline; min-width: 0; max-width: 100%; color: #fff; font-size: 13px; line-height: 1.35; }
+  .photo-metric { display: flex; gap: 3px 5px; flex-wrap: wrap; align-items: baseline; min-width: 0; max-width: 100%; color: #fff; font-size: calc(var(--hk-badge-font-desktop, 12px) * 1.0833); line-height: 1.35; }
   .photo-metric strong { font-weight: 750; font-size: inherit; color: #fff; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
-  .photo-metric small { color: #eef4f7; font-size: 11px; font-weight: 500; max-width: 100%; overflow-wrap: anywhere; }
+  .photo-metric small { color: #eef4f7; font-size: calc(var(--hk-badge-font-desktop, 12px) * .9167); font-weight: 500; max-width: 100%; overflow-wrap: anywhere; }
   .photo-metric-icon { display: inline-flex; align-self: center; flex-shrink: 0; color: #ffc095; width: 16px; }
   .photo-metric-icon.relative_humidity { color: #8dd6ee; }
   .photo-metric-icon.absolute_humidity { color: #9bdad0; }
@@ -107,9 +107,9 @@ export const photoStyles = css`
   .photo-badge.name-only { padding: 4px; background: transparent; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .photo-badge.name-only .photo-room-name { color: #263238; text-shadow: 0 1px 3px #fff, 0 0 8px #fff; }
   .photo-badge.name-only:hover, .photo-badge.name-only:focus-visible { background: #ffffffa6; }
-  .photo-device .photo-metric { font-size: 12px; }
-  .photo-device .photo-metric small { font-size: 10px; }
-  .photo-device .photo-room-name { font-size: 11px; }
+  .photo-device .photo-metric { font-size: var(--hk-badge-font-desktop, 12px); }
+  .photo-device .photo-metric small { font-size: calc(var(--hk-badge-font-desktop, 12px) * .833); }
+  .photo-device .photo-room-name { font-size: calc(var(--hk-badge-font-desktop, 12px) * .917); }
   .photo-outdoor { width: 100%; }
   .photo-outdoor-choice { display: grid; gap: 4px; background: var(--hk-chip, rgba(22, 26, 30, .72)); color: #fff; border-radius: 9px 9px 0 0; padding: 7px 9px; font-size: 10px; }
   .photo-outdoor-choice select { min-height: 30px; width: 100%; min-width: 0; color: #fff; color-scheme: dark; background: #263039; border: 1px solid #ffffff60; border-radius: 5px; font: inherit; font-size: 12px; }
@@ -127,7 +127,7 @@ export const photoStyles = css`
     .photo-image { border-radius: 12px; }
     .photo-placement { display: block; z-index: 3; }
     .photo-badge.with-metrics.mobile-climate {
-      padding: 4px 6px; min-height: 36px; border: 1px solid #ffffff59;
+      padding: 2px 4px; min-height: 29px; gap: 1px; border: 1px solid #ffffff59;
       border-radius: 8px; box-shadow: 0 2px 10px #0005;
       background: var(--hk-chip, rgba(22, 26, 30, .72));
     }
@@ -140,33 +140,35 @@ export const photoStyles = css`
       width: 100%; min-height: 28px; font-size: 10px;
       background: #263039; color: #fff; border-color: #ffffff60;
     }
-    .photo-mobile-climate { display: flex; flex-direction: column; gap: 2px; min-width: 0; max-width: 100%; }
+    .photo-mobile-climate { display: flex; flex-direction: column; gap: 0; min-width: 0; max-width: 100%; }
     .photo-mobile-name {
-      display: block; color: #fff; font-size: 11px; font-weight: 750;
+      display: flex; gap: 2px; align-items: center; color: #fff; font-size: calc(var(--hk-badge-font-mobile, 9px) * .9); font-weight: 750;
       line-height: 1.2; overflow-wrap: anywhere;
     }
+    .photo-mobile-name > .room-icon { width: 1em; height: 1em; flex-shrink: 0; }
+    .photo-mobile-name > span { min-width: 0; overflow-wrap: anywhere; }
     .photo-mobile-reading {
       display: flex; align-items: center; justify-content: flex-start;
       gap: 2px 4px; min-width: 0; max-width: 100%; color: #fff;
-      font-size: 12px; line-height: 1.2; font-variant-numeric: tabular-nums;
+      font-size: var(--hk-badge-font-mobile, 9px); line-height: 1.08; font-variant-numeric: tabular-nums;
       overflow-wrap: anywhere;
     }
     .photo-mobile-reading strong { font-size: inherit; font-weight: 750; color: #fff; }
-    .photo-mobile-reading small { font-size: 10px; font-weight: 500; color: #eef4f7; }
-    .mobile-reading-icon { display: inline-flex; align-items: center; flex-shrink: 0; width: 13px; height: 13px; color: #ffc095; }
+    .photo-mobile-reading small { font-size: .85em; font-weight: 500; color: #eef4f7; }
+    .mobile-reading-icon { display: inline-flex; align-items: center; flex-shrink: 0; width: 1em; height: 1em; color: #ffc095; }
     .mobile-reading-icon.relative_humidity { color: #8dd6ee; }
-    .mobile-reading-icon :is(svg, .hk-icon) { width: 13px; height: 13px; }
-    .photo-leaders { display: block; z-index: 2; }
-    .photo-leaders path { stroke: #f5f5f4; stroke-width: 1.6; }
-    .photo-object-target, .photo-dock-note { display: none; }
+    .mobile-reading-icon :is(svg, .hk-icon) { width: 1em; height: 1em; }
+    .photo-leaders { display: none; } /* Never draw crossing lines on iPhone. */
+    .photo-object-target { display: block; }
+    .photo-object-target span, .photo-dock-note { display: none; }
     .photo-lower .rooms-section { display: block; padding: 12px 0 16px; }
   }
   @container hausklima (max-width: 440px) {
-    .photo-badge.with-metrics.mobile-climate { padding: 3px 4px; min-height: 33px; border-radius: 6px; }
-    .photo-mobile-name { font-size: 10px; letter-spacing: -.025em; }
-    .photo-mobile-reading { font-size: 11px; gap: 1px 3px; }
-    .photo-mobile-reading small { font-size: 9px; }
-    .mobile-reading-icon { width: 11px; height: 11px; }
-    .mobile-reading-icon :is(svg, .hk-icon) { width: 11px; height: 11px; }
+    .photo-badge.with-metrics.mobile-climate { padding: 2px 3px; min-height: 27px; border-radius: 6px; }
+    .photo-mobile-name { letter-spacing: -.025em; }
+    .photo-mobile-reading { gap: 1px 3px; }
+    .photo-mobile-reading small { font-size: .85em; }
+    .mobile-reading-icon { width: 1em; height: 1em; }
+    .mobile-reading-icon :is(svg, .hk-icon) { width: 1em; height: 1em; }
   }
 `;

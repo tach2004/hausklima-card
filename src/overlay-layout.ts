@@ -17,97 +17,72 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
   const entries = [...stage.querySelectorAll<HTMLElement>('.photo-placement')];
   const containerWidth = stage.closest('ha-card')?.clientWidth ?? stage.clientWidth;
   if (containerWidth <= 1000) {
-    // The artwork stays identical across devices. On narrow cards we distribute
-    // the named, two-reading badges across its three room rows, while garage
-    // equipment uses a connected three-column dock immediately below the image.
-    const coordinates: Record<string, [number, number]> = {
-      bedroom: [22, 30], storage: [52, 30],
-      living_room: [14, 54], ground_hall: [37, 54], kitchen: [60, 54],
-      workshop: [14, 78], basement_hall: [37, 78], laundry: [60, 78],
-      garage: [85, 53],
+    // Same original illustration and spatial room arrangement as desktop.
+    // Only three densely packed garage-device badges use a compact dark strip
+    // below the image. Deliberately no diagonal or cross-image leader lines.
+    const mobileCenters: Record<string, [number, number]> = {
+      bedroom: [27, 33], storage: [56, 33],
+      living_room: [15, 55], ground_hall: [37, 55], kitchen: [59, 55],
+      workshop: [15, 78], basement_hall: [37, 78], laundry: [59, 78],
+      garage: [85, 55],
     };
     const occupied: Rectangle[] = [];
     const dock: HTMLElement[] = [];
-    const connectors: { element: HTMLElement; rect: Rectangle }[] = [];
     const svg = stage.querySelector<SVGSVGElement>('.photo-leaders');
     svg?.replaceChildren();
+    const note = stage.querySelector<HTMLElement>('.photo-dock-note');
+    if (note) note.hidden = true;
 
     for (const element of entries) {
       element.classList.remove('is-docked');
+      const id = element.dataset.overlayId ?? '';
       const badge = element.querySelector<HTMLElement>('.photo-badge.mobile-climate');
       if (!badge) {
         element.style.width = '0px';
         element.style.maxWidth = '0px';
         continue;
       }
-      const id = element.dataset.overlayId ?? '';
       if (id.startsWith('garage_battery_') || id === 'garage_cabinet') {
         dock.push(element);
         continue;
       }
       element.style.width = 'max-content';
-      element.style.maxWidth = `${Math.min(94, width * .224)}px`;
-      const w = element.offsetWidth;
-      const h = element.offsetHeight;
-      const [xPercent, yPercent] = coordinates[id] ?? [Number(element.dataset.preferredX), Number(element.dataset.preferredY)];
-      const centerX = width * xPercent / 100;
-      const centerY = imageHeight * yPercent / 100;
-      let selected: Rectangle | undefined;
-      for (const [dx, dy] of [[0, 0], [-8, 0], [8, 0], [0, -9], [0, 9], [-14, -7], [14, 7]]) {
-        const x = Math.max(2, Math.min(width - w - 2, centerX - w / 2 + dx!));
-        const y = Math.max(2, Math.min(imageHeight - h - 2, centerY - h / 2 + dy!));
-        const candidate = { x, y, width: w, height: h };
-        if (!occupied.some((previous) => overlaps(candidate, previous, 2))) {
-          selected = candidate;
-          break;
-        }
+      element.style.maxWidth = `${Math.min(id === 'bedroom' || id === 'storage' ? 105 : 95, width * (id === 'bedroom' || id === 'storage' ? .27 : .205))}px`;
+      const w = element.offsetWidth, h = element.offsetHeight;
+      const [xPct, yPct] = mobileCenters[id] ?? [Number(element.dataset.preferredX), Number(element.dataset.preferredY)];
+      const preferredX = width * xPct / 100 - w / 2;
+      const preferredY = imageHeight * yPct / 100 - h / 2;
+      let placed: Rectangle | undefined;
+      for (const [dx, dy] of [[0, 0], [-4, 0], [4, 0], [0, -4], [0, 4], [0, -8], [0, 8]]) {
+        const rect = {
+          x: Math.max(2, Math.min(width - w - 2, preferredX + dx!)),
+          y: Math.max(2, Math.min(imageHeight - h - 2, preferredY + dy!)),
+          width: w, height: h,
+        };
+        if (!occupied.some((previous) => overlaps(rect, previous, 1))) { placed = rect; break; }
       }
-      if (!selected) {
+      if (!placed) {
         dock.push(element);
         continue;
       }
-      element.style.left = `${selected.x + w / 2}px`;
-      element.style.top = `${selected.y + h / 2}px`;
-      occupied.push(selected);
+      element.style.left = `${placed.x + w / 2}px`;
+      element.style.top = `${placed.y + h / 2}px`;
+      occupied.push(placed);
     }
-
-    const dockRowHeight = 72;
-    let lastBottom = imageHeight;
+    let maxBottom = imageHeight;
     for (const [index, element] of dock.entries()) {
       element.classList.add('is-docked');
       element.style.width = 'max-content';
       element.style.maxWidth = `${Math.min(120, width / 3 - 8)}px`;
-      const w = element.offsetWidth;
       const h = element.offsetHeight;
       const column = index % 3, row = Math.floor(index / 3);
-      const centerX = (column + .5) * width / 3;
-      const centerY = imageHeight + 12 + h / 2 + row * dockRowHeight;
-      const rect = { x: centerX - w / 2, y: centerY - h / 2, width: w, height: h };
-      element.style.left = `${centerX}px`;
-      element.style.top = `${centerY}px`;
-      lastBottom = Math.max(lastBottom, rect.y + h);
-      connectors.push({ element, rect });
+      const x = (column + .5) * width / 3;
+      const y = imageHeight + 10 + h / 2 + row * 64;
+      element.style.left = `${x}px`;
+      element.style.top = `${y}px`;
+      maxBottom = Math.max(maxBottom, y + h / 2 + 8);
     }
-    const totalHeight = lastBottom > imageHeight ? lastBottom + 10 : imageHeight;
-    stage.style.height = `${totalHeight}px`;
-
-    if (svg) {
-      svg.setAttribute('viewBox', `0 0 ${width} ${totalHeight}`);
-      const namespace = 'http://www.w3.org/2000/svg';
-      svg.replaceChildren(...connectors.flatMap(({ element, rect }) => {
-        const x = width * Number(element.dataset.anchorX) / 100;
-        const y = imageHeight * Number(element.dataset.anchorY) / 100;
-        const endX = rect.x + rect.width / 2;
-        const endY = rect.y;
-        const path = document.createElementNS(namespace, 'path');
-        path.setAttribute('d', `M ${x} ${y} L ${endX} ${endY}`);
-        const circle = document.createElementNS(namespace, 'circle');
-        circle.setAttribute('cx', String(x));
-        circle.setAttribute('cy', String(y));
-        circle.setAttribute('r', '3');
-        return [path, circle];
-      }));
-    }
+    stage.style.height = `${maxBottom}px`;
     return;
   }
   const occupied: Rectangle[] = [];

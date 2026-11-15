@@ -120,6 +120,13 @@ function validateBuilding(value: unknown): asserts value is BuildingConfig {
     }
     positive(room.width_m, `${path}.width_m`, true);
     if (room.measurements !== undefined) validateMeasurements(room.measurements, `${path}.measurements`);
+    if (room.mobile_overview !== undefined) {
+      const mobile = object(room.mobile_overview, `${path}.mobile_overview`);
+      for (const [metric, value] of Object.entries(mobile)) {
+        if (metric !== 'temperature' && metric !== 'relative_humidity') throw new Error(`${path}.mobile_overview: unbekannte Messart ${metric}.`);
+        boolean(value, `${path}.mobile_overview.${metric}`);
+      }
+    }
   });
   list(building.notes, 'building.notes').forEach((note, index) => text(note, `building.notes[${index}]`));
   // Intentionally no sum/fit check: known room widths and unresolved wall widths
@@ -134,6 +141,8 @@ export function getDefaultConfig(): HausKlimaCardConfig {
     show_room_names: true,
     chip_opacity: 0.72,
     scene_max_width: 1400,
+    badge_font_desktop: 12,
+    badge_font_mobile: 9,
     theme_mode: 'auto',
   };
 }
@@ -150,6 +159,11 @@ export function normalizeConfig(input: unknown): HausKlimaCardConfig {
   }
   if (config.scene_max_width !== undefined && (typeof config.scene_max_width !== 'number' || !Number.isFinite(config.scene_max_width) || config.scene_max_width < 900 || config.scene_max_width > 3200)) {
     throw new Error('scene_max_width muss zwischen 900 und 3200 CSS-Pixeln liegen.');
+  }
+  for (const [key, min, max] of [['badge_font_desktop', 9, 20], ['badge_font_mobile', 8, 16]] as const) {
+    const value = config[key];
+    if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max))
+      throw new Error(`${key} muss zwischen ${min} und ${max} Pixeln liegen.`);
   }
   if (config.theme_mode !== undefined && (typeof config.theme_mode !== 'string' || !['auto', 'light', 'dark'].includes(config.theme_mode))) {
     throw new Error('theme_mode muss auto, light oder dark sein.');
