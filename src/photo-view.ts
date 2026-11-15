@@ -142,6 +142,18 @@ export const photoStyles = css`
       background: var(--hk-chip, rgba(22, 26, 30, .72));
     }
     .photo-badge .sensor-groups, .photo-badge .photo-room-name, .photo-badge.mobile-no-climate { display: none; }
+    /* Three devices remain identifiable even before a temperature/RH sensor
+       is assigned: show a lightweight label, never an empty dark box. */
+    .photo-device .photo-badge.mobile-no-climate {
+      display: flex; min-height: 19px; padding: 2px; border: 0;
+      background: transparent; box-shadow: none; backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+    .photo-device .photo-badge.mobile-no-climate .photo-room-name {
+      display: flex; align-items: center; gap: 2px;
+      font-size: var(--hk-badge-font-mobile, 9px); color: #243137;
+      text-shadow: 0 1px 2px #fff, 0 0 4px #fff;
+    }
     /* Also on mobile, multiple outdoor measurement locations stay reachable
        from the same dropdown attached to the in-picture outdoor badge. */
     .photo-outdoor-choice { display: block; padding: 3px 4px; font-size: 10px; }
@@ -168,7 +180,11 @@ export const photoStyles = css`
     .mobile-reading-icon { display: inline-flex; align-items: center; flex-shrink: 0; width: 1em; height: 1em; color: #ffc095; }
     .mobile-reading-icon.relative_humidity { color: #8dd6ee; }
     .mobile-reading-icon :is(svg, .hk-icon) { width: 1em; height: 1em; }
-    .photo-leaders { display: none; } /* Never draw crossing lines on iPhone. */
+    /* Same three garage-object connectors as desktop. The layout engine moves
+       their ends with the corresponding badge (including manually saved positions). */
+    .photo-leaders { display: block; z-index: 2; }
+    .photo-leaders path { stroke: #f5f8f8; stroke-width: 1.25; filter: drop-shadow(0 1px 1px #09181b); }
+    .photo-leaders circle { fill: #fff; stroke: #263e35; stroke-width: 1.25; }
     .photo-object-target { display: block; }
     .photo-object-target span, .photo-dock-note { display: none; }
     .photo-lower .rooms-section { display: block; padding: 12px 0 16px; }

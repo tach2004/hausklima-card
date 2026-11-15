@@ -107,7 +107,38 @@ async function checkResponsive(browser, engine) {
         assert.deepEqual(await roomBadge.locator('.photo-mobile-reading:visible').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-metric'))),
           ['temperature', 'relative_humidity'], `${name}: only temperature and humidity with separate icons on mobile`);
         assert.equal(await roomBadge.locator('.photo-mobile-reading:visible svg').count(), 2, `${name}: proper colored SVG climate symbols`);
-        assert.equal(await card.locator('.photo-leaders path').count(), 0, `${name}: no crossing connector lines on mobile`);
+        const leaderPaths = card.locator('.photo-leaders path[data-leader-room]');
+        assert.equal(await leaderPaths.count(), 3, `${name}: cabinet and two batteries have one responsive leader line each`);
+        assert.deepEqual((await leaderPaths.evaluateAll((nodes) =>
+          nodes.map((node) => node.getAttribute('data-leader-room')).sort())),
+          ['garage_battery_litime', 'garage_battery_pylontech', 'garage_cabinet'],
+          `${name}: each leader line belongs to the correct device`);
+        assert.equal(await card.locator('.photo-leaders').evaluate((svg) => getComputedStyle(svg).display), 'block',
+          `${name}: phone lines must be visibly drawn`);
+        const badLines = await leaderPaths.evaluateAll((nodes) => {
+          const stage = nodes[0]?.closest('.photo-stage');
+          const image = stage?.querySelector('.photo-image');
+          const width = image?.clientWidth ?? 0;
+          const height = image?.clientHeight ?? 0;
+          const outer = stage?.getBoundingClientRect();
+          return nodes.flatMap((path) => {
+            const id = path.getAttribute('data-leader-room');
+            const badge = stage?.querySelector(`.photo-placement[data-overlay-id="${id}"]`);
+            const d = path.getAttribute('d') ?? '';
+            const numbers = [...d.matchAll(/-?\d+(?:\.\d+)?/g)].map((match) => Number(match[0]));
+            if (!badge || !outer || numbers.length !== 4) return [{ id, reason: 'missing geometry' }];
+            const [startX, startY, endX, endY] = numbers;
+            const bounds = badge.getBoundingClientRect();
+            const left = bounds.left - outer.left, right = bounds.right - outer.left;
+            const top = bounds.top - outer.top, bottom = bounds.bottom - outer.top;
+            const expectedX = width * Number(badge.getAttribute('data-anchor-x')) / 100;
+            const expectedY = height * Number(badge.getAttribute('data-anchor-y')) / 100;
+            const endsAtBox = endX >= left - 2 && endX <= right + 2 && endY >= top - 2 && endY <= bottom + 2;
+            return Math.abs(startX - expectedX) < 1.5 && Math.abs(startY - expectedY) < 1.5 && endsAtBox
+              ? [] : [{ id, reason: 'line does not connect object anchor to badge', d }];
+          });
+        });
+        assert.deepEqual(badLines, [], `${name}: leader lines dynamically connect the actual object to the actual badge`);
         assert.equal(await card.locator('.photo-lower .location-column, .outdoor-block, .garage-block').count(), 0,
           `${name}: no permanent outdoor or garage summary below the illustration on mobile`);
         const outdoorSelector = card.locator('#photo-outdoor-select');
@@ -192,6 +223,12 @@ async function checkStates(browser) {
   assert.equal(await initial.card.locator(overlaySelector).count(), 0, 'unconfigured sensors create no dark photo panel');
   assert.equal(await initial.card.locator('.photo-device, .photo-air').count(), 4, 'all four garage measurement locations remain in the illustration');
   assert.equal(await initial.card.locator('.location-column').count(), 0, 'no redundant garage/outdoor cards');
+  assert.deepEqual(
+    (await initial.card.locator('.photo-leaders path[data-leader-room]').evaluateAll((paths) =>
+      paths.map((path) => path.getAttribute('data-leader-room')).sort())),
+    ['garage_battery_litime', 'garage_battery_pylontech', 'garage_cabinet'],
+    'even unconfigured garage devices retain their three label connectors without empty black panels',
+  );
   const emptyBackground = await initial.card.locator('.photo-room.name-only').first().evaluate((element) => getComputedStyle(element).backgroundColor);
   assert.equal(emptyBackground, 'rgba(0, 0, 0, 0)', 'unconfigured room has no dark overlay');
 
@@ -435,9 +472,16 @@ async function checkEditor(browser) {
   assert.equal(await desktopSize.inputValue(), '12');
   assert.equal(await mobileSize.inputValue(), '9');
   await desktopSize.evaluate((el) => { el.value = '14'; el.dispatchEvent(new Event('change', { bubbles: true })); });
-  await mobileSize.evaluate((el) => { el.value = '9'; el.dispatchEvent(new Event('change', { bubbles: true })); });
+  assert.equal(await mobileSize.getAttribute('min'), '5', 'phone fonts may be smaller than 8px');
+  assert.equal(await mobileSize.getAttribute('step'), '0.5', 'phone fonts support 0.5px precision');
+  await mobileSize.evaluate((el) => { el.value = '5.5'; el.dispatchEvent(new Event('change', { bubbles: true })); });
   assert.equal((await page.evaluate(() => window.hausklimaPreview.getConfig())).badge_font_desktop, 14);
-  assert.equal((await page.evaluate(() => window.hausklimaPreview.getConfig())).badge_font_mobile, 9);
+  assert.equal((await page.evaluate(() => window.hausklimaPreview.getConfig())).badge_font_mobile, 5.5);
+  await page.evaluate(async () => { await window.hausklimaPreview.card.updateComplete; await new Promise(requestAnimationFrame); });
+  const actualPhoneFont = await card.locator('.photo-mobile-reading:visible').first()
+    .evaluate((node) => parseFloat(getComputedStyle(node).fontSize));
+  assert.ok(Math.abs(actualPhoneFont - 5.5) <= 0.05, 'font slider really renders badge values smaller than 8px');
+
   const phoneToggle = editor.locator('#mobile-metric-visible');
   await editor.locator('#room-select').selectOption('laundry');
   await editor.locator('#metric-select').selectOption('temperature');
@@ -519,7 +563,7 @@ async function checkEditor(browser) {
   assert.equal(config.chip_opacity, 0.55);
   assert.equal(config.theme_mode, 'auto');
   assert.equal(config.badge_font_desktop, 14);
-  assert.equal(config.badge_font_mobile, 9);
+  assert.equal(config.badge_font_mobile, 5.5);
   assert.equal(config.building.garage_components_initialized, true);
   measurement = config.building.rooms.find((room) => room.id === 'workshop').measurements.temperature;
   assert.equal(measurement.primary, 'sensor.demo_additional_temperature');
@@ -574,6 +618,44 @@ async function checkBadgePositionEditor(browser) {
   if (process.env.UPDATE_SCREENSHOTS === '1') {
     await editor.locator('.position-settings').screenshot({ path: `${screenshotDirectory}/badge-position-editor-mobile.png` });
   }
+  // Moving a manually positioned GARAGE badge changes its own line endpoint.
+  // This must also work when it comes off the default three-column dock.
+  const deviceId = 'garage_battery_pylontech';
+  const leader = card.locator(`.photo-leaders path[data-leader-room="${deviceId}"]`);
+  const originalLeader = await leader.getAttribute('d');
+  assert.ok(originalLeader, 'Pylontech leader exists before movement');
+  await page.evaluate((id) => {
+    const next = window.hausklimaPreview.getConfig();
+    next.badge_positions = { ...next.badge_positions, [id]: { mobile: { x: 88, y: 79 } } };
+    window.hausklimaPreview.setConfig(next);
+  }, deviceId);
+  await page.waitForFunction(({ id, previous }) => {
+    const stage = window.hausklimaPreview.card.shadowRoot.querySelector('.photo-stage');
+    const line = stage?.querySelector(`.photo-leaders path[data-leader-room="${id}"]`);
+    return line?.getAttribute('d') && line.getAttribute('d') !== previous;
+  }, { id: deviceId, previous: originalLeader });
+  const movedLeader = await leader.getAttribute('d');
+  assert.notEqual(movedLeader, originalLeader, 'Pylontech line follows user-saved phone badge position');
+  assert.equal(await card.locator(`.photo-placement[data-overlay-id="${deviceId}"]`).getAttribute('data-manual-mobile-x'), '88');
+  // Moving only the desktop badge must NOT alter the phone connector.
+  await page.evaluate((id) => {
+    const next = window.hausklimaPreview.getConfig();
+    next.badge_positions[id].desktop = { x: 81, y: 90 };
+    window.hausklimaPreview.setConfig(next);
+  }, deviceId);
+  await page.waitForFunction(() => window.hausklimaPreview.card.updateComplete);
+  assert.equal(await leader.getAttribute('d'), movedLeader, 'desktop position does not change phone connector');
+  // Resetting the custom phone placement returns the line to its docked end.
+  await page.evaluate((id) => {
+    const next = window.hausklimaPreview.getConfig();
+    delete next.badge_positions[id].mobile;
+    window.hausklimaPreview.setConfig(next);
+  }, deviceId);
+  await page.waitForFunction(({ id, previous }) => {
+    const line = window.hausklimaPreview.card.shadowRoot.querySelector(`.photo-leaders path[data-leader-room="${id}"]`);
+    return line?.getAttribute('d') && line.getAttribute('d') !== previous;
+  }, { id: deviceId, previous: movedLeader });
+  assert.equal(await leader.getAttribute('d'), originalLeader, 'reset restores original mobile dock connection');
   const selectedMobile = structuredClone(config.badge_positions.laundry.mobile);
   await editor.locator('#position-device').selectOption('desktop');
   const desktop = editor.locator('#position-marker');

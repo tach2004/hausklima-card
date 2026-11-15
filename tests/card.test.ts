@@ -96,9 +96,10 @@ describe('Lovelace card integration', () => {
     expect(find<HTMLElement>(card, 'ha-card').style.getPropertyValue('--hk-badge-font-desktop')).toContain('15px');
     expect(find<HTMLElement>(card, 'ha-card').style.getPropertyValue('--hk-badge-font-mobile')).toContain('9px');
     for (const [key, value] of [['badge_font_desktop', 8], ['badge_font_desktop', 21],
-      ['badge_font_mobile', 7], ['badge_font_mobile', 17], ['badge_font_mobile', NaN]] as const) {
+      ['badge_font_mobile', 4.5], ['badge_font_mobile', 17], ['badge_font_mobile', NaN]] as const) {
       expect(() => normalizeConfig({ ...config, [key]: value })).toThrow(/badge_font/);
     }
+    expect(normalizeConfig({ ...config, badge_font_mobile: 5.5 }).badge_font_mobile).toBe(5.5);
     const bad = structuredClone(building);
     bad.rooms.find((room) => room.id === 'laundry')!.mobile_overview = { temperature: 'no' as unknown as boolean };
     expect(() => normalizeConfig({ ...config, building: bad })).toThrow(/mobile_overview/);

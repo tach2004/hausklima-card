@@ -360,7 +360,7 @@ export class HausKlimaCardEditor extends LitElement {
               @change=${(event: Event) => this.updateBase('badge_font_desktop', Number((event.target as HTMLInputElement).value))} />
           </label>
           <label class="field badge-font" for="badge-font-mobile"><span>Schriftgröße der Kästchen – Handy: ${this._config.badge_font_mobile ?? 9} px</span>
-            <input id="badge-font-mobile" type="range" min="8" max="16" step="1"
+            <input id="badge-font-mobile" type="range" min="5" max="16" step="0.5"
               .value=${String(this._config.badge_font_mobile ?? 9)}
               @change=${(event: Event) => this.updateBase('badge_font_mobile', Number((event.target as HTMLInputElement).value))} />
             <small>Gilt nur für das Hausbild. Die Detailansicht bleibt gleich; Kästchen passen sich weiterhin dynamisch an.</small>

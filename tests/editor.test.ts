@@ -105,14 +105,16 @@ describe('Lovelace editor', () => {
     await editor.updateComplete;
     expect(input(editor, 'mobile-metric-visible').checked).toBe(true);
     const fontMobile = input(editor, 'badge-font-mobile');
-    fontMobile.value = '9'; fontMobile.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(fontMobile.min).toBe('5');
+    expect(fontMobile.step).toBe('0.5');
+    fontMobile.value = '5.5'; fontMobile.dispatchEvent(new Event('change', { bubbles: true }));
     const fontDesktop = input(editor, 'badge-font-desktop');
     fontDesktop.value = '14'; fontDesktop.dispatchEvent(new Event('change', { bubbles: true }));
     await editor.updateComplete;
-    expect(latestConfig().badge_font_mobile).toBe(9);
+    expect(latestConfig().badge_font_mobile).toBe(5.5);
     expect(latestConfig().badge_font_desktop).toBe(14);
     const restored = await createEditor(latestConfig());
-    expect(input(restored, 'badge-font-mobile').value).toBe('9');
+    expect(input(restored, 'badge-font-mobile').value).toBe('5.5');
     expect(latestConfig().building!.rooms.find((room) => room.id === 'laundry')!.mobile_overview?.temperature).toBe(false);
   });
 
