@@ -116,6 +116,35 @@ describe('Lovelace editor', () => {
     expect(latestConfig().building!.rooms.find((room) => room.id === 'laundry')!.mobile_overview?.temperature).toBe(false);
   });
 
+  it('edits the selected overlay position using keyboard arrows and preserves other device', async () => {
+    const editor = await createEditor();
+    const events: HausKlimaCardConfig[] = [];
+    editor.addEventListener('config-changed', (event) => events.push((event as CustomEvent<{ config: HausKlimaCardConfig }>).detail.config));
+    const select = editor.shadowRoot!.querySelector<HTMLSelectElement>('#room-select')!;
+    select.value = 'laundry'; select.dispatchEvent(new Event('change', { bubbles: true }));
+    await editor.updateComplete;
+    expect(editor.shadowRoot!.querySelector('#position-marker')).not.toBeNull();
+    const mode = editor.shadowRoot!.querySelector<HTMLSelectElement>('#position-device')!;
+    mode.value = 'mobile'; mode.dispatchEvent(new Event('change', { bubbles: true }));
+    await editor.updateComplete;
+    const marker = editor.shadowRoot!.querySelector<HTMLButtonElement>('#position-marker')!;
+    marker.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await editor.updateComplete;
+    const saved = events[events.length - 1]!;
+    expect(saved.badge_positions?.laundry?.mobile).toEqual({ x: 60, y: 78 });
+    expect(saved.badge_positions?.laundry?.desktop).toBeUndefined();
+    mode.value = 'desktop'; mode.dispatchEvent(new Event('change', { bubbles: true }));
+    await editor.updateComplete;
+    editor.shadowRoot!.querySelector<HTMLButtonElement>('#position-marker')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, shiftKey: true }));
+    await editor.updateComplete;
+    expect(events[events.length - 1]!.badge_positions?.laundry?.desktop?.y).toBe(80);
+    expect(events[events.length - 1]!.badge_positions?.laundry?.mobile).toEqual({ x: 60, y: 78 });
+    editor.shadowRoot!.querySelector<HTMLButtonElement>('#position-reset')!.click();
+    await editor.updateComplete;
+    expect(events[events.length - 1]!.badge_positions?.laundry?.desktop).toBeUndefined();
+    expect(events[events.length - 1]!.badge_positions?.laundry?.mobile).toEqual({ x: 60, y: 78 });
+  });
+
   it('edits and persists auto/light/dark with config-changed', async () => {
     const editor = await createEditor();
     const configs = capture(editor);

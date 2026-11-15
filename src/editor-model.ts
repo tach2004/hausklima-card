@@ -44,6 +44,25 @@ export function editRoom(config: HausKlimaCardConfig, id: string, patch: RoomEdi
   });
 }
 
+/** Save positions independent of sensor readings and of the other device. */
+export function saveBadgePosition(config: HausKlimaCardConfig, roomId: string,
+  device: 'desktop' | 'mobile', position: { x: number; y: number }): HausKlimaCardConfig {
+  const next = normalizeConfig(config);
+  if (!resolveBuilding(next).rooms.some((room) => room.id === roomId)) throw new Error('Messort existiert nicht.');
+  const positions = { ...next.badge_positions, [roomId]: { ...next.badge_positions?.[roomId], [device]: position } };
+  return normalizeConfig({ ...next, badge_positions: positions });
+}
+
+export function resetBadgePosition(config: HausKlimaCardConfig, roomId: string, device: 'desktop' | 'mobile'): HausKlimaCardConfig {
+  const next = normalizeConfig(config);
+  const positions = structuredClone(next.badge_positions ?? {});
+  if (positions[roomId]) {
+    delete positions[roomId]![device];
+    if (!Object.keys(positions[roomId]!).length) delete positions[roomId];
+  }
+  return normalizeConfig({ ...next, badge_positions: positions });
+}
+
 /** Per-room mobile photo switches do not alter desktop or full details. */
 export function setMobileOverview(config: HausKlimaCardConfig, roomId: string,
   metric: 'temperature' | 'relative_humidity', shown: boolean): HausKlimaCardConfig {

@@ -32,6 +32,10 @@ export interface SensorConfig {
   overview_group?: string;
 }
 
+/** Percent-of-artwork coordinates. Each device has independent desktop/mobile slots. */
+export interface BadgeCoordinates { x: number; y: number; }
+export interface BadgePositionSet { desktop?: BadgeCoordinates; mobile?: BadgeCoordinates; }
+
 /** Coordinates are relative to the room, from 0 to 1. Layout UI follows later. */
 export interface MeasurementPosition {
   x: number;
@@ -117,6 +121,8 @@ export interface HausKlimaCardConfig {
   /** Photo badge font sizes in CSS pixels, separate from detail panels. */
   badge_font_desktop?: number;
   badge_font_mobile?: number;
+  /** Individually persisted per-location positions, keyed by stable room ID. */
+  badge_positions?: Record<string, BadgePositionSet>;
   /** Visual theme of this card; auto follows Home Assistant's active theme. */
   theme_mode?: 'auto' | 'light' | 'dark';
   building?: BuildingConfig;

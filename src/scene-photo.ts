@@ -25,3 +25,11 @@ export const GARAGE_ART_POSITIONS: Readonly<Record<string, { x: number; y: numbe
   garage_battery_pylontech: { x: 85, y: 89, anchorX: 84.2, anchorY: 71 },
   garage_battery_litime: { x: 94.5, y: 89, anchorX: 90.1, anchorY: 71 },
 };
+
+/** Default phone badge centers: only the responsive UI changes, never the photo. */
+export const MOBILE_ROOM_ART_POSITIONS: Readonly<Record<string, { x: number; y: number }>> = {
+  bedroom: { x: 27, y: 33 }, storage: { x: 56, y: 33 },
+  living_room: { x: 15, y: 55 }, ground_hall: { x: 37, y: 55 }, kitchen: { x: 59, y: 55 },
+  workshop: { x: 15, y: 78 }, basement_hall: { x: 37, y: 78 }, laundry: { x: 59, y: 78 },
+  garage: { x: 85, y: 55 },
+};

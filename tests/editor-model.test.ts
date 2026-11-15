@@ -9,6 +9,8 @@ import {
   editSensor,
   removeSensor,
   setPrimarySensor,
+  saveBadgePosition,
+  resetBadgePosition,
   updateMeasurement,
 } from '../src/editor-model';
 import type { HausKlimaCardConfig, RoomConfig } from '../src/types';
@@ -28,6 +30,32 @@ function room(config: HausKlimaCardConfig, id = 'workshop'): RoomConfig {
 function withTwoSensors(): HausKlimaCardConfig {
   return addSensor(addSensor(getDefaultConfig(), 'workshop', 'temperature', firstEntity), 'workshop', 'temperature', secondEntity);
 }
+
+describe('saved responsive badge coordinates', () => {
+  it('stores independent positions, keeps existing Lovelace fields and resets per device', () => {
+    const config = { ...getDefaultConfig(), grid_options: { columns: 'full' } };
+    const old = structuredClone(config);
+    const desktop = saveBadgePosition(config, 'laundry', 'desktop', { x: 35.5, y: 72.25 });
+    const mobile = saveBadgePosition(desktop, 'laundry', 'mobile', { x: 54, y: 80 });
+    expect(config).toEqual(old);
+    expect(mobile.badge_positions?.laundry).toEqual({
+      desktop: { x: 35.5, y: 72.25 }, mobile: { x: 54, y: 80 },
+    });
+    expect(mobile.grid_options).toEqual({ columns: 'full' });
+    const resetMobile = resetBadgePosition(mobile, 'laundry', 'mobile');
+    expect(resetMobile.badge_positions?.laundry?.desktop).toEqual({ x: 35.5, y: 72.25 });
+    expect(resetMobile.badge_positions?.laundry?.mobile).toBeUndefined();
+    const resetBoth = resetBadgePosition(resetMobile, 'laundry', 'desktop');
+    expect(resetBoth.badge_positions?.laundry).toBeUndefined();
+    expect(() => saveBadgePosition(config, 'does_not_exist', 'mobile', { x: 5, y: 5 })).toThrow();
+  });
+  it('rejects out-of-range, nonfinite and malformed position data', () => {
+    for (const position of [{ x: -1, y: 50 }, { x: 45, y: 101 }, { x: NaN, y: 50 }, { x: 50, y: Infinity }]) {
+      expect(() => saveBadgePosition(getDefaultConfig(), 'laundry', 'desktop', position)).toThrow(/badge_positions/);
+    }
+    expect(() => normalizeConfig({ ...getDefaultConfig(), badge_positions: { laundry: { tablet: { x: 5, y: 5 } } } })).toThrow(/badge_positions/);
+  });
+});
 
 describe('immutable graphical editor changes', () => {
   it('edits a room name without changing its ID, known geometry or the input object', () => {

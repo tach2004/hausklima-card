@@ -104,6 +104,23 @@ describe('Lovelace card integration', () => {
     expect(() => normalizeConfig({ ...config, building: bad })).toThrow(/mobile_overview/);
   });
 
+  it('binds desktop and phone overlay position overrides without affecting sensors', async () => {
+    const config = { ...getDefaultConfig(), badge_positions: {
+      laundry: { desktop: { x: 20, y: 80 }, mobile: { x: 60, y: 65 } },
+      garage_battery_pylontech: { mobile: { x: 85, y: 77 } },
+    } };
+    const card = await createCard(config);
+    const laundry = find(card, '.photo-placement[data-overlay-id="laundry"]');
+    expect(laundry.getAttribute('data-manual-desktop-x')).toBe('20');
+    expect(laundry.getAttribute('data-manual-mobile-x')).toBe('60');
+    expect(laundry.getAttribute('data-manual-mobile-y')).toBe('65');
+    expect(find(card, '.photo-placement[data-overlay-id="garage_battery_pylontech"]').getAttribute('data-manual-mobile-x')).toBe('85');
+    const reset = { ...getDefaultConfig(), badge_positions: {} };
+    card.setConfig(reset);
+    await card.updateComplete;
+    expect(find(card, '.photo-placement[data-overlay-id="laundry"]').hasAttribute('data-manual-mobile-x')).toBe(false);
+  });
+
   it('rejects invalid incoming configurations', () => {
     const card = document.createElement('hausklima-card') as HausKlimaCard;
     expect(() => card.setConfig(null)).toThrow();
