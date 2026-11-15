@@ -12,7 +12,7 @@ import type { HausKlimaCardConfig, HomeAssistant, MetricType, RoomConfig, Sensor
 import { editorStyles } from './editor-styles';
 import { houseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS, MOBILE_ROOM_ART_POSITIONS } from './scene-photo';
 import { roomIcon, metricIcon } from './icons';
-import { formatSensorValue, resolveMeasurements } from './metrics';
+import { formatSensorValue, isMobileOverviewEnabled, resolveMeasurements } from './metrics';
 
 interface NativeCardConstructor {
   getConfigElement?: () => HTMLElement | Promise<HTMLElement>;
@@ -196,8 +196,7 @@ export class HausKlimaCardEditor extends LitElement {
     const position = this.savedPosition(room);
     const stored = this._config.badge_positions?.[room.id]?.[this._positionDevice];
     const measurements = resolveMeasurements(room, this.hass, 'overview')
-      .filter((m) => this._positionDevice === 'desktop' ||
-        (m.type === 'temperature' || m.type === 'relative_humidity') && room.mobile_overview?.[m.type] !== false);
+      .filter((m) => this._positionDevice === 'desktop' || isMobileOverviewEnabled(room, m.type));
     return html`<details class="position-settings">
       <summary>Messwertkästchen im Bild verschieben</summary>
       <p class="hint">Raum oben auswählen, dann das schwarze Kästchen mit Maus oder Finger ziehen.
@@ -411,16 +410,14 @@ export class HausKlimaCardEditor extends LitElement {
               <label class="check-label"><input id="metric-overview" type="checkbox" .checked=${overview}
                 @change=${(event: Event) => this.apply(() => updateMeasurement(this._config, room.id, this._metric, { show_in_overview: (event.target as HTMLInputElement).checked }))} /> Hauptwert im Raum anzeigen</label>
             </div>
-            ${this._metric === 'temperature' || this._metric === 'relative_humidity' ? html`
-              <div class="measurement-options mobile-overview-setting">
-                <label class="check-label"><input type="checkbox" id="mobile-metric-visible" data-mobile-metric=${this._metric}
-                  .checked=${room.mobile_overview?.[this._metric] !== false}
-                  @change=${(event: Event) => this.apply(() => setMobileOverview(this._config, room.id,
-                    this._metric as 'temperature' | 'relative_humidity', (event.target as HTMLInputElement).checked))} />
-                  Diesen Messwert im Handy-Kästchen anzeigen</label>
-              </div>
-              <p class="hint">Nur fürs Handy. Desktop und alle Sensorquellen in den Details bleiben unverändert.</p>
-            ` : nothing}
+            <div class="measurement-options mobile-overview-setting">
+              <label class="check-label"><input type="checkbox" id="mobile-metric-visible" data-mobile-metric=${this._metric}
+                .checked=${isMobileOverviewEnabled(room, this._metric)}
+                @change=${(event: Event) => this.apply(() => setMobileOverview(this._config, room.id,
+                  this._metric, (event.target as HTMLInputElement).checked))} />
+                Diesen Messwert im Handy-Kästchen anzeigen</label>
+            </div>
+            <p class="hint">Nur fürs Handy: Temperatur und relative Feuchte sind standardmäßig aktiv, weitere Messarten optional. Desktop und vollständige Details bleiben unverändert.</p>
             <p class="hint">Mit „Haupt – in Übersicht“ können mehrere Quellen sichtbar sein. Gleiche Gruppennamen bündeln Werte unter einem gemeinsamen Namen, z. B. Temperatur und Feuchte von „Homematic“. Ohne Gruppe bleiben einzelne Hauptwerte schmal untereinander; mehrere Quellen derselben Messart erhalten ihren Anzeigenamen. „Standardquelle“ bestimmt die Hauptanzeige nur, solange der jeweilige Haupt-Haken nicht ausdrücklich gesetzt oder entfernt wurde. Alle Quellen bleiben in den Details erreichbar.</p>
             <div class="sensor-list">${measurement?.sensors.map((sensor, index) => this.renderSensor(room, sensor, index, measurement.primary))}</div>
             ${!measurement?.sensors.length ? html`<p class="empty-hint">Noch kein Sensor für diese Messart zugeordnet.</p>` : nothing}

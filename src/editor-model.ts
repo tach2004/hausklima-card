@@ -65,7 +65,7 @@ export function resetBadgePosition(config: HausKlimaCardConfig, roomId: string, 
 
 /** Per-room mobile photo switches do not alter desktop or full details. */
 export function setMobileOverview(config: HausKlimaCardConfig, roomId: string,
-  metric: 'temperature' | 'relative_humidity', shown: boolean): HausKlimaCardConfig {
+  metric: MetricType, shown: boolean): HausKlimaCardConfig {
   return changeBuilding(config, (building) => {
     const room = requireRoom(building, roomId);
     room.mobile_overview ??= {};

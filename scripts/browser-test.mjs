@@ -491,6 +491,66 @@ async function checkEditor(browser) {
   const bedroom = card.locator('.photo-room[data-room-id="bedroom"]');
   assert.ok(await bedroom.locator('.photo-metric').count() > 0, 'desktop values unaffected by phone switches');
   await phoneToggle.check();
+  // Extra phone metrics are opt-in per room, while desktop and room details
+  // continue to show every enabled HA source independently.
+  await editor.locator('#room-select').selectOption('bedroom');
+  for (const type of ['absolute_humidity', 'co2', 'voc']) {
+    await editor.locator('#metric-select').selectOption(type);
+    assert.equal(await editor.locator('#mobile-metric-visible').isChecked(), false,
+      `phone's additional ${type} is initially hidden`);
+    await editor.locator('#mobile-metric-visible').check();
+    assert.equal((await page.evaluate(() => window.hausklimaPreview.getConfig()))
+      .building.rooms.find((room) => room.id === 'bedroom').mobile_overview[type], true);
+  }
+  const phoneBedroom = card.locator('.photo-placement[data-overlay-id="bedroom"]');
+  await page.waitForFunction(() => window.hausklimaPreview.card.updateComplete);
+  assert.deepEqual(await phoneBedroom.locator('.photo-mobile-reading:visible').evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute('data-metric'))),
+    ['temperature', 'relative_humidity', 'absolute_humidity', 'co2', 'voc'],
+    'phone can independently display all five bedroom measurement types');
+  assert.equal(await phoneBedroom.locator('.photo-mobile-reading:visible svg').count(), 5,
+    'each enabled optional phone value retains its icon');
+  assert.equal(await phoneBedroom.locator('.photo-metric').count(), 5,
+    'desktop badge values remain unchanged when phone toggles are selected');
+  await editor.locator('#room-select').selectOption('demo_outdoor');
+  for (const type of ['pressure_relative', 'pressure_absolute']) {
+    await editor.locator('#metric-select').selectOption(type);
+    assert.equal(await editor.locator('#mobile-metric-visible').isChecked(), false,
+      `pressure ${type} defaults to hidden on phone`);
+    await editor.locator('#mobile-metric-visible').check();
+  }
+  const outdoorBadge = card.locator('.photo-placement[data-overlay-id="demo_outdoor"]');
+  assert.deepEqual(await outdoorBadge.locator('.photo-mobile-reading:visible').evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute('data-metric'))),
+    ['temperature', 'relative_humidity', 'pressure_relative', 'pressure_absolute'],
+    'both pressure types can be enabled on the phone independently');
+  await editor.locator('#metric-select').selectOption('pressure_absolute');
+  await editor.locator('#mobile-metric-visible').uncheck();
+  assert.equal(await outdoorBadge.locator('.photo-mobile-reading[data-metric="pressure_absolute"]:visible').count(), 0,
+    'individual optional measurement can be hidden without disturbing the other metrics');
+  assert.equal(await outdoorBadge.locator('.photo-mobile-reading[data-metric="pressure_relative"]:visible').count(), 1,
+    'one pressure option does not affect the other');
+  assert.equal(await outdoorBadge.locator('.photo-metric').count() > 0, true,
+    'all configured desktop groups remain in the DOM');
+  await assertLayout(page, card, 'mobile-metric-all-types-enabled/small-font');
+  // Exercise both the deliberately tiny 5.5px option and the normal default
+  // when a room contains multiple optional sensors.
+  await page.evaluate(() => {
+    const next = window.hausklimaPreview.getConfig();
+    next.badge_font_mobile = 9;
+    window.hausklimaPreview.setConfig(next);
+  });
+  await assertLayout(page, card, 'mobile-metric-all-types-enabled/default-font');
+  if (process.env.UPDATE_SCREENSHOTS === '1') {
+    await page.locator('#editor-panel > summary').click();
+    await page.screenshot({ path: `${screenshotDirectory}/iphone-optional-metrics.png`, fullPage: true });
+    await page.locator('#editor-panel > summary').click();
+  }
+  await page.evaluate(() => {
+    const next = window.hausklimaPreview.getConfig();
+    next.badge_font_mobile = 5.5;
+    window.hausklimaPreview.setConfig(next);
+  });
   const theme = editor.locator('#theme-mode');
   assert.equal(await theme.inputValue(), 'auto', 'theme follows Home Assistant by default');
   await theme.selectOption('dark');
@@ -595,6 +655,12 @@ async function checkEditor(browser) {
 async function checkBadgePositionEditor(browser) {
   const page = await browser.newPage({ viewport: { width: 390, height: 950 }, hasTouch: true });
   const { card, editor, errors } = await ready(page);
+  const settlePhoto = async () => page.evaluate(async () => {
+    await window.hausklimaPreview.card.updateComplete;
+    await new Promise(requestAnimationFrame);
+    await new Promise(requestAnimationFrame);
+    await new Promise(requestAnimationFrame);
+  });
   await page.locator('#editor-panel > summary').click();
   await editor.locator('#room-select').selectOption('laundry');
   await editor.locator('.position-settings > summary').click();
@@ -612,7 +678,7 @@ async function checkBadgePositionEditor(browser) {
   assert.ok(Math.abs(config.badge_positions.laundry.mobile.x - 44) < 6, 'touch/mouse drag stores normalized X');
   assert.ok(Math.abs(config.badge_positions.laundry.mobile.y - 66) < 6, 'touch/mouse drag stores normalized Y');
   assert.equal(config.badge_positions.laundry.desktop, undefined, 'dragging mobile does not affect desktop');
-  await page.waitForFunction(() => window.hausklimaPreview.card.updateComplete);
+  await settlePhoto();
   assert.ok(await card.locator('.photo-placement[data-overlay-id="laundry"][data-manual-mobile-x]').count(),
     'saved phone position reaches the actual image badge');
   if (process.env.UPDATE_SCREENSHOTS === '1') {
@@ -629,6 +695,7 @@ async function checkBadgePositionEditor(browser) {
     next.badge_positions = { ...next.badge_positions, [id]: { mobile: { x: 88, y: 79 } } };
     window.hausklimaPreview.setConfig(next);
   }, deviceId);
+  await settlePhoto();
   await page.waitForFunction(({ id, previous }) => {
     const stage = window.hausklimaPreview.card.shadowRoot.querySelector('.photo-stage');
     const line = stage?.querySelector(`.photo-leaders path[data-leader-room="${id}"]`);
@@ -643,19 +710,44 @@ async function checkBadgePositionEditor(browser) {
     next.badge_positions[id].desktop = { x: 81, y: 90 };
     window.hausklimaPreview.setConfig(next);
   }, deviceId);
-  await page.waitForFunction(() => window.hausklimaPreview.card.updateComplete);
+  await settlePhoto();
   assert.equal(await leader.getAttribute('d'), movedLeader, 'desktop position does not change phone connector');
   // Resetting the custom phone placement returns the line to its docked end.
+  // Await the actual Lit render and both animation frames; testing the mere
+  // existence of updateComplete previously raced with the reflow.
   await page.evaluate((id) => {
     const next = window.hausklimaPreview.getConfig();
     delete next.badge_positions[id].mobile;
     window.hausklimaPreview.setConfig(next);
   }, deviceId);
+  await settlePhoto();
   await page.waitForFunction(({ id, previous }) => {
-    const line = window.hausklimaPreview.card.shadowRoot.querySelector(`.photo-leaders path[data-leader-room="${id}"]`);
-    return line?.getAttribute('d') && line.getAttribute('d') !== previous;
+    const stage = window.hausklimaPreview.card.shadowRoot.querySelector('.photo-stage');
+    const placement = stage?.querySelector(`.photo-placement[data-overlay-id="${id}"]`);
+    const line = stage?.querySelector(`.photo-leaders path[data-leader-room="${id}"]`);
+    return !placement?.hasAttribute('data-manual-mobile-x') && line?.getAttribute('d') &&
+      line.getAttribute('d') !== previous;
   }, { id: deviceId, previous: movedLeader });
-  assert.equal(await leader.getAttribute('d'), originalLeader, 'reset restores original mobile dock connection');
+  const resetConnection = await leader.evaluate((line, id) => {
+    const stage = line.closest('.photo-stage');
+    const placement = stage?.querySelector(`.photo-placement[data-overlay-id="${id}"]`);
+    const svgPath = line.getAttribute('d') ?? '';
+    const values = [...svgPath.matchAll(/-?\d+(?:\.\d+)?/g)].map((match) => Number(match[0]));
+    if (!stage || !placement || values.length !== 4) return { auto: false, docked: false, connected: false };
+    const bounds = placement.getBoundingClientRect();
+    const stageBounds = stage.getBoundingClientRect();
+    const endX = values[2], endY = values[3];
+    return {
+      auto: !placement.hasAttribute('data-manual-mobile-x'),
+      docked: placement.classList.contains('is-docked'),
+      connected: endX >= bounds.left - stageBounds.left - 2 &&
+        endX <= bounds.right - stageBounds.left + 2 &&
+        endY >= bounds.top - stageBounds.top - 2 &&
+        endY <= bounds.bottom - stageBounds.top + 2,
+    };
+  }, deviceId);
+  assert.deepEqual(resetConnection, { auto: true, docked: true, connected: true },
+    'reset restores automatic mobile dock placement and reconnects to its current position');
   const selectedMobile = structuredClone(config.badge_positions.laundry.mobile);
   await editor.locator('#position-device').selectOption('desktop');
   const desktop = editor.locator('#position-marker');

@@ -3,6 +3,7 @@ import { getDefaultConfig } from '../src/config';
 import { getDefaultBuilding } from '../src/defaults';
 import '../src/hausklima-card-editor';
 import type { HausKlimaCardEditor } from '../src/hausklima-card-editor';
+import { METRIC_TYPES } from '../src/types';
 import type { HausKlimaCardConfig } from '../src/types';
 
 afterEach(() => {
@@ -116,6 +117,57 @@ describe('Lovelace editor', () => {
     const restored = await createEditor(latestConfig());
     expect(input(restored, 'badge-font-mobile').value).toBe('5.5');
     expect(latestConfig().building!.rooms.find((room) => room.id === 'laundry')!.mobile_overview?.temperature).toBe(false);
+  });
+
+  it('shows a phone checkbox for all seven types, persists opt-ins and updates position previews', async () => {
+    const building = getDefaultBuilding();
+    const laundry = building.rooms.find((room) => room.id === 'laundry')!;
+    laundry.measurements = {};
+    for (const type of METRIC_TYPES) laundry.measurements[type] = { sensors: [{ entity: `sensor.test_${type}` }] };
+    const original = { ...getDefaultConfig(), building };
+    const editor = await createEditor(original);
+    const events: HausKlimaCardConfig[] = [];
+    editor.addEventListener('config-changed', (event) => events.push((event as CustomEvent<{ config: HausKlimaCardConfig }>).detail.config));
+    const roomSelect = editor.shadowRoot!.querySelector<HTMLSelectElement>('#room-select')!;
+    roomSelect.value = 'laundry'; roomSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await editor.updateComplete;
+    const metricSelect = editor.shadowRoot!.querySelector<HTMLSelectElement>('#metric-select')!;
+    for (const type of METRIC_TYPES) {
+      metricSelect.value = type; metricSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      await editor.updateComplete;
+      const checkbox = input(editor, 'mobile-metric-visible');
+      expect(checkbox.dataset.mobileMetric).toBe(type);
+      expect(checkbox.checked).toBe(type === 'temperature' || type === 'relative_humidity');
+      if (type !== 'temperature' && type !== 'relative_humidity') {
+        checkbox.checked = true; checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+        await editor.updateComplete;
+        expect(events[events.length - 1]!.building!.rooms.find((room) => room.id === 'laundry')!
+          .mobile_overview?.[type]).toBe(true);
+      }
+    }
+    // Mobile preview uses exactly the same enabled metrics as the photo badge.
+    const device = editor.shadowRoot!.querySelector<HTMLSelectElement>('#position-device')!;
+    device.value = 'mobile'; device.dispatchEvent(new Event('change', { bubbles: true }));
+    await editor.updateComplete;
+    expect(editor.shadowRoot!.querySelectorAll('.position-marker .marker-reading')).toHaveLength(7);
+    metricSelect.value = 'voc'; metricSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await editor.updateComplete;
+    const vocCheckbox = input(editor, 'mobile-metric-visible');
+    expect(vocCheckbox.checked).toBe(true);
+    vocCheckbox.checked = false; vocCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+    await editor.updateComplete;
+    expect(editor.shadowRoot!.querySelectorAll('.position-marker .marker-reading')).toHaveLength(6);
+    const saved = events[events.length - 1]!;
+    expect(saved.building!.rooms.find((room) => room.id === 'laundry')!.mobile_overview?.co2).toBe(true);
+    expect(saved.building!.rooms.find((room) => room.id === 'laundry')!.mobile_overview?.voc).toBe(false);
+    expect(original.building.rooms.find((room) => room.id === 'laundry')!.mobile_overview).toBeUndefined();
+    const restored = await createEditor(saved);
+    const restoredRoom = restored.shadowRoot!.querySelector<HTMLSelectElement>('#room-select')!;
+    restoredRoom.value = 'laundry'; restoredRoom.dispatchEvent(new Event('change', { bubbles: true }));
+    const restoredType = restored.shadowRoot!.querySelector<HTMLSelectElement>('#metric-select')!;
+    restoredType.value = 'co2'; restoredType.dispatchEvent(new Event('change', { bubbles: true }));
+    await restored.updateComplete;
+    expect(input(restored, 'mobile-metric-visible').checked).toBe(true);
   });
 
   it('edits the selected overlay position using keyboard arrows and preserves other device', async () => {
