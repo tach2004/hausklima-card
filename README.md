@@ -147,3 +147,13 @@ Für Phase 3 sind ein optionaler Vorne-/Hinten-Umschalter, eine abgestimmte Verf
 ## Lizenz
 
 [MIT](LICENSE), Copyright © 2026 tach2004. Die vorhandene Projektlizenz bleibt erhalten; gebündelte Bibliotheken behalten ihre eigenen Lizenzhinweise.
+
+## iPhone-Hausansicht und Dark-Surface-Details
+
+Auf schmalen Dashboards einschließlich iPhone 17 werden **kompakte dunkle Messwertfelder direkt auf der unveränderten Hausillustration** angezeigt. Sie zeigen pro konfiguriertem Raum bzw. Gerät bevorzugt den Temperaturwert, andernfalls den ersten aktiven Hauptwert. Ein Tipp öffnet die vollständigen Raumdetails; sämtliche weiteren Werte und Sensorquellen bleiben zusätzlich in den größeren Raum- und Geräteübersichten darunter sichtbar. Diese bewusste Verdichtung vermeidet unlesbare Stapel mit fünf Messarten im kleinen Hausbild.
+
+Die äußeren Rahmenflächen von Raumdetails und der Außen-/Garagenübersicht sind in hellem und dunklem HA-Theme jetzt gedämpft dunkel. Die schwarzen, teiltransparenten Sensor-Kästchen selbst bleiben im bisherigen Stil.
+
+Im Karteneditor können Raum- und Sensornamen sowie optionale Quellgruppen während laufender HA-Statusaktualisierungen bearbeitet werden; nicht gespeicherter Texteingabetext wird nicht mehr bei jedem Rendern durch den vorherigen Namen ersetzt. Leere optionale Alias-/Gruppenfelder fallen auf HA-Standardnamen bzw. keine Gruppierung zurück. Die technischen Entity-IDs sind in den sichtbaren Raumdetails ausgeblendet, das Öffnen der HA-Entitätsdetails per Klick bleibt unverändert.
+
+Das Illustrationsasset `src/assets/hausklima-cutaway.webp` bleibt **bitidentisch unverändert**.

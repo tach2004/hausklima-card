@@ -181,13 +181,13 @@ export class HausKlimaCardEditor extends LitElement {
         ></ha-selector>`)}
         <label class="field"><span>Anzeigename <small>(optional)</small></span>
           <input type="text" data-action="sensor-name" data-entity=${sensor.entity}
-            aria-label=${`Anzeigename für Sensor ${index + 1}`} .value=${live(sensor.name ?? '')}
+            aria-label=${`Anzeigename für Sensor ${index + 1}`} .value=${sensor.name ?? ''}
             placeholder="Name der HA-Entität verwenden"
             @change=${(event: Event) => this.apply(() => editSensor(this._config, room.id, this._metric, sensor.entity, { name: (event.target as HTMLInputElement).value }))} />
         </label>
         <label class="field"><span>Gruppe in der Übersicht <small>(optional)</small></span>
           <input type="text" data-action="sensor-group" data-entity=${sensor.entity}
-            aria-label=${`Sensorgruppe für Sensor ${index + 1}`} .value=${live(sensor.overview_group ?? '')}
+            aria-label=${`Sensorgruppe für Sensor ${index + 1}`} .value=${sensor.overview_group ?? ''}
             placeholder="z. B. Homematic, Ecowitt, Vitodens"
             @change=${(event: Event) => this.apply(() => editSensor(this._config, room.id, this._metric, sensor.entity, { overview_group: (event.target as HTMLInputElement).value }))} />
         </label>
@@ -218,7 +218,7 @@ export class HausKlimaCardEditor extends LitElement {
       <div class="editor">
         <section class="base-settings" aria-label="Darstellung">
           <label class="field" for="title"><span>Kartentitel</span>
-            <input id="title" type="text" .value=${live(this._config.title ?? '')}
+            <input id="title" type="text" .value=${this._config.title ?? ''}
               @change=${(event: Event) => this.updateBase('title', (event.target as HTMLInputElement).value)} />
           </label>
           <label class="field chip-opacity" for="chip-opacity"><span>Transparenz der dunklen Messwert-Kästchen: ${Math.round((this._config.chip_opacity ?? 0.72) * 100)} % Deckkraft</span>
@@ -250,7 +250,7 @@ export class HausKlimaCardEditor extends LitElement {
           ${room ? html`
             <div class="room-name-row">
               <label class="field" for="room-name"><span>Anzeigename des Raums</span>
-                <input id="room-name" type="text" .value=${live(room.name)}
+                <input id="room-name" type="text" .value=${room.name}
                   @change=${(event: Event) => this.apply(() => editRoom(this._config, room.id, { name: (event.target as HTMLInputElement).value }))} />
               </label>
               <button id="delete-room" type="button" class="text-button danger" @click=${() => { this._confirmDelete = true; }}>Raum entfernen</button>

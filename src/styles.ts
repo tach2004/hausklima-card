@@ -149,9 +149,27 @@ export const cardStyles = css`
     margin: 0;
     border-radius: 16px;
     padding: 16px;
-    background: color-mix(in srgb, var(--hk-paper) 95%, #d5e6e3);
+    background: #414c49;
+    border: 1px solid #667770;
+    color: #f3f6f4;
+    box-shadow: 0 6px 20px #101e1a17;
   }
-  .photo-main .room-detail { margin: 14px auto; max-width: var(--hk-scene-max-width, 1400px); }
+  .photo-main .room-detail {
+    margin: 14px auto; max-width: var(--hk-scene-max-width, 1400px);
+    background: #414c49; color: #f3f6f4; border-color: #667770;
+    box-shadow: 0 6px 20px #101e1a17;
+  }
+  .photo-lower .location-block :is(.garage-title p, .section-title > span, .location-caption),
+  .photo-main .room-detail :is(.section-kicker, .room-dimension) { color: #c9d5d0; }
+  .photo-lower .location-block :is(.garage-title strong, .location-heading, .section-title h2),
+  .photo-main .room-detail .detail-header h2 { color: #f3f6f4; }
+  .photo-lower .location-block .location-heading > span:last-child { color: #c9d5d0; }
+  .photo-lower .location-block .garage-zone.no-readings,
+  .photo-lower .location-block .room-tile.no-readings {
+    background: #54625d; color: #f3f6f4; border-color: #798882;
+  }
+  .photo-lower .location-block .garage-zone.no-readings .garage-device-content > strong,
+  .photo-lower .location-block .room-tile.no-readings .tile-level { color: #f3f6f4; }
   .garage-title { display: flex; align-items: center; margin-bottom: 12px; }
   .garage-title strong { font-size: 15px; }
   .garage-title p { margin: 3px 0 0; color: var(--hk-muted); font-size: 11px; }

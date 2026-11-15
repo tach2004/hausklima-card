@@ -126,7 +126,7 @@ export class HausKlimaCard extends LitElement {
       <div class="metric-heading"><h3><span class="reading-icon ${metric.type}" aria-hidden="true">${metricIcon(metric.type)}</span>${metric.label}</h3>
         ${!metric.visible || !metric.show_in_overview ? html`<span class="hidden-label">Nur in Details</span>` : nothing}</div>
       ${metric.sensors.map((sensor) => html`<button class="sensor-row ${sensor.is_primary ? 'primary-sensor' : ''} ${sensor.show_in_overview ? 'overview-sensor' : ''}" data-entity=${sensor.entity} @click=${() => this.showEntity(sensor.entity)}>
-        <span class="source-name">${sensor.name}<small>${sensor.entity}</small><span class="sensor-meta">${sensor.overview_group ? `${sensor.overview_group} · ` : ''}${sensor.is_primary ? 'Standardquelle · ' : ''}${sensor.show_in_overview ? metric.visible && metric.show_in_overview ? 'Hauptanzeige' : 'Übersicht ausgeblendet' : 'Nur in Details'} · ${sensorStatusLabel(sensor.status)}</span></span>
+        <span class="source-name">${sensor.name}<span class="sensor-meta">${sensor.overview_group ? `${sensor.overview_group} · ` : ''}${sensor.is_primary ? 'Standardquelle · ' : ''}${sensor.show_in_overview ? metric.visible && metric.show_in_overview ? 'Hauptanzeige' : 'Übersicht ausgeblendet' : 'Nur in Details'} · ${sensorStatusLabel(sensor.status)}</span></span>
         <span class="source-value ${sensor.status !== 'available' ? 'unavailable' : ''}"><strong>${formatSensorValue(sensor, this.hass)}</strong>
           ${sensor.status === 'available' && sensor.unit ? html`<span>${sensor.unit}</span>` : nothing}<span class="entity-arrow" aria-hidden="true">${arrowIcon()}</span></span>
       </button>`)}
