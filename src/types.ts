@@ -63,8 +63,8 @@ export interface RoomConfig {
   /** Stated clear width, never resized to fill the facade; null means unknown. */
   width_m: number | null;
   measurements?: Partial<Record<MetricType, MeasurementConfig>>;
-  /** Separate per-room phone visibility, never affects desktop or details. */
-  mobile_overview?: Partial<Record<'temperature' | 'relative_humidity', boolean>>;
+  /** Per-metric phone badge visibility, independent from desktop and details. */
+  mobile_overview?: Partial<Record<MetricType, boolean>>;
 }
 
 export interface LevelConfig {

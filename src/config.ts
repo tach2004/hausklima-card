@@ -123,7 +123,7 @@ function validateBuilding(value: unknown): asserts value is BuildingConfig {
     if (room.mobile_overview !== undefined) {
       const mobile = object(room.mobile_overview, `${path}.mobile_overview`);
       for (const [metric, value] of Object.entries(mobile)) {
-        if (metric !== 'temperature' && metric !== 'relative_humidity') throw new Error(`${path}.mobile_overview: unbekannte Messart ${metric}.`);
+        if (!(METRIC_TYPES as readonly string[]).includes(metric)) throw new Error(`${path}.mobile_overview: unbekannte Messart ${metric}.`);
         boolean(value, `${path}.mobile_overview.${metric}`);
       }
     }

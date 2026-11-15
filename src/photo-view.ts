@@ -1,6 +1,6 @@
 import { css, html, nothing } from 'lit';
 import { houseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS } from './scene-photo';
-import { formatSensorValue, resolveMeasurements, resolveOverviewGroups } from './metrics';
+import { formatSensorValue, isMobileOverviewEnabled, resolveMeasurements, resolveOverviewGroups } from './metrics';
 import { metricIcon, roomIcon } from './icons';
 import { renderReadingGroups } from './reading-view';
 import type { BadgePositionSet, BuildingConfig, HomeAssistant, RoomConfig } from './types';
@@ -23,15 +23,15 @@ export function renderPhotoView(
   const devices = building.rooms.filter((room) => GARAGE_ART_POSITIONS[room.id] && room.location !== 'outdoor');
   const outdoors = building.rooms.filter((room) => room.location === 'outdoor' && resolveOverviewGroups(room, hass).length);
   const outdoor = outdoors.find((room) => room.id === options.outdoorId) ?? outdoors[0];
-  const mobileClimateReadings = (room: RoomConfig) => resolveMeasurements(room, hass, 'overview')
-    .filter((metric) => (metric.type === 'temperature' || metric.type === 'relative_humidity') && room.mobile_overview?.[metric.type] !== false)
+  const mobileReadings = (room: RoomConfig) => resolveMeasurements(room, hass, 'overview')
+    .filter((metric) => isMobileOverviewEnabled(room, metric.type))
     .map((metric) => ({ type: metric.type, sensor: metric.primary }));
 
   // Desktop retains every configured reading and all selected sources. On a
   // narrow picture the same dark panel displays only temperature and RH.
   const renderBadge = (room: RoomConfig, category: string) => {
     const groups = resolveOverviewGroups(room, hass);
-    const climate = mobileClimateReadings(room);
+    const climate = mobileReadings(room);
     return html`<button class="photo-badge ${category} ${groups.length ? 'with-metrics' : 'name-only'} ${climate.length ? 'mobile-climate' : 'mobile-no-climate'}"
       data-room-id=${room.id} data-select-room=${room.id} type="button"
       aria-pressed=${String(selectedRoomId === room.id)} aria-label=${`${room.name}: Details öffnen`}
@@ -179,6 +179,10 @@ export const photoStyles = css`
     .photo-mobile-reading small { font-size: .85em; font-weight: 500; color: #eef4f7; }
     .mobile-reading-icon { display: inline-flex; align-items: center; flex-shrink: 0; width: 1em; height: 1em; color: #ffc095; }
     .mobile-reading-icon.relative_humidity { color: #8dd6ee; }
+    .mobile-reading-icon.absolute_humidity { color: #9bdad0; }
+    .mobile-reading-icon.co2 { color: #b5d998; }
+    .mobile-reading-icon.voc { color: #d7c0f0; }
+    .mobile-reading-icon.pressure_relative, .mobile-reading-icon.pressure_absolute { color: #b6c9f0; }
     .mobile-reading-icon :is(svg, .hk-icon) { width: 1em; height: 1em; }
     /* Same three garage-object connectors as desktop. The layout engine moves
        their ends with the corresponding badge (including manually saved positions). */

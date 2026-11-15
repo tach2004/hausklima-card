@@ -4,6 +4,7 @@ import { HausKlimaCard } from '../src/hausklima-card';
 import { getDefaultConfig, normalizeConfig } from '../src/config';
 import { getDefaultBuilding } from '../src/defaults';
 import type { HausKlimaCardEditor } from '../src/hausklima-card-editor';
+import { METRIC_TYPES } from '../src/types';
 import type { HausKlimaCardConfig, HomeAssistant } from '../src/types';
 
 // DEMO-WERTE: synthetic entity IDs/states in these tests never enter production defaults.
@@ -103,6 +104,56 @@ describe('Lovelace card integration', () => {
     const bad = structuredClone(building);
     bad.rooms.find((room) => room.id === 'laundry')!.mobile_overview = { temperature: 'no' as unknown as boolean };
     expect(() => normalizeConfig({ ...config, building: bad })).toThrow(/mobile_overview/);
+  });
+
+  it('lets every supported sensor type be independently shown on the phone without altering desktop or details', async () => {
+    const building = getDefaultBuilding();
+    const laundry = building.rooms.find((room) => room.id === 'laundry')!;
+    laundry.measurements = {};
+    const states: HomeAssistant['states'] = {};
+    for (const [index, type] of METRIC_TYPES.entries()) {
+      const entity = `sensor.mobile_all_${type}`;
+      laundry.measurements[type] = { sensors: [{ entity }] };
+      states[entity] = { state: String(20 + index), attributes: { unit_of_measurement: type === 'co2' ? 'ppm' : 'test' } };
+    }
+    const config = normalizeConfig({ ...getDefaultConfig(), building });
+    const card = await createCard(config, { states });
+    const readings = () => [...find(card, '.photo-room[data-room-id="laundry"]').querySelectorAll('[class~="photo-mobile-reading"]')]
+      .map((el) => el.getAttribute('data-metric'));
+    const desktopCount = () => find(card, '.photo-room[data-room-id="laundry"]').querySelectorAll('.photo-metric').length;
+    expect(readings()).toEqual(['temperature', 'relative_humidity']); // Old dashboard default
+    expect(desktopCount()).toBe(7);
+    const optIn = structuredClone(building);
+    const room = optIn.rooms.find((r) => r.id === 'laundry')!;
+    room.mobile_overview = {
+      temperature: false,
+      relative_humidity: true,
+      absolute_humidity: true,
+      co2: true,
+      voc: true,
+      pressure_relative: true,
+      pressure_absolute: true,
+    };
+    card.setConfig(normalizeConfig({ ...config, building: optIn }));
+    await card.updateComplete;
+    expect(readings()).toEqual([
+      'relative_humidity', 'absolute_humidity', 'co2', 'voc', 'pressure_relative', 'pressure_absolute',
+    ]);
+    expect(desktopCount()).toBe(7); // desktop sees all regardless of mobile toggle
+    for (const type of METRIC_TYPES.filter((type) => type !== 'temperature')) {
+      const row = find(card, `.photo-room[data-room-id="laundry"] .photo-mobile-reading[data-metric="${type}"]`);
+      expect(row.querySelector('svg')).not.toBeNull();
+    }
+    const detail = await openRoom(card, 'laundry');
+    expect(detail.querySelectorAll('.sensor-row')).toHaveLength(7); // hidden phone temp remains in details
+    const valid = normalizeConfig({ ...config, building: optIn });
+    expect(valid.building!.rooms.find((r) => r.id === 'laundry')!.mobile_overview?.voc).toBe(true);
+    const invalidType = structuredClone(optIn);
+    (invalidType.rooms.find((r) => r.id === 'laundry')!.mobile_overview as Record<string, boolean>).fake_metric = true;
+    expect(() => normalizeConfig({ ...config, building: invalidType })).toThrow(/mobile_overview/);
+    const invalidValue = structuredClone(optIn);
+    invalidValue.rooms.find((r) => r.id === 'laundry')!.mobile_overview!.co2 = 'yes' as unknown as boolean;
+    expect(() => normalizeConfig({ ...config, building: invalidValue })).toThrow(/mobile_overview/);
   });
 
   it('binds desktop and phone overlay position overrides without affecting sensors', async () => {

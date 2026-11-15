@@ -11,6 +11,14 @@ export const METRIC_LABELS: Record<MetricType, string> = {
   pressure_absolute: 'Luftdruck absolut',
 };
 
+/** Phone-only switches are independent of the desktop overview and details.
+ * Older dashboards keep the original compact temperature/RH default. The
+ * five extra measurement types are explicit opt-ins to avoid overcrowding.
+ */
+export function isMobileOverviewEnabled(room: RoomConfig, type: MetricType): boolean {
+  return room.mobile_overview?.[type] ?? (type === 'temperature' || type === 'relative_humidity');
+}
+
 export type MeasurementScope = 'visible' | 'overview' | 'details';
 
 export function sensorStatusLabel(status: SensorStatus): string {
