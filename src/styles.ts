@@ -13,6 +13,8 @@ export const cardStyles = css`
     font-family: var(--paper-font-body1_-_font-family, system-ui, sans-serif);
   }
   * { box-sizing: border-box; }
+  ha-card[data-theme-resolved='light'] { --hk-ink: #24342c; --hk-muted: #586b61; --hk-paper: #f9faf8; --hk-line: #d7dfd9; --hk-accent: #2c7891; color-scheme: light; color: var(--hk-ink); }
+  ha-card[data-theme-resolved='dark'] { --hk-ink: #f1f5f3; --hk-muted: #becdc6; --hk-paper: #212b29; --hk-line: #4b5f57; --hk-accent: #9ed7e4; color-scheme: dark; color: var(--hk-ink); }
   ha-card {
     display: block;
     container: hausklima / inline-size;
@@ -110,26 +112,26 @@ export const cardStyles = css`
   .outdoor-detail-arrow { flex-shrink: 0; font-size: 22px; }
   .room-detail { margin: 10px 3px 18px; border: 1px solid var(--hk-line); background: color-mix(in srgb, var(--hk-paper) 95%, #bdcbb8); border-radius: 16px; padding: 18px; outline: none; }
   .detail-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-  .section-kicker { display: block; color: var(--hk-muted); font-size: 10px; margin-bottom: 5px; }
+  .section-kicker { display: block; color: var(--hk-muted); font-size: 13px; margin-bottom: 7px; }
   .close-detail { border: none; background: transparent; color: var(--hk-muted); width: 44px; height: 44px; font-size: 25px; border-radius: 12px; }
   .metric-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 12px; }
-  .metric-group { min-width: 0; border-radius: 12px; padding: 12px; background: var(--hk-chip); color: #fff; }
+  .metric-group { min-width: 0; border-radius: 12px; padding: 16px; background: var(--hk-chip); color: #fff; }
   .metric-heading { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
-  .metric-heading h3 { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; color: #edf2ef; margin: 0; }
-  .hidden-label { font-size: 9px; color: #d2ded5; }
-  .sensor-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 12px 0 6px; border: none; background: transparent; color: #fff; text-align: left; font-size: 11px; min-height: 64px; }
+  .metric-heading h3 { display: flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 600; color: #edf2ef; margin: 0; }
+  .hidden-label { font-size: 12px; color: #d2ded5; }
+  .sensor-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 12px 0 6px; border: none; background: transparent; color: #fff; text-align: left; font-size: 14px; min-height: 70px; }
   .sensor-row + .sensor-row { margin-top: 6px; border-top: 1px solid #ffffff26; }
   .source-name { min-width: 0; font-weight: 550; overflow-wrap: anywhere; }
   .source-name small { display: block; font-size: 9px; font-weight: 400; color: #c6d1cb; margin-top: 3px; overflow-wrap: anywhere; }
-  .sensor-meta { display: block; color: #c6d1cb; font-size: 9px; font-weight: 400; margin-top: 6px; line-height: 1.5; }
+  .sensor-meta { display: block; color: #c6d1cb; font-size: 12px; font-weight: 400; margin-top: 7px; line-height: 1.5; }
   .source-value { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; align-items: baseline; text-align: right; max-width: 50%; flex-shrink: 0; }
-  .source-value strong { font-size: 19px; font-weight: 650; letter-spacing: -.035em; overflow-wrap: anywhere; }
-  .source-value > span { max-width: 100%; overflow-wrap: anywhere; font-size: 10px; color: #d8e1dc; }
+  .source-value strong { font-size: 23px; font-weight: 650; letter-spacing: -.035em; overflow-wrap: anywhere; }
+  .source-value > span { max-width: 100%; overflow-wrap: anywhere; font-size: 13px; color: #d8e1dc; }
   .source-value .entity-arrow { color: #b6cbbf; }
   .unavailable { color: var(--warning-color, #e9bb75); }
-  .unavailable strong { font-size: 12px; letter-spacing: 0; }
+  .unavailable strong { font-size: 14px; letter-spacing: 0; }
   .detail-empty, .room-dimension { color: var(--hk-muted); font-size: 12px; line-height: 1.6; }
-  .room-dimension { font-size: 10px; margin-bottom: 0; }
+  .room-dimension { font-size: 12px; margin-bottom: 0; }
   .building-details { border-top: 1px solid var(--hk-line); padding: 0 24px; color: var(--hk-muted); font-size: 11px; line-height: 1.7; }
   .building-details summary { cursor: pointer; padding: 14px 0; min-height: 44px; }
   .building-details p { margin: 0 0 10px; }
@@ -139,7 +141,7 @@ export const cardStyles = css`
   .photo-main { min-width: 0; padding: 10px 24px 12px; }
   .photo-lower { width: 100%; max-width: var(--hk-scene-max-width, 1400px); margin: auto; padding: 0 0 20px; }
   .photo-lower .location-column {
-    display: grid;
+    display: none; /* Source overview appears exclusively in the photo on all devices. */
     grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr);
     align-items: start;
     gap: 16px;
@@ -245,6 +247,9 @@ export const cardStyles = css`
     .card-header { padding: 12px 16px 0; }
     h1 { font-size: 19px; }
     .room-detail { margin-top: 8px; margin-bottom: 18px; padding: 14px; }
+    .sensor-row { font-size: 13px; }
+    .sensor-meta { font-size: 11px; }
+    .source-value strong { font-size: 21px; }
     .house-drawing { max-width: 610px; margin: auto; }
     .building-details { padding: 0 16px; }
   }

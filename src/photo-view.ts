@@ -1,6 +1,6 @@
 import { css, html, nothing } from 'lit';
 import { houseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS } from './scene-photo';
-import { formatSensorValue, resolveOverviewGroups } from './metrics';
+import { formatSensorValue, resolveMeasurements, resolveOverviewGroups } from './metrics';
 import { metricIcon, roomIcon } from './icons';
 import { renderReadingGroups } from './reading-view';
 import type { BuildingConfig, HomeAssistant, RoomConfig } from './types';
@@ -22,27 +22,30 @@ export function renderPhotoView(
   const devices = building.rooms.filter((room) => GARAGE_ART_POSITIONS[room.id] && room.location !== 'outdoor');
   const outdoors = building.rooms.filter((room) => room.location === 'outdoor' && resolveOverviewGroups(room, hass).length);
   const outdoor = outdoors.find((room) => room.id === options.outdoorId) ?? outdoors[0];
-  // On a narrow phone picture, show a compact, real HA reading for each configured
-  // location. The larger cards below the picture retain every configured value.
-  const compactReading = (room: RoomConfig) => {
-    const readings = resolveOverviewGroups(room, hass).flatMap((group) => group.readings);
-    const reading = readings.find((item) => item.type === 'temperature') ?? readings[0];
-    if (!reading) return nothing;
-    return html`<span class="photo-mobile-reading" data-metric=${reading.type}>
-      <span class="mobile-reading-icon" aria-hidden="true">${metricIcon(reading.type)}</span>
-      <strong>${formatSensorValue(reading.sensor, hass)}</strong>
-      ${reading.sensor.status === 'available' && reading.sensor.unit ? html`<small>${reading.sensor.unit}</small>` : nothing}
-    </span>`;
-  };
+  const mobileClimateReadings = (room: RoomConfig) => resolveMeasurements(room, hass, 'overview')
+    .filter((metric) => metric.type === 'temperature' || metric.type === 'relative_humidity')
+    .map((metric) => ({ type: metric.type, sensor: metric.primary }));
+
+  // Desktop retains every configured reading and all selected sources. On a
+  // narrow picture the same dark panel displays only temperature and RH.
   const renderBadge = (room: RoomConfig, category: string) => {
     const groups = resolveOverviewGroups(room, hass);
-    return html`<button class="photo-badge ${category} ${groups.length ? 'with-metrics' : 'name-only'}"
+    const climate = mobileClimateReadings(room);
+    return html`<button class="photo-badge ${category} ${groups.length ? 'with-metrics' : 'name-only'} ${climate.length ? 'mobile-climate' : 'mobile-no-climate'}"
       data-room-id=${room.id} data-select-room=${room.id} type="button"
       aria-pressed=${String(selectedRoomId === room.id)} aria-label=${`${room.name}: Details öffnen`}
       @click=${() => onSelect(room)}>
       ${showNames ? html`<span class="photo-room-name">${roomIcon(room)}<span>${room.name}</span></span>` : nothing}
       ${renderReadingGroups(room, hass, true)}
-      ${compactReading(room)}
+      ${climate.length ? html`<span class="photo-mobile-climate">
+        ${showNames ? html`<span class="photo-mobile-name">${room.name}</span>` : nothing}
+        ${climate.map(({ type, sensor }) => html`
+          <span class="photo-mobile-reading" data-metric=${type} data-reading-entity=${sensor.entity}>
+            <span class="mobile-reading-icon ${type}" aria-hidden="true">${metricIcon(type)}</span>
+            <strong>${formatSensorValue(sensor, hass)}</strong>
+            ${sensor.status === 'available' && sensor.unit ? html`<small>${sensor.unit}</small>` : nothing}
+          </span>`)}
+      </span>` : nothing}
     </button>`;
   };
   const placement = (room: RoomConfig, position: { x: number; y: number; anchorX?: number; anchorY?: number }, category: string) => html`
@@ -100,7 +103,7 @@ export const photoStyles = css`
   .photo-metric-icon.absolute_humidity { color: #9bdad0; }
   .photo-metric-icon.co2 { color: #b5d998; }
   .photo-metric-icon.voc { color: #d7c0f0; }
-  .photo-mobile-reading { display: none; }
+  .photo-mobile-climate { display: none; }
   .photo-badge.name-only { padding: 4px; background: transparent; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .photo-badge.name-only .photo-room-name { color: #263238; text-shadow: 0 1px 3px #fff, 0 0 8px #fff; }
   .photo-badge.name-only:hover, .photo-badge.name-only:focus-visible { background: #ffffffa6; }
@@ -119,31 +122,51 @@ export const photoStyles = css`
   .photo-dock-note { position: absolute; margin: 0; font-size: 11px; line-height: 1.5; color: var(--hk-muted, #687b71); }
   .photo-dock-note[hidden] { display: none; }
   @container hausklima (max-width: 1000px) {
+    /* Dark, connected dock under the unmodified illustration for overflow badges. */
+    .photo-stage { background: #3f4d49; }
     .photo-image { border-radius: 12px; }
-    /* Keep compact, touchable black readings visible on phones without zooming or cropping the artwork. */
     .photo-placement { display: block; z-index: 3; }
-    .photo-badge.with-metrics {
-      min-height: 20px; max-width: 100%; padding: 2px 4px; gap: 0;
-      border-radius: 6px; border-color: #ffffff6b; box-shadow: 0 1px 5px #0005;
+    .photo-badge.with-metrics.mobile-climate {
+      padding: 4px 6px; min-height: 36px; border: 1px solid #ffffff59;
+      border-radius: 8px; box-shadow: 0 2px 10px #0005;
+      background: var(--hk-chip, rgba(22, 26, 30, .72));
     }
-    .photo-badge .sensor-groups, .photo-badge .photo-room-name,
-    .photo-outdoor-choice, .photo-badge.name-only { display: none; }
+    .photo-badge .sensor-groups, .photo-badge .photo-room-name, .photo-badge.mobile-no-climate { display: none; }
+    /* Also on mobile, multiple outdoor measurement locations stay reachable
+       from the same dropdown attached to the in-picture outdoor badge. */
+    .photo-outdoor-choice { display: block; padding: 3px 4px; font-size: 10px; }
+    .photo-outdoor-choice > span { display: none; }
+    .photo-outdoor-choice select {
+      width: 100%; min-height: 28px; font-size: 10px;
+      background: #263039; color: #fff; border-color: #ffffff60;
+    }
+    .photo-mobile-climate { display: flex; flex-direction: column; gap: 2px; min-width: 0; max-width: 100%; }
+    .photo-mobile-name {
+      display: block; color: #fff; font-size: 11px; font-weight: 750;
+      line-height: 1.2; overflow-wrap: anywhere;
+    }
     .photo-mobile-reading {
-      display: flex; align-items: baseline; flex-wrap: wrap; justify-content: center;
-      gap: 1px 3px; min-width: 0; max-width: 100%; color: #fff;
-      font-size: 10px; line-height: 1.2; font-variant-numeric: tabular-nums;
-      text-align: center; overflow-wrap: anywhere;
+      display: flex; align-items: center; justify-content: flex-start;
+      gap: 2px 4px; min-width: 0; max-width: 100%; color: #fff;
+      font-size: 12px; line-height: 1.2; font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
     }
     .photo-mobile-reading strong { font-size: inherit; font-weight: 750; color: #fff; }
-    .photo-mobile-reading small { font-size: 8px; color: #eef4f7; }
-    .mobile-reading-icon { display: none; }
-    .photo-object-target, .photo-leaders, .photo-dock-note { display: none; }
-    .photo-stage { height: auto !important; }
+    .photo-mobile-reading small { font-size: 10px; font-weight: 500; color: #eef4f7; }
+    .mobile-reading-icon { display: inline-flex; align-items: center; flex-shrink: 0; width: 13px; height: 13px; color: #ffc095; }
+    .mobile-reading-icon.relative_humidity { color: #8dd6ee; }
+    .mobile-reading-icon :is(svg, .hk-icon) { width: 13px; height: 13px; }
+    .photo-leaders { display: block; z-index: 2; }
+    .photo-leaders path { stroke: #f5f5f4; stroke-width: 1.6; }
+    .photo-object-target, .photo-dock-note { display: none; }
     .photo-lower .rooms-section { display: block; padding: 12px 0 16px; }
   }
   @container hausklima (max-width: 440px) {
-    .photo-badge.with-metrics { padding: 2px 3px; border-radius: 5px; min-height: 18px; }
-    .photo-mobile-reading { font-size: 9px; line-height: 1.15; }
-    .photo-mobile-reading small { font-size: 8px; }
+    .photo-badge.with-metrics.mobile-climate { padding: 3px 4px; min-height: 33px; border-radius: 6px; }
+    .photo-mobile-name { font-size: 10px; letter-spacing: -.025em; }
+    .photo-mobile-reading { font-size: 11px; gap: 1px 3px; }
+    .photo-mobile-reading small { font-size: 9px; }
+    .mobile-reading-icon { width: 11px; height: 11px; }
+    .mobile-reading-icon :is(svg, .hk-icon) { width: 11px; height: 11px; }
   }
 `;

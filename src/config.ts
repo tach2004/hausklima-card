@@ -134,6 +134,7 @@ export function getDefaultConfig(): HausKlimaCardConfig {
     show_room_names: true,
     chip_opacity: 0.72,
     scene_max_width: 1400,
+    theme_mode: 'auto',
   };
 }
 
@@ -149,6 +150,9 @@ export function normalizeConfig(input: unknown): HausKlimaCardConfig {
   }
   if (config.scene_max_width !== undefined && (typeof config.scene_max_width !== 'number' || !Number.isFinite(config.scene_max_width) || config.scene_max_width < 900 || config.scene_max_width > 3200)) {
     throw new Error('scene_max_width muss zwischen 900 und 3200 CSS-Pixeln liegen.');
+  }
+  if (config.theme_mode !== undefined && (typeof config.theme_mode !== 'string' || !['auto', 'light', 'dark'].includes(config.theme_mode))) {
+    throw new Error('theme_mode muss auto, light oder dark sein.');
   }
   if (config.building !== undefined) validateBuilding(config.building);
   return structuredClone({ ...getDefaultConfig(), ...config }) as HausKlimaCardConfig;

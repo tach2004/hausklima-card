@@ -112,6 +112,8 @@ export interface HausKlimaCardConfig {
   chip_opacity?: number;
   /** Maximum width of the full building scene, from 900 to 3200 CSS pixels. */
   scene_max_width?: number;
+  /** Visual theme of this card; auto follows Home Assistant's active theme. */
+  theme_mode?: 'auto' | 'light' | 'dark';
   building?: BuildingConfig;
   /** Lovelace may attach layout/visibility properties; preserve these in editor. */
   [key: string]: unknown;

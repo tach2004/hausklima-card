@@ -222,12 +222,12 @@ describe('approved-image climate overlays', () => {
     const saved = JSON.parse(JSON.stringify({ ...getDefaultConfig(), building })) as HausKlimaCardConfig;
     const card = await createCard(saved.building, { states }, saved);
     expect(card.shadowRoot?.querySelector('[data-select-room="garage"]')).toBeNull();
-    expect(card.shadowRoot?.querySelectorAll('.garage-zone')).toHaveLength(3);
+    expect(card.shadowRoot?.querySelectorAll('.garage-zone, .garage-block')).toHaveLength(0);
     expect(card.shadowRoot?.querySelectorAll('.photo-device.with-metrics')).toHaveLength(3);
     for (const [index, id] of ids.entries()) {
-      const tile = query<HTMLButtonElement>(card, `.garage-zone[data-select-room="${id}"]`);
-      expect(tile.querySelector('.reading strong')?.textContent).toBe(`${index + 18},0`);
-      tile.click();
+      const badge = query<HTMLButtonElement>(card, `.photo-device[data-select-room="${id}"]`);
+      expect(badge.textContent).toContain(`${index + 18},0`);
+      badge.click();
       await card.updateComplete;
       expect(query(card, '.room-detail').getAttribute('data-room-id')).toBe(id);
     }
@@ -266,9 +266,9 @@ describe('approved-image climate overlays', () => {
     expect(panel.querySelector('[data-metric="pressure_relative"]')?.textContent).toContain('rel.');
     expect(panel.querySelector('[data-metric="pressure_absolute"]')?.textContent).toContain('abs.');
     expect(panel.textContent).not.toContain('9,9');
-    const lower = query(card, '.outdoor-block[data-room-id="test_grouped_outdoor"]');
-    expect(lower.querySelectorAll('.reading')).toHaveLength(5);
-    expect(lower.querySelectorAll('[data-overview-group]')).toHaveLength(2);
+    expect(card.shadowRoot?.querySelector('.outdoor-block, .garage-block, .location-column')).toBeNull();
+    // All outdoor source groups are in the photo; complete sensor values open on click.
+    expect(panel.querySelectorAll('[data-overview-group]')).toHaveLength(2);
     panel.click();
     await card.updateComplete;
     const detail = query(card, '.room-detail');

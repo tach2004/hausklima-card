@@ -60,6 +60,21 @@ describe('Lovelace card integration', () => {
     expect(editor.shadowRoot?.querySelector('#metric-select')).not.toBeNull();
   });
 
+  it('follows Home Assistant theme in auto mode and allows explicit light/dark overrides', async () => {
+    const card = await createCard({ ...getDefaultConfig(), theme_mode: 'auto' }, { states: {}, themes: { darkMode: true } });
+    expect(find(card, 'ha-card').getAttribute('data-theme-resolved')).toBe('dark');
+    card.hass = { states: {}, themes: { darkMode: false } };
+    await card.updateComplete;
+    expect(find(card, 'ha-card').getAttribute('data-theme-resolved')).toBe('light');
+    card.setConfig({ ...getDefaultConfig(), theme_mode: 'dark' });
+    await card.updateComplete;
+    expect(find(card, 'ha-card').getAttribute('data-theme-resolved')).toBe('dark');
+    card.setConfig({ ...getDefaultConfig(), theme_mode: 'light' });
+    await card.updateComplete;
+    expect(find(card, 'ha-card').getAttribute('data-theme-resolved')).toBe('light');
+    expect(() => normalizeConfig({ ...getDefaultConfig(), theme_mode: 'blue' })).toThrow(/theme_mode/);
+  });
+
   it('rejects invalid incoming configurations', () => {
     const card = document.createElement('hausklima-card') as HausKlimaCard;
     expect(() => card.setConfig(null)).toThrow();
@@ -71,7 +86,7 @@ describe('Lovelace card integration', () => {
     const building = getDefaultBuilding();
     const card = await createCard();
     expect(card.shadowRoot?.querySelectorAll('.photo-room')).toHaveLength(8);
-    expect(card.shadowRoot?.querySelectorAll('.garage-block')).toHaveLength(1);
+    expect(card.shadowRoot?.querySelectorAll('.garage-block, .outdoor-block, .location-column')).toHaveLength(0);
     expect(card.shadowRoot?.querySelectorAll('.photo-metric, .reading, .sensor-row')).toHaveLength(0);
     expect(building.rooms.every((room) => !room.measurements || Object.values(room.measurements).every((metric) => !metric.sensors.length))).toBe(true);
     expect(find(card, '.room-tile[data-select-room="workshop"]').classList.contains('no-readings')).toBe(true);
@@ -84,7 +99,7 @@ describe('Lovelace card integration', () => {
     }
     const image = find<HTMLImageElement>(card, '.photo-image');
     expect(image.getAttribute('src')?.length).toBeGreaterThan(10);
-    expect(card.shadowRoot?.querySelectorAll('.garage-zone')).toHaveLength(4);
+    expect(card.shadowRoot?.querySelectorAll('.photo-device, .photo-air')).toHaveLength(4);
   });
 
   it('opens room details through the accessible photo buttons and closes explicitly', async () => {
@@ -108,7 +123,7 @@ describe('Lovelace card integration', () => {
   it('keeps each battery and cabinet separately configurable and selectable', async () => {
     const card = await createCard();
     for (const id of ['garage', 'garage_battery_pylontech', 'garage_battery_litime', 'garage_cabinet']) {
-      const button = find<HTMLButtonElement>(card, `.garage-zone[data-select-room="${id}"]`);
+      const button = find<HTMLButtonElement>(card, `.photo-badge[data-select-room="${id}"]`);
       button.click();
       await card.updateComplete;
       expect(find(card, '.room-detail h2').textContent).not.toBe('');
@@ -203,8 +218,8 @@ describe('Lovelace card integration', () => {
     const card = await createCard();
     expect(card.shadowRoot?.querySelectorAll('.photo-room.with-metrics, .photo-garage, .photo-metric')).toHaveLength(0);
     expect(card.shadowRoot?.querySelectorAll('.photo-room.name-only')).toHaveLength(8);
-    expect(card.shadowRoot?.querySelectorAll('.garage-zone.no-readings')).toHaveLength(4);
-    expect(card.shadowRoot?.querySelectorAll('.garage-zone .reading')).toHaveLength(0);
+    expect(card.shadowRoot?.querySelectorAll('.photo-device.with-metrics, .photo-garage.with-metrics')).toHaveLength(0);
+    expect(card.shadowRoot?.querySelectorAll('.location-column')).toHaveLength(0);
   });
 
   it('shows five optional metric types for garage air and equipment without inventing other values', async () => {
@@ -233,8 +248,8 @@ describe('Lovelace card integration', () => {
     expect(garageOverlay.textContent).toContain('7,6');
     expect(garageOverlay.textContent).toContain('640');
     expect(garageOverlay.textContent).toContain('123');
-    expect(find(card, '.garage-zone[data-select-room="garage_battery_pylontech"]').textContent).toContain('19,2');
-    expect(find(card, '.garage-zone[data-select-room="garage_battery_litime"]').classList.contains('no-readings')).toBe(true);
+    expect(find(card, '.photo-device[data-select-room="garage_battery_pylontech"]').textContent).toContain('19,2');
+    expect(find(card, '.photo-device[data-select-room="garage_battery_litime"]').classList.contains('name-only')).toBe(true);
     expect(find<HTMLElement>(card, 'ha-card').style.getPropertyValue('--hk-chip')).toContain('0.5');
   });
 
@@ -260,7 +275,7 @@ describe('Lovelace card integration', () => {
       'sensor.test_unknown': { state: 'unknown', attributes: { unit_of_measurement: '°C' } },
     } });
     expect(find(card, '.photo-stage .photo-outdoor[data-room-id="test_outdoor"]').textContent).toContain('Nicht verfügbar');
-    expect(find(card, '.outdoor-block').querySelectorAll('.reading')).toHaveLength(1);
+    expect(card.shadowRoot?.querySelector('.outdoor-block, .garage-block, .location-column')).toBeNull();
     const detail = await openRoom(card, 'test_outdoor');
     expect(detail.querySelectorAll('.sensor-row')).toHaveLength(3);
     expect(detail.textContent).toContain('Nicht verfügbar');
@@ -287,7 +302,7 @@ describe('Lovelace card integration', () => {
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
     expect(find(card, '.rooms-section').classList.contains('expanded')).toBe(true);
     expect(card.shadowRoot?.querySelectorAll('.house-room-list [data-select-room]')).toHaveLength(8);
-    expect(card.shadowRoot?.querySelector('.garage-block [data-select-room="garage"]')).not.toBeNull();
+    expect(card.shadowRoot?.querySelector('.photo-air[data-select-room="garage"]')).not.toBeNull();
   });
 
   it('clears details when the selected room is removed by a saved editor update', async () => {
@@ -311,6 +326,6 @@ describe('Lovelace card integration', () => {
     expect(find(card, 'h1').textContent).toBe('Mein Haus');
     expect(card.shadowRoot?.querySelectorAll('.photo-room-name, .dimension-label, .building-details')).toHaveLength(0);
     expect(card.shadowRoot?.querySelectorAll('.photo-room')).toHaveLength(8);
-    expect(card.shadowRoot?.querySelector('.garage-block [data-select-room="garage"]')).not.toBeNull();
+    expect(card.shadowRoot?.querySelector('.photo-air[data-select-room="garage"]')).not.toBeNull();
   });
 });

@@ -26,7 +26,15 @@ async function ready(page, path = '/?demo=1') {
 async function selectRoom(page, card, id, touch = false) {
   const tile = card.locator(`[data-select-room="${id}"]:visible`).first();
   if (!await tile.count()) {
-    await card.locator('.overview-toggle').click();
+    // On desktop the permanent outdoor tiles are intentionally gone.
+    // Additional outdoor locations remain available via the selector in the photo.
+    const outdoorSelect = card.locator('#photo-outdoor-select:visible');
+    if (await outdoorSelect.count() && await outdoorSelect.locator(`option[value="${id}"]`).count()) {
+      await outdoorSelect.selectOption(id);
+      await page.evaluate(() => window.hausklimaPreview.card.updateComplete);
+    } else {
+      await card.locator('.overview-toggle').click();
+    }
   }
   const button = card.locator(`[data-select-room="${id}"]:visible`).first();
   await button.waitFor();
@@ -90,17 +98,35 @@ async function checkResponsive(browser, engine) {
       assert.equal(createHash('sha256').update(Buffer.from(source.slice(source.indexOf(',') + 1), 'base64')).digest('hex'), artworkHash, 'bundled WebP is bit-identical');
       const cardWidth = await card.evaluate((node) => node.clientWidth);
       if (cardWidth <= 1000) {
-        const mobileBadges = card.locator('.photo-badge.with-metrics:visible');
-        assert.ok(await mobileBadges.count() > 0, `${name}: compact black reading badges visible on the picture`);
+        const mobileBadges = card.locator('.photo-badge.mobile-climate:visible');
+        assert.ok(await mobileBadges.count() > 0, `${name}: named black climate badges visible on the picture`);
+        const roomBadge = card.locator('.photo-room[data-room-id="laundry"]');
+        assert.equal(await roomBadge.locator('.photo-mobile-name:visible').innerText(), 'Waschküche');
+        assert.deepEqual(await roomBadge.locator('.photo-mobile-reading:visible').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-metric'))),
+          ['temperature', 'relative_humidity'], `${name}: only temperature and humidity with separate icons on mobile`);
+        assert.equal(await roomBadge.locator('.photo-mobile-reading:visible svg').count(), 2, `${name}: proper colored SVG climate symbols`);
+        assert.ok(await card.locator('.photo-leaders path').count() >= 3, `${name}: cabinet and both batteries retain connector lines`);
+        assert.equal(await card.locator('.photo-lower .location-column, .outdoor-block, .garage-block').count(), 0,
+          `${name}: no permanent outdoor or garage summary below the illustration on mobile`);
+        const outdoorSelector = card.locator('#photo-outdoor-select');
+        assert.equal(await outdoorSelector.isVisible(), true, `${name}: mobile outdoor selection stays accessible`);
         const mobileValue = card.locator('.photo-placement[data-overlay-id="laundry"] .photo-mobile-reading:visible');
         assert.ok(await mobileValue.count() > 0, `${name}: laundry reading visibly overlaid on the picture`);
-        assert.ok((await mobileValue.innerText()).trim().length > 0, `${name}: mobile badge contains an actual sensor value`);
+        assert.ok((await mobileValue.allInnerTexts()).every((reading) => reading.trim().length > 0), `${name}: both mobile readings contain actual sensor values`);
         for (const room of demoConfig.building.rooms.filter((entry) => entry.location !== 'outdoor' && entry.id !== 'demo_study')) {
-          const mobileTile = card.locator(`.house-room-list [data-select-room="${room.id}"], .garage-zone[data-select-room="${room.id}"]`).first();
-          assert.ok(await mobileTile.isVisible(), `${name}: mobile primary readings accessible without an extra tap for ${room.id}`);
-          assert.equal(await mobileTile.locator('.reading').count(), Object.values(room.measurements ?? {}).filter((metric) => metric.visible !== false && metric.show_in_overview !== false).length);
+          const isGarage = room.level_id === 'garage';
+          const mobileTile = card.locator(isGarage
+            ? `.photo-placement[data-overlay-id="${room.id}"] .photo-badge`
+            : `.house-room-list [data-select-room="${room.id}"]`).first();
+          assert.ok(await mobileTile.isVisible(), `${name}: ${room.id} remains visible and accessible on mobile`);
+          if (!isGarage) {
+            assert.equal(await mobileTile.locator('.reading').count(), Object.values(room.measurements ?? {})
+              .filter((metric) => metric.visible !== false && metric.show_in_overview !== false).length);
+          }
         }
       } else {
+        assert.equal(await card.locator('.photo-lower .location-column, .outdoor-block, .garage-block').count(), 0,
+          `${name}: no redundant outdoor or garage cards on desktop`);
         assert.equal(await card.locator('.photo-room.with-metrics[data-room-id="bedroom"] .photo-metric').count(), 5, `${name}: five room metrics in overlay`);
         for (const id of ['garage', 'garage_cabinet', 'garage_battery_pylontech', 'garage_battery_litime']) {
           assert.equal(await card.locator(`.photo-device[data-room-id="${id}"], .photo-garage[data-room-id="${id}"]`).count(), 1, `${name}: own device overlay ${id}`);
@@ -113,6 +139,8 @@ async function checkResponsive(browser, engine) {
         const expected = Object.values(room.measurements ?? {}).reduce((count, metric) => count + metric.sensors.length, 0);
         assert.equal(await detail.locator('.sensor-row').count(), expected, `${engine}/${name}: all sources ${room.id}`);
         assert.equal(await detail.locator('.source-name small').count(), 0, `${name}: no redundant entity IDs in visible details`);
+        const rowFont = await detail.locator('.sensor-row').first().evaluate((node) => parseFloat(getComputedStyle(node).fontSize)).catch(() => 0);
+        if (expected) assert.ok(rowFont >= (cardWidth <= 780 ? 13 : 14), `${name}: readable detail source typography`);
         await card.getByRole('button', { name: 'Raumdetails schließen' }).click();
       }
       if (engine === 'chromium' && name === 'width-1440') await page.screenshot({ path: `${screenshotDirectory}/panel-${theme}.png`, fullPage: true });
@@ -160,7 +188,8 @@ async function checkStates(browser) {
   const initial = await ready(empty, '/');
   assert.equal(await initial.card.locator('.photo-metric').count(), 0);
   assert.equal(await initial.card.locator(overlaySelector).count(), 0, 'unconfigured sensors create no dark photo panel');
-  assert.equal(await initial.card.locator('.garage-zone.no-readings').count(), 4, 'unconfigured garage devices use light navigation tiles');
+  assert.equal(await initial.card.locator('.photo-device, .photo-air').count(), 4, 'all four garage measurement locations remain in the illustration');
+  assert.equal(await initial.card.locator('.location-column').count(), 0, 'no redundant garage/outdoor cards');
   const emptyBackground = await initial.card.locator('.photo-room.name-only').first().evaluate((element) => getComputedStyle(element).backgroundColor);
   assert.equal(emptyBackground, 'rgba(0, 0, 0, 0)', 'unconfigured room has no dark overlay');
 
@@ -323,19 +352,19 @@ async function checkSourceGroups(browser) {
   for (const width of [390, 1440]) {
     const page = await browser.newPage({ viewport: { width, height: 1100 }, hasTouch: width < 768 });
     const { card, editor, errors, external } = await ready(page);
-    const outdoor = card.locator(width < 768 ? '.outdoor-block[data-room-id="demo_outdoor"]' : '.photo-outdoor[data-room-id="demo_outdoor"]').first();
+    const outdoor = card.locator('.photo-outdoor[data-room-id="demo_outdoor"]').first();
     const groups = outdoor.locator('[data-overview-group]');
     assert.deepEqual(await groups.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-overview-group'))), ['Homematic', 'Ecowitt', 'Vitodens']);
-    const metricSelector = width < 768 ? '.reading' : '.photo-metric';
+    const metricSelector = '.photo-metric';
     const homematic = outdoor.locator('[data-overview-group="Homematic"]');
     const ecowitt = outdoor.locator('[data-overview-group="Ecowitt"]');
     assert.equal(await homematic.locator(metricSelector).count(), 2, 'temperature and humidity share their named source');
-    assert.match(await homematic.innerText(), /3,4/);
-    assert.match(await homematic.innerText(), /86,0/);
+    assert.match(await homematic.textContent(), /3,4/);
+    assert.match(await homematic.textContent(), /86,0/);
     assert.equal(await ecowitt.locator(metricSelector).count(), 4, 'relative and absolute air pressure join Ecowitt only');
-    assert.equal(await ecowitt.locator('[data-metric="pressure_relative"] strong').innerText(), '1013');
-    assert.equal(await ecowitt.locator('[data-metric="pressure_absolute"] strong').innerText(), '999');
-    assert.match(await ecowitt.innerText(), /hPa/);
+    assert.equal(await ecowitt.locator('[data-metric="pressure_relative"] strong').textContent(), '1013');
+    assert.equal(await ecowitt.locator('[data-metric="pressure_absolute"] strong').textContent(), '999');
+    assert.match(await ecowitt.textContent(), /hPa/);
     assert.equal(await outdoor.locator(`${metricSelector} svg`).count(), 7, 'each visible reading uses a genuine SVG icon');
 
     await page.locator('#editor-panel > summary').click();
@@ -399,6 +428,14 @@ async function checkEditor(browser) {
   });
   assert.equal((await page.evaluate(() => window.hausklimaPreview.getConfig())).chip_opacity, 0.55);
   assert.ok((await card.locator('ha-card').getAttribute('style')).includes('0.55'), 'opacity propagated to all dark panels');
+  const theme = editor.locator('#theme-mode');
+  assert.equal(await theme.inputValue(), 'auto', 'theme follows Home Assistant by default');
+  await theme.selectOption('dark');
+  assert.equal(await card.locator('ha-card').getAttribute('data-theme-resolved'), 'dark');
+  await theme.selectOption('light');
+  assert.equal(await card.locator('ha-card').getAttribute('data-theme-resolved'), 'light');
+  await theme.selectOption('auto');
+  assert.equal((await page.evaluate(() => window.hausklimaPreview.getConfig())).theme_mode, 'auto');
   const sceneWidth = editor.locator('#scene-max-width');
   await sceneWidth.evaluate((element) => { element.value = '1600'; element.dispatchEvent(new Event('input', { bubbles: true })); });
   assert.equal((await page.evaluate(() => window.hausklimaPreview.getConfig())).scene_max_width, 1600, 'scene width persists via config-changed');
@@ -461,6 +498,7 @@ async function checkEditor(browser) {
   config = await page.evaluate(() => window.hausklimaPreview.getConfig());
   assert.equal(config.scene_max_width, 1600);
   assert.equal(config.chip_opacity, 0.55);
+  assert.equal(config.theme_mode, 'auto');
   assert.equal(config.building.garage_components_initialized, true);
   measurement = config.building.rooms.find((room) => room.id === 'workshop').measurements.temperature;
   assert.equal(measurement.primary, 'sensor.demo_additional_temperature');

@@ -133,40 +133,6 @@ export class HausKlimaCard extends LitElement {
     </section>`;
   }
 
-  /** Garage air, two batteries and control cabinet each have their own HA sensors. */
-  private renderGarage(room: RoomConfig | undefined, equipment: RoomConfig[]) {
-    return html`<section class="garage-block location-block" aria-label="Garage und Batterietechnik">
-      <div class="garage-title">
-        <div><span class="location-icon" aria-hidden="true">${roomIcon({ id: 'garage' })}</span>
-          <strong>Garage und Batterietechnik</strong>
-          <p>Unabhängig konfigurierbare Klimamessstellen</p>
-        </div>
-      </div>
-      <div class="garage-zones">
-        ${[...(room ? [room] : []), ...equipment].map((device) => html`<button type="button"
-          class="garage-zone ${resolveOverviewGroups(device, this.hass).length ? '' : 'no-readings'}" data-select-room=${device.id}
-          @click=${() => this.selectRoom(device)}
-          aria-label=${`${device.name} – Messwerte und Sensorquellen öffnen`}>
-          <span class="garage-device-icon" aria-hidden="true">${roomIcon(device)}</span>
-          <span class="garage-device-content">
-            <strong>${device.name}</strong>
-            ${this.renderReadings(device, true)}
-          </span>
-          <span class="garage-zone-arrow" aria-hidden="true">›</span>
-        </button>`)}
-      </div>
-    </section>`;
-  }
-
-  private renderOutdoor(room: RoomConfig) {
-    const groups = resolveOverviewGroups(room, this.hass);
-    return html`<section class="outdoor-block location-block" data-room-id=${room.id} aria-label=${room.name}>
-      <button class="location-heading" data-select-room=${room.id} @click=${() => this.selectRoom(room)}><span><span class="location-icon outdoor-icon" aria-hidden="true">${roomIcon(room)}</span>${room.name}</span><span aria-hidden="true">${arrowIcon()}</span></button>
-      ${groups.length ? html`<button class="outdoor-overview" @click=${() => this.selectRoom(room)} aria-label=${`${room.name}: alle Sensorquellen öffnen`}>${this.renderReadings(room, true)}<span class="outdoor-detail-arrow" aria-hidden="true">›</span></button>`
-        : html`<button class="outdoor-empty" @click=${() => this.selectRoom(room)}>${resolveMeasurements(room, this.hass, 'details').length ? 'Alle Messwerte in den Details öffnen' : 'Noch keine Sensoren zugeordnet'}</button>`}
-    </section>`;
-  }
-
   private renderBuildingDetails(building: BuildingConfig) {
     return html`<details class="building-details"><summary>Gebäudedetails</summary>
       <p>Traufansicht · Haus ${formatDimension(building.house.width_m)} × ${formatDimension(building.house.depth_m)} m. First parallel zur sichtbaren Seite.</p>
@@ -183,14 +149,15 @@ export class HausKlimaCard extends LitElement {
     const layout = createLayout(building);
     const shapes = layout.shapes.filter((shape) => shape.level !== 'garage' && shape.room.location !== 'outdoor');
     const drawnIds = new Set(shapes.map((shape) => shape.room.id));
-    const outdoor = building.rooms.filter((room) => room.location === 'outdoor');
     const garages = building.rooms.filter((room) => room.location !== 'outdoor' && building.levels.find((level) => level.id === room.level_id)?.building_id === 'garage');
     const garageIds = new Set(garages.map((room) => room.id));
-    const garage = garages.find((room) => room.id === 'garage');
-    const garageEquipment = garages.filter((room) => room.id !== 'garage');
+    const themeMode = config.theme_mode ?? 'auto';
+    const darkMode = themeMode === 'auto' ? this.hass?.themes?.darkMode : themeMode === 'dark';
+    const resolvedTheme = typeof darkMode === 'boolean' ? (darkMode ? 'dark' : 'light') : 'inherit';
     const others = building.rooms.filter((room) => !drawnIds.has(room.id) && !garageIds.has(room.id) && room.location !== 'outdoor');
     const selected = building.rooms.find((room) => room.id === this._selected);
-    return html`<ha-card style=${`--hk-chip: rgba(22, 26, 30, ${config.chip_opacity ?? 0.72}); --hk-scene-max-width: ${config.scene_max_width ?? 1400}px;`}>
+    return html`<ha-card data-theme-mode=${themeMode} data-theme-resolved=${resolvedTheme}
+      style=${`--hk-chip: rgba(22, 26, 30, ${config.chip_opacity ?? 0.72}); --hk-scene-max-width: ${config.scene_max_width ?? 1400}px;`}>
       <header class="card-header"><div class="card-title"><span class="home-icon" aria-hidden="true">⌂</span>${config.title ? html`<h1>${config.title}</h1>` : nothing}</div>
         <button class="overview-toggle" aria-expanded=${String(this._showRooms)} @click=${() => { this._showRooms = !this._showRooms; }}>Räume <span>${building.rooms.length}</span></button></header>
       <div class="photo-main">
@@ -202,10 +169,6 @@ export class HausKlimaCard extends LitElement {
           <div class="section-title"><h2>Räume</h2><span>Antippen für alle Sensorquellen</span></div>
           <div class="room-list house-room-list">${shapes.map((shape, index) => this.renderRoomTile(shape.room, building, index + 1))}</div>
         </section>
-        ${outdoor.length || garages.length ? html`<aside class="location-column" aria-label="Außen und Garage">
-          ${outdoor.map((room) => this.renderOutdoor(room))}
-          ${garage || garageEquipment.length ? this.renderGarage(garage, garageEquipment) : nothing}
-        </aside>` : nothing}
       </div>
       ${others.length ? html`<section class="other-rooms" aria-label="Weitere Räume"><div class="section-title"><h2>Weitere Räume</h2><span>Alle Messorte, auch außerhalb der Hausansicht</span></div>
         <div class="room-list">${others.map((room) => this.renderRoomTile(room, building))}</div></section>` : nothing}
