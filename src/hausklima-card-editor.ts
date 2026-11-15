@@ -108,7 +108,7 @@ export class HausKlimaCardEditor extends LitElement {
     catch (error) { this._error = error instanceof Error ? error.message : 'Die Änderung konnte nicht übernommen werden.'; }
   }
 
-  private updateBase(key: 'title' | 'show_dimensions' | 'show_room_names' | 'chip_opacity' | 'scene_max_width', value: string | boolean | number): void {
+  private updateBase(key: 'title' | 'show_dimensions' | 'show_room_names' | 'chip_opacity' | 'scene_max_width' | 'theme_mode', value: string | boolean | number): void {
     this.apply(() => ({ ...this._config, [key]: value }));
   }
 
@@ -220,6 +220,15 @@ export class HausKlimaCardEditor extends LitElement {
           <label class="field" for="title"><span>Kartentitel</span>
             <input id="title" type="text" .value=${this._config.title ?? ''}
               @change=${(event: Event) => this.updateBase('title', (event.target as HTMLInputElement).value)} />
+          </label>
+          <label class="field" for="theme-mode"><span>Darstellung der HausKlima Card</span>
+            <select id="theme-mode" .value=${this._config.theme_mode ?? 'auto'}
+              @change=${(event: Event) => this.updateBase('theme_mode', (event.target as HTMLSelectElement).value)}>
+              <option value="auto">Automatisch (Home Assistant)</option>
+              <option value="light">Hell</option>
+              <option value="dark">Dunkel</option>
+            </select>
+            <small>Automatisch übernimmt den aktiven Hell-/Dunkelmodus von Home Assistant.</small>
           </label>
           <label class="field chip-opacity" for="chip-opacity"><span>Transparenz der dunklen Messwert-Kästchen: ${Math.round((this._config.chip_opacity ?? 0.72) * 100)} % Deckkraft</span>
             <input id="chip-opacity" type="range" min="35" max="100" step="1"

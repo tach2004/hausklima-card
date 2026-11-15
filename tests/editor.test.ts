@@ -87,6 +87,22 @@ describe('Lovelace editor', () => {
     }
   });
 
+  it('edits and persists auto/light/dark with config-changed', async () => {
+    const editor = await createEditor();
+    const configs = capture(editor);
+    const picker = element<HTMLSelectElement>(editor, '#theme-mode');
+    expect(picker.value).toBe('auto');
+    for (const mode of ['dark', 'light', 'auto']) {
+      picker.value = mode;
+      picker.dispatchEvent(new Event('change', { bubbles: true }));
+      await editor.updateComplete;
+      expect(latest(configs).theme_mode).toBe(mode);
+      expect(element<HTMLSelectElement>(editor, '#theme-mode').value).toBe(mode);
+    }
+    const reloaded = await createEditor(latest(configs));
+    expect(element<HTMLSelectElement>(reloaded, '#theme-mode').value).toBe('auto');
+  });
+
   it('validates incoming configurations', async () => {
     const editor = await createEditor();
     expect(() => editor.setConfig({ type: 'custom:another-card' })).toThrow();
