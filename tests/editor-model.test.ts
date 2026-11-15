@@ -9,6 +9,7 @@ import {
   editSensor,
   removeSensor,
   setPrimarySensor,
+  setMobileSensorOverview,
   saveBadgePosition,
   resetBadgePosition,
   updateMeasurement,
@@ -30,6 +31,24 @@ function room(config: HausKlimaCardConfig, id = 'workshop'): RoomConfig {
 function withTwoSensors(): HausKlimaCardConfig {
   return addSensor(addSensor(getDefaultConfig(), 'workshop', 'temperature', firstEntity), 'workshop', 'temperature', secondEntity);
 }
+
+describe('per-source phone selection', () => {
+  it('automatically enables the phone metric without changing desktop source choices', () => {
+    const initial = withTwoSensors();
+    const original = structuredClone(initial);
+    const next = setMobileSensorOverview(initial, 'workshop', 'temperature', secondEntity, true);
+    const temp = room(next).measurements!.temperature!;
+    expect(temp.sensors[1]!.show_on_mobile).toBe(true);
+    expect(temp.sensors[1]!.show_in_overview).toBeUndefined();
+    expect(room(next).mobile_overview?.temperature).toBe(true);
+    expect(initial).toEqual(original);
+    const off = setMobileSensorOverview(next, 'workshop', 'temperature', firstEntity, false);
+    expect(room(off).measurements!.temperature!.sensors[0]!.show_on_mobile).toBe(false);
+    expect(room(off).measurements!.temperature!.sensors[1]!.show_on_mobile).toBe(true);
+    expect(room(off).measurements!.temperature!.sensors[0]!.show_in_overview).toBeUndefined();
+    expect(() => setMobileSensorOverview(initial, 'workshop', 'temperature', 'sensor.missing', true)).toThrow();
+  });
+});
 
 describe('saved responsive badge coordinates', () => {
   it('stores independent positions, keeps existing Lovelace fields and resets per device', () => {

@@ -4,7 +4,7 @@ import { keyed } from 'lit/directives/keyed.js';
 import { getDefaultConfig, normalizeConfig, resolveBuilding } from './config';
 import {
   addRoom, addSensor, deleteRoom, editRoom, editSensor, removeSensor,
-  setPrimarySensor, setMobileOverview, saveBadgePosition, resetBadgePosition, updateMeasurement,
+  setPrimarySensor, setMobileOverview, setMobileSensorOverview, saveBadgePosition, resetBadgePosition, updateMeasurement,
 } from './editor-model';
 import { METRIC_LABELS } from './metrics';
 import { METRIC_TYPES } from './types';
@@ -12,7 +12,7 @@ import type { HausKlimaCardConfig, HomeAssistant, MetricType, RoomConfig, Sensor
 import { editorStyles } from './editor-styles';
 import { houseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS, MOBILE_ROOM_ART_POSITIONS } from './scene-photo';
 import { roomIcon, metricIcon } from './icons';
-import { formatSensorValue, isMobileOverviewEnabled, resolveMeasurements } from './metrics';
+import { formatSensorValue, isMobileOverviewEnabled, resolveMeasurements, resolveMobileReadings } from './metrics';
 
 interface NativeCardConstructor {
   getConfigElement?: () => HTMLElement | Promise<HTMLElement>;
@@ -195,8 +195,9 @@ export class HausKlimaCardEditor extends LitElement {
     if (!room) return nothing;
     const position = this.savedPosition(room);
     const stored = this._config.badge_positions?.[room.id]?.[this._positionDevice];
-    const measurements = resolveMeasurements(room, this.hass, 'overview')
-      .filter((m) => this._positionDevice === 'desktop' || isMobileOverviewEnabled(room, m.type));
+    const measurements = this._positionDevice === 'desktop'
+      ? resolveMeasurements(room, this.hass, 'overview').map((m) => ({ type: m.type, sensor: m.primary }))
+      : resolveMobileReadings(room, this.hass);
     return html`<details class="position-settings">
       <summary>Messwertkästchen im Bild verschieben</summary>
       <p class="hint">Raum oben auswählen, dann das schwarze Kästchen mit Maus oder Finger ziehen.
@@ -219,8 +220,10 @@ export class HausKlimaCardEditor extends LitElement {
           @keydown=${(event: KeyboardEvent) => this.positionKeyDown(event, room)}>
           <span class="marker-heading">${roomIcon(room)}<span>${room.name}</span></span>
           ${measurements.length ? measurements.map((metric) => html`<span class="marker-reading">
-            ${metricIcon(metric.type)} <strong>${formatSensorValue(metric.primary, this.hass)}</strong>
-            <small>${metric.primary.unit}</small>
+            ${metricIcon(metric.type)}
+            ${'sourceLabel' in metric && metric.sourceLabel ? html`<span>${metric.sourceLabel}</span>` : nothing}
+            <strong>${formatSensorValue(metric.sensor, this.hass)}</strong>
+            <small>${metric.sensor.unit}</small>
           </span>`) : nothing}
         </button>
       </div>
@@ -312,6 +315,15 @@ export class HausKlimaCardEditor extends LitElement {
             data-action="sensor-overview" data-entity=${sensor.entity}
             .checked=${sensor.show_in_overview ?? (primary ?? room.measurements?.[this._metric]?.sensors[0]?.entity) === sensor.entity}
             @change=${(event: Event) => this.apply(() => editSensor(this._config, room.id, this._metric, sensor.entity, { show_in_overview: (event.target as HTMLInputElement).checked }))} /> Haupt – in Übersicht</label>
+          <label class="check-label"><input type="checkbox"
+            data-action="sensor-mobile" data-entity=${sensor.entity}
+            .checked=${sensor.show_on_mobile ?? (
+              isMobileOverviewEnabled(room, this._metric) &&
+              room.measurements?.[this._metric]?.show_in_overview !== false &&
+              (primary ?? room.measurements?.[this._metric]?.sensors[0]?.entity) === sensor.entity)}
+            @change=${(event: Event) => this.apply(() => setMobileSensorOverview(this._config, room.id,
+              this._metric, sensor.entity, (event.target as HTMLInputElement).checked))} />
+            Handy – diesen Sensor anzeigen</label>
           <button type="button" class="text-button danger" data-action="remove-sensor" data-entity=${sensor.entity}
             aria-label=${`Sensor ${index + 1} entfernen`}
             @click=${() => this.apply(() => removeSensor(this._config, room.id, this._metric, sensor.entity))}>Entfernen</button>
@@ -417,7 +429,7 @@ export class HausKlimaCardEditor extends LitElement {
                   this._metric, (event.target as HTMLInputElement).checked))} />
                 Diesen Messwert im Handy-Kästchen anzeigen</label>
             </div>
-            <p class="hint">Nur fürs Handy: Temperatur und relative Feuchte sind standardmäßig aktiv, weitere Messarten optional. Desktop und vollständige Details bleiben unverändert.</p>
+            <p class="hint">Handy: Diese Messart insgesamt ein-/ausblenden. Zusätzlich kannst du bei jedem Sensor darunter einen eigenen Handy-Haken setzen. Beim Aktivieren einer Quelle wird die Messart fürs Handy automatisch aktiviert. Desktop und Details bleiben unabhängig.</p>
             <p class="hint">Mit „Haupt – in Übersicht“ können mehrere Quellen sichtbar sein. Gleiche Gruppennamen bündeln Werte unter einem gemeinsamen Namen, z. B. Temperatur und Feuchte von „Homematic“. Ohne Gruppe bleiben einzelne Hauptwerte schmal untereinander; mehrere Quellen derselben Messart erhalten ihren Anzeigenamen. „Standardquelle“ bestimmt die Hauptanzeige nur, solange der jeweilige Haupt-Haken nicht ausdrücklich gesetzt oder entfernt wurde. Alle Quellen bleiben in den Details erreichbar.</p>
             <div class="sensor-list">${measurement?.sensors.map((sensor, index) => this.renderSensor(room, sensor, index, measurement.primary))}</div>
             ${!measurement?.sensors.length ? html`<p class="empty-hint">Noch kein Sensor für diese Messart zugeordnet.</p>` : nothing}

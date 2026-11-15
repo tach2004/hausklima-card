@@ -1,6 +1,6 @@
 import { css, html, nothing } from 'lit';
 import { houseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS } from './scene-photo';
-import { formatSensorValue, isMobileOverviewEnabled, resolveMeasurements, resolveOverviewGroups } from './metrics';
+import { formatSensorValue, resolveMobileReadings, resolveOverviewGroups } from './metrics';
 import { metricIcon, roomIcon } from './icons';
 import { renderReadingGroups } from './reading-view';
 import type { BadgePositionSet, BuildingConfig, HomeAssistant, RoomConfig } from './types';
@@ -21,17 +21,15 @@ export function renderPhotoView(
 ) {
   const rooms = building.rooms.filter((room) => ROOM_ART_POSITIONS[room.id] && room.visible && room.location !== 'outdoor');
   const devices = building.rooms.filter((room) => GARAGE_ART_POSITIONS[room.id] && room.location !== 'outdoor');
-  const outdoors = building.rooms.filter((room) => room.location === 'outdoor' && resolveOverviewGroups(room, hass).length);
+  const outdoors = building.rooms.filter((room) => room.location === 'outdoor' &&
+    (resolveOverviewGroups(room, hass).length || resolveMobileReadings(room, hass).length));
   const outdoor = outdoors.find((room) => room.id === options.outdoorId) ?? outdoors[0];
-  const mobileReadings = (room: RoomConfig) => resolveMeasurements(room, hass, 'overview')
-    .filter((metric) => isMobileOverviewEnabled(room, metric.type))
-    .map((metric) => ({ type: metric.type, sensor: metric.primary }));
 
   // Desktop retains every configured reading and all selected sources. On a
   // narrow picture the same dark panel displays only temperature and RH.
   const renderBadge = (room: RoomConfig, category: string) => {
     const groups = resolveOverviewGroups(room, hass);
-    const climate = mobileReadings(room);
+    const climate = resolveMobileReadings(room, hass);
     return html`<button class="photo-badge ${category} ${groups.length ? 'with-metrics' : 'name-only'} ${climate.length ? 'mobile-climate' : 'mobile-no-climate'}"
       data-room-id=${room.id} data-select-room=${room.id} type="button"
       aria-pressed=${String(selectedRoomId === room.id)} aria-label=${`${room.name}: Details öffnen`}
@@ -40,9 +38,10 @@ export function renderPhotoView(
       ${renderReadingGroups(room, hass, true)}
       ${climate.length ? html`<span class="photo-mobile-climate">
         ${showNames ? html`<span class="photo-mobile-name">${roomIcon(room)}<span>${room.name}</span></span>` : nothing}
-        ${climate.map(({ type, sensor }) => html`
+        ${climate.map(({ type, sensor, sourceLabel }) => html`
           <span class="photo-mobile-reading" data-metric=${type} data-reading-entity=${sensor.entity}>
             <span class="mobile-reading-icon ${type}" aria-hidden="true">${metricIcon(type)}</span>
+            ${sourceLabel ? html`<span class="photo-mobile-source" title=${sourceLabel}>${sourceLabel}</span>` : nothing}
             <strong>${formatSensorValue(sensor, hass)}</strong>
             ${sensor.status === 'available' && sensor.unit ? html`<small>${sensor.unit}</small>` : nothing}
           </span>`)}
@@ -136,7 +135,7 @@ export const photoStyles = css`
     .photo-stage { background: #3f4d49; }
     .photo-image { border-radius: 12px; }
     .photo-placement { display: block; z-index: 3; }
-    .photo-badge.with-metrics.mobile-climate {
+    .photo-badge.mobile-climate {
       padding: 2px 4px; min-height: 29px; gap: 1px; border: 1px solid #ffffff59;
       border-radius: 8px; box-shadow: 0 2px 10px #0005;
       background: var(--hk-chip, rgba(22, 26, 30, .72));
@@ -175,6 +174,8 @@ export const photoStyles = css`
       font-size: var(--hk-badge-font-mobile, 9px); line-height: 1.08; font-variant-numeric: tabular-nums;
       overflow-wrap: anywhere;
     }
+    .photo-mobile-source { font-size: .9em; font-weight: 600; color: #e4eef4; max-width: 13ch;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
     .photo-mobile-reading strong { font-size: inherit; font-weight: 750; color: #fff; }
     .photo-mobile-reading small { font-size: .85em; font-weight: 500; color: #eef4f7; }
     .mobile-reading-icon { display: inline-flex; align-items: center; flex-shrink: 0; width: 1em; height: 1em; color: #ffc095; }
@@ -194,7 +195,7 @@ export const photoStyles = css`
     .photo-lower .rooms-section { display: block; padding: 12px 0 16px; }
   }
   @container hausklima (max-width: 440px) {
-    .photo-badge.with-metrics.mobile-climate { padding: 2px 3px; min-height: 27px; border-radius: 6px; }
+    .photo-badge.mobile-climate { padding: 2px 3px; min-height: 27px; border-radius: 6px; }
     .photo-mobile-name { letter-spacing: -.025em; }
     .photo-mobile-reading { gap: 1px 3px; }
     .photo-mobile-reading small { font-size: .85em; }

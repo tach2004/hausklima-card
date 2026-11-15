@@ -652,6 +652,74 @@ async function checkEditor(browser) {
   await page.close();
   console.log('PASS editor: native selector contract, unlimited list operations, primary, visibility, names, indoor/outdoor, safe delete, JSON reload persistence');
 }
+async function checkPhoneSourceToggles(browser) {
+  const page = await browser.newPage({ viewport: { width: 402, height: 880 }, hasTouch: true });
+  const { card, editor, errors } = await ready(page);
+  await page.locator('#editor-panel > summary').click();
+  await editor.locator('#room-select').selectOption('demo_outdoor');
+  await editor.locator('#metric-select').selectOption('temperature');
+  const badge = card.locator('.photo-outdoor[data-room-id="demo_outdoor"]');
+  const names = () => badge.locator('.photo-mobile-reading[data-metric="temperature"]:visible');
+  const selectedEntities = () => names().evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-reading-entity')));
+  const before = await badge.locator('.photo-metric').allTextContents();
+  assert.deepEqual(await selectedEntities(), ['sensor.demo_outdoor_ecowitt_temperature'],
+    'existing phone config still shows primary source only');
+  const homematic = editor.locator('[data-action="sensor-mobile"][data-entity="sensor.demo_outdoor_homematic_temperature"]');
+  const vitodens = editor.locator('[data-action="sensor-mobile"][data-entity="sensor.demo_outdoor_vitodens_temperature"]');
+  const ecowitt = editor.locator('[data-action="sensor-mobile"][data-entity="sensor.demo_outdoor_ecowitt_temperature"]');
+  assert.equal(await homematic.isChecked(), false, 'extra sources start hidden');
+  assert.equal(await ecowitt.isChecked(), true, 'primary starts visible');
+  await homematic.check();
+  await vitodens.check();
+  assert.deepEqual(await selectedEntities(), [
+    'sensor.demo_outdoor_homematic_temperature',
+    'sensor.demo_outdoor_ecowitt_temperature',
+    'sensor.demo_outdoor_vitodens_temperature',
+  ]);
+  assert.deepEqual(await names().locator('.photo-mobile-source').allTextContents(), ['Homematic', 'Ecowitt', 'Vitodens'],
+    'multiple sources show their own group name on the phone');
+  assert.deepEqual(await badge.locator('.photo-metric').allTextContents(), before, 'desktop sources are independent');
+  await ecowitt.uncheck();
+  assert.deepEqual(await selectedEntities(), [
+    'sensor.demo_outdoor_homematic_temperature', 'sensor.demo_outdoor_vitodens_temperature',
+  ], 'primary can also be individually removed from the phone');
+  assert.equal((await page.evaluate(() => window.hausklimaPreview.getConfig()))
+    .building.rooms.find((r) => r.id === 'demo_outdoor').measurements.temperature.sensors[1].show_on_mobile, false);
+  await editor.locator('#metric-select').selectOption('relative_humidity');
+  const rh = editor.locator('[data-action="sensor-mobile"][data-entity="sensor.demo_outdoor_homematic_humidity"]');
+  await rh.check();
+  assert.deepEqual(await badge.locator('.photo-mobile-reading[data-metric="relative_humidity"]:visible').evaluateAll(
+    (nodes) => nodes.map((n) => n.getAttribute('data-reading-entity'))),
+    ['sensor.demo_outdoor_homematic_humidity', 'sensor.demo_outdoor_ecowitt_humidity'],
+    'humidity sources can also be enabled independently');
+  await editor.locator('#metric-select').selectOption('pressure_relative');
+  await editor.locator('[data-action="sensor-mobile"][data-entity="sensor.demo_outdoor_relative_pressure"]').check();
+  assert.equal(await badge.locator('.photo-mobile-reading[data-metric="pressure_relative"]:visible').count(), 1,
+    'source-only selection also enables a previously disabled mobile metric');
+  await editor.locator('#metric-select').selectOption('temperature');
+  await editor.locator('#mobile-metric-visible').uncheck();
+  assert.equal(await names().count(), 0, 'metric-level master switch still hides its selected sources');
+  await editor.locator('#mobile-metric-visible').check();
+  assert.equal(await names().count(), 2, 're-enabling the phone metric restores source-level selections');
+  await assertLayout(page, card, 'phone selected sources and layout');
+  if (process.env.UPDATE_SCREENSHOTS === '1') {
+    await page.locator('#editor-panel > summary').click();
+    await page.screenshot({ path: `${screenshotDirectory}/iphone-multiple-sources.png`, fullPage: true });
+    await page.locator('#editor-panel > summary').click();
+  }
+  // Source checkbox states must survive editing and page reload.
+  await page.reload();
+  await page.waitForFunction(() => window.previewReady === true);
+  const saved = await page.evaluate(() => window.hausklimaPreview.getConfig());
+  const sensors = saved.building.rooms.find((r) => r.id === 'demo_outdoor').measurements.temperature.sensors;
+  assert.deepEqual(sensors.map((x) => x.show_on_mobile), [true, false, true]);
+  await selectRoom(page, card, 'demo_outdoor', true);
+  assert.equal(await card.locator('.room-detail .sensor-row').count(), 7, 'phone source choices never remove details');
+  assert.deepEqual(errors, []);
+  await page.close();
+  console.log('PASS phone source selection: Homematic, Ecowitt, Vitodens, RH, pressure, desktop isolation, persistence');
+}
+
 async function checkBadgePositionEditor(browser) {
   const page = await browser.newPage({ viewport: { width: 390, height: 950 }, hasTouch: true });
   const { card, editor, errors } = await ready(page);
@@ -787,6 +855,7 @@ try {
   await checkEditor(browser);
   await checkOverlayBehavior(browser);
   await checkSceneSizing(browser);
+  await checkPhoneSourceToggles(browser);
   await checkBadgePositionEditor(browser);
   await checkResponsive(browser, 'chromium');
   for (const [width, sectionWidth] of [[360, 480], [1440, 480], [1440, 1100]]) {

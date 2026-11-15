@@ -59,6 +59,7 @@ function validateMeasurements(value: unknown, path: string): void {
       entities.add(sensor.entity);
       if (sensor.name !== undefined) text(sensor.name, `${measurementPath}.sensors[${index}].name`);
       if (sensor.show_in_overview !== undefined) boolean(sensor.show_in_overview, `${measurementPath}.sensors[${index}].show_in_overview`);
+      if (sensor.show_on_mobile !== undefined) boolean(sensor.show_on_mobile, `${measurementPath}.sensors[${index}].show_on_mobile`);
       if (sensor.overview_group !== undefined) text(sensor.overview_group, `${measurementPath}.sensors[${index}].overview_group`);
     });
     if (measurement.primary !== undefined) {
