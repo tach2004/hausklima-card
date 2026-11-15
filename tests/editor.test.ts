@@ -372,3 +372,55 @@ describe('scene width visual setting', () => {
     expect(reloaded.shadowRoot?.textContent).toContain('3190 px');
   });
 });
+
+
+describe('text fields during live Home Assistant updates', () => {
+  it('keeps room names, sensor aliases and grouping editable while hass changes', async () => {
+    const building = getDefaultBuilding();
+    const room = building.rooms.find((entry) => entry.id === 'workshop')!;
+    room.measurements = { temperature: { sensors: [
+      { entity: 'sensor.test_temperature', name: 'Alter Name', overview_group: 'Alte Gruppe' },
+    ] } };
+    const editor = await createEditor({ ...getDefaultConfig(), building });
+    const updates = capture(editor);
+    const roomField = input(editor, 'room-name');
+    const aliasField = element<HTMLInputElement>(editor, '[data-action="sensor-name"][data-entity="sensor.test_temperature"]');
+    const groupField = element<HTMLInputElement>(editor, '[data-action="sensor-group"][data-entity="sensor.test_temperature"]');
+
+    // Home Assistant refreshes entity states during every keystroke. A draft
+    // must not be overwritten with the previously saved value on each render.
+    for (const field of [roomField, aliasField, groupField]) {
+      field.value = '';
+      editor.hass = { states: { 'sensor.test_temperature': { state: '21.3', attributes: {} } } };
+      await editor.updateComplete;
+      expect(field.value).toBe('');
+    }
+
+    roomField.value = 'Werkstatt Nord';
+    roomField.dispatchEvent(new Event('change', { bubbles: true }));
+    await editor.updateComplete;
+    aliasField.value = 'Neuer Sensorname';
+    aliasField.dispatchEvent(new Event('change', { bubbles: true }));
+    await editor.updateComplete;
+    groupField.value = 'Ecowitt';
+    groupField.dispatchEvent(new Event('change', { bubbles: true }));
+    await editor.updateComplete;
+    const savedRoom = latest(updates).building!.rooms.find((entry) => entry.id === 'workshop')!;
+    expect(savedRoom.name).toBe('Werkstatt Nord');
+    expect(savedRoom.measurements!.temperature!.sensors[0]).toMatchObject({
+      name: 'Neuer Sensorname', overview_group: 'Ecowitt',
+    });
+
+    // Both optional fields are intentionally clearable (back to HA name / no group).
+    aliasField.value = '';
+    aliasField.dispatchEvent(new Event('change', { bubbles: true }));
+    await editor.updateComplete;
+    groupField.value = '';
+    groupField.dispatchEvent(new Event('change', { bubbles: true }));
+    await editor.updateComplete;
+    const cleared = latest(updates).building!.rooms.find((entry) => entry.id === 'workshop')!
+      .measurements!.temperature!.sensors[0]!;
+    expect(cleared.name).toBeUndefined();
+    expect(cleared.overview_group).toBeUndefined();
+  });
+});

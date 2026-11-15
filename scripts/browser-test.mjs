@@ -90,6 +90,11 @@ async function checkResponsive(browser, engine) {
       assert.equal(createHash('sha256').update(Buffer.from(source.slice(source.indexOf(',') + 1), 'base64')).digest('hex'), artworkHash, 'bundled WebP is bit-identical');
       const cardWidth = await card.evaluate((node) => node.clientWidth);
       if (cardWidth <= 1000) {
+        const mobileBadges = card.locator('.photo-badge.with-metrics:visible');
+        assert.ok(await mobileBadges.count() > 0, `${name}: compact black reading badges visible on the picture`);
+        const mobileValue = card.locator('.photo-placement[data-overlay-id="laundry"] .photo-mobile-reading:visible');
+        assert.ok(await mobileValue.count() > 0, `${name}: laundry reading visibly overlaid on the picture`);
+        assert.ok((await mobileValue.innerText()).trim().length > 0, `${name}: mobile badge contains an actual sensor value`);
         for (const room of demoConfig.building.rooms.filter((entry) => entry.location !== 'outdoor' && entry.id !== 'demo_study')) {
           const mobileTile = card.locator(`.house-room-list [data-select-room="${room.id}"], .garage-zone[data-select-room="${room.id}"]`).first();
           assert.ok(await mobileTile.isVisible(), `${name}: mobile primary readings accessible without an extra tap for ${room.id}`);
@@ -107,6 +112,7 @@ async function checkResponsive(browser, engine) {
         assert.equal((await detail.locator('h2').innerText()).trim(), room.name);
         const expected = Object.values(room.measurements ?? {}).reduce((count, metric) => count + metric.sensors.length, 0);
         assert.equal(await detail.locator('.sensor-row').count(), expected, `${engine}/${name}: all sources ${room.id}`);
+        assert.equal(await detail.locator('.source-name small').count(), 0, `${name}: no redundant entity IDs in visible details`);
         await card.getByRole('button', { name: 'Raumdetails schließen' }).click();
       }
       if (engine === 'chromium' && name === 'width-1440') await page.screenshot({ path: `${screenshotDirectory}/panel-${theme}.png`, fullPage: true });
@@ -402,7 +408,16 @@ async function checkEditor(browser) {
   await editor.locator('#metric-select').selectOption('temperature');
   await editor.locator('#new-sensor select').selectOption('sensor.demo_additional_temperature');
   const alias = editor.locator('[data-action="sensor-name"][data-entity="sensor.demo_additional_temperature"]');
+  await alias.fill('');
+  await page.evaluate(() => window.hausklimaPreview.setStates(structuredClone(window.hausklimaPreview.card.hass.states)));
+  assert.equal(await alias.inputValue(), '', 'empty alias draft must not be restored on HA updates');
   await alias.fill('Zweiter Testsensor'); await alias.press('Tab');
+  const groupDraft = editor.locator('[data-action="sensor-group"][data-entity="sensor.demo_additional_temperature"]');
+  await groupDraft.fill('');
+  await page.evaluate(() => window.hausklimaPreview.setStates(structuredClone(window.hausklimaPreview.card.hass.states)));
+  assert.equal(await groupDraft.inputValue(), '', 'group draft must remain empty during HA state updates');
+  await groupDraft.fill('Lüfter'); await groupDraft.press('Tab');
+
   await editor.locator('[data-action="sensor-primary"][data-entity="sensor.demo_additional_temperature"]').check();
   await editor.locator('#metric-overview').uncheck();
   let config = await page.evaluate(() => window.hausklimaPreview.getConfig());
@@ -417,7 +432,11 @@ async function checkEditor(browser) {
   await selectRoom(page, card, 'bedroom', true);
   await selectRoom(page, card, 'workshop', true);
   assert.equal(await card.locator('.room-detail [data-metric="temperature"] .sensor-row').count(), 2, 'disabled metric remains findable in details');
-  await editor.locator('#room-name').fill('Werkstatt und Hobby'); await editor.locator('#room-name').press('Tab');
+  const roomName = editor.locator('#room-name');
+  await roomName.fill('');
+  await page.evaluate(() => window.hausklimaPreview.setStates(structuredClone(window.hausklimaPreview.card.hass.states)));
+  assert.equal(await roomName.inputValue(), '', 'empty room-name draft must stay editable while typing');
+  await roomName.fill('Werkstatt und Hobby'); await roomName.press('Tab');
   await editor.locator('.new-room-settings summary').click();
   await editor.locator('#new-room-name').fill('Garage');
   await editor.locator('#new-room-kind').selectOption('indoor');

@@ -15,6 +15,28 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
     target.style.top = `${imageHeight * Number(target.dataset.anchorY) / 100}px`;
   }
   const entries = [...stage.querySelectorAll<HTMLElement>('.photo-placement')];
+  const containerWidth = stage.closest('ha-card')?.clientWidth ?? stage.clientWidth;
+  if (containerWidth <= 1000) {
+    // Desktop uses collision-avoiding panels. On iPhone only compact real HA
+    // readings stay over the original artwork; detailed values remain below.
+    stage.style.height = '';
+    stage.querySelector('.photo-leaders')?.replaceChildren();
+    for (const element of entries) {
+      element.classList.remove('is-docked');
+      element.style.width = 'max-content';
+      element.style.maxWidth = `${Math.min(56, width * 0.145)}px`;
+      const id = element.dataset.overlayId;
+      const x = Number(element.dataset.preferredX);
+      const y = id === 'garage_cabinet' || id === 'garage_battery_litime' ? 79
+        : id === 'garage_battery_pylontech' ? 91
+        : Number(element.dataset.preferredY);
+      const elementWidth = element.offsetWidth;
+      const elementHeight = element.offsetHeight;
+      element.style.left = `${Math.max(elementWidth / 2 + 2, Math.min(width - elementWidth / 2 - 2, width * x / 100))}px`;
+      element.style.top = `${Math.max(elementHeight / 2 + 2, Math.min(imageHeight - elementHeight / 2 - 2, imageHeight * y / 100))}px`;
+    }
+    return;
+  }
   const occupied: Rectangle[] = [];
   const dock: HTMLElement[] = [];
   const lines: { element: HTMLElement; rect: Rectangle }[] = [];
