@@ -78,3 +78,19 @@ Die lokale Browserprüfung verwendet die gebündelte Karte in der getrennten Ent
 WebKit konnte auch beim aktuellen Lauf wegen des fehlenden Browser-Binarys nicht starten und wurde entsprechend als nicht verfügbar gemeldet. Frühere offizielle Downloads scheiterten an der Netzwerkpolicy der Arbeitsumgebung mit HTTP 403. Die erfolgreiche Chromium-Prüfung ist davon getrennt; eine fehlende Engine ist kein bestandener Safari-/WebKit-Test.
 
 Technische Prüfungen ersetzen nicht die visuelle Abnahme des Projektinhabers. Es wird nichts in Home Assistant ausgerollt. Nach einem genehmigten Merge übernimmt der vorhandene Release-Workflow die Versionsvergabe.
+
+
+## Nachprüfung: iPhone-Overlays, Editor-Textfelder und dunkle Außenflächen (15.11.2026)
+
+Die visuelle Architekturillustration `src/assets/hausklima-cutaway.webp` wurde in dieser Änderung **nicht** bearbeitet. Die bereits festgelegten Raum- und Gerätekonfigurationen sowie die konfigurierbare Messwertdeckkraft und Bildgröße bleiben erhalten.
+
+- Grundursache fehlender iPhone-Kästchen: die Container-CSS-Regel unter 1000 Pixel blendete sämtliche Bild-Overlays aus. Bei schmalen Ansichten bleiben nun **kompakte dunkle Hauptwert-Kästchen** an den Bildpositionen sichtbar. Die ausführlichen Messwertkarten darunter enthalten weiterhin sämtliche konfigurierten, aktiven Messwerte.
+- Grundursache springender Texteingaben: `live()` synchronisierte Eingaben bei jeder Home-Assistant-Statusaktualisierung auf den alten Konfigurationswert zurück. Raumname, Sensor-Alias, Quellgruppe und Kartentitel sind nicht mehr mit diesem Live-Reset verdrahtet. `change` speichert weiterhin in die HA-Kartenkonfiguration.
+- Das äußere Layout von Raumdetails und Garage/Außenübersicht ist nun schiefergrau statt weiß; **die schwarzen Messwertkarten selbst wurden nicht geändert**.
+- Entity-IDs werden nicht mehr als zweiter Text unter Sensornamen ausgegeben. Klickbare Sensorzeilen und Standard-HA-More-Info bleiben erhalten.
+
+**Automatisierter Nachweis (GitHub Actions, Run [#43695152316](https://github.com/tach2004/hausklima-card/actions/runs/43695152316)):**
+- `npm ci`, `npm run check`, `npm test`, `npm run build`: erfolgreich; **149 Unit-Tests / sieben Dateien**.
+- `npm run test:browser`: Chromium erfolgreich; 360/390/430/1280/1440/1920 Pixel und iPhone-17-Emulation im Hoch- und Querformat, jeweils hell/dunkel; keine erkannten Panel-Kollisionen oder Seitenüberläufe.
+- Der HACS-Bundle-Neubau wurde nach diesen Prüfungen automatisch in den PR-Branch übernommen. Der temporäre Build-Workflow ist **nicht** Bestandteil des fertigen PR-Diffs.
+- **Kein echter iPhone-/Home-Assistant-Livetest**. Designabnahme nach dem Merge weiterhin durch den Besitzer.
