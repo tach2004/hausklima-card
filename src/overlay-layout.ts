@@ -1,3 +1,4 @@
+import { MOBILE_ROOM_ART_POSITIONS } from './scene-photo';
 interface Rectangle { x: number; y: number; width: number; height: number; }
 const overlaps = (a: Rectangle, b: Rectangle, gap = 7) =>
   a.x < b.x + b.width + gap && a.x + a.width + gap > b.x &&
@@ -20,12 +21,7 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
     // Same original illustration and spatial room arrangement as desktop.
     // Only three densely packed garage-device badges use a compact dark strip
     // below the image. Deliberately no diagonal or cross-image leader lines.
-    const mobileCenters: Record<string, [number, number]> = {
-      bedroom: [27, 33], storage: [56, 33],
-      living_room: [15, 55], ground_hall: [37, 55], kitchen: [59, 55],
-      workshop: [15, 78], basement_hall: [37, 78], laundry: [59, 78],
-      garage: [85, 55],
-    };
+    const mobileCenters = MOBILE_ROOM_ART_POSITIONS;
     const occupied: Rectangle[] = [];
     const dock: HTMLElement[] = [];
     const svg = stage.querySelector<SVGSVGElement>('.photo-leaders');
@@ -33,7 +29,9 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
     const note = stage.querySelector<HTMLElement>('.photo-dock-note');
     if (note) note.hidden = true;
 
-    for (const element of entries) {
+    const mobileEntries = [...entries].sort((a, b) =>
+      Number(b.dataset.manualMobileX !== undefined) - Number(a.dataset.manualMobileX !== undefined));
+    for (const element of mobileEntries) {
       element.classList.remove('is-docked');
       const id = element.dataset.overlayId ?? '';
       const badge = element.querySelector<HTMLElement>('.photo-badge.mobile-climate');
@@ -42,24 +40,30 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
         element.style.maxWidth = '0px';
         continue;
       }
-      if (id.startsWith('garage_battery_') || id === 'garage_cabinet') {
+      const manuallyPlaced = element.dataset.manualMobileX !== undefined && element.dataset.manualMobileY !== undefined;
+      if (!manuallyPlaced && (id.startsWith('garage_battery_') || id === 'garage_cabinet')) {
         dock.push(element);
         continue;
       }
       element.style.width = 'max-content';
       element.style.maxWidth = `${Math.min(id === 'bedroom' || id === 'storage' ? 105 : 95, width * (id === 'bedroom' || id === 'storage' ? .27 : .205))}px`;
       const w = element.offsetWidth, h = element.offsetHeight;
-      const [xPct, yPct] = mobileCenters[id] ?? [Number(element.dataset.preferredX), Number(element.dataset.preferredY)];
+      const fallback = mobileCenters[id];
+      const fallbackX = fallback?.x ?? Number(element.dataset.preferredX);
+      const fallbackY = fallback?.y ?? Number(element.dataset.preferredY);
+      const xPct = manuallyPlaced ? Number(element.dataset.manualMobileX) : fallbackX;
+      const yPct = manuallyPlaced ? Number(element.dataset.manualMobileY) : fallbackY;
       const preferredX = width * xPct / 100 - w / 2;
       const preferredY = imageHeight * yPct / 100 - h / 2;
       let placed: Rectangle | undefined;
-      for (const [dx, dy] of [[0, 0], [-4, 0], [4, 0], [0, -4], [0, 4], [0, -8], [0, 8]]) {
+      const attempts = manuallyPlaced ? [[0, 0]] : [[0, 0], [-4, 0], [4, 0], [0, -4], [0, 4], [0, -8], [0, 8]];
+      for (const [dx, dy] of attempts) {
         const rect = {
           x: Math.max(2, Math.min(width - w - 2, preferredX + dx!)),
           y: Math.max(2, Math.min(imageHeight - h - 2, preferredY + dy!)),
           width: w, height: h,
         };
-        if (!occupied.some((previous) => overlaps(rect, previous, 1))) { placed = rect; break; }
+        if (manuallyPlaced || !occupied.some((previous) => overlaps(rect, previous, 1))) { placed = rect; break; }
       }
       if (!placed) {
         dock.push(element);
@@ -89,7 +93,9 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
   const dock: HTMLElement[] = [];
   const lines: { element: HTMLElement; rect: Rectangle }[] = [];
   stage.style.height = '';
-  for (const element of entries) {
+  const desktopEntries = [...entries].sort((a, b) =>
+    Number(b.dataset.manualDesktopX !== undefined) - Number(a.dataset.manualDesktopX !== undefined));
+  for (const element of desktopEntries) {
     element.classList.remove('is-docked');
     // Natural content width keeps one-value badges compact at every scene size.
     // Named source rows may grow wider, but long units always wrap within bounds.
@@ -97,12 +103,17 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
     element.style.maxWidth = `${Math.min(width - 8, element.querySelector('.has-named-groups') ? 360 : 220)}px`;
     const w = element.offsetWidth;
     const h = element.offsetHeight;
-    const preferredX = width * Number(element.dataset.preferredX) / 100 - w / 2;
-    const preferredY = imageHeight * Number(element.dataset.preferredY) / 100 - h / 2;
+    const manual = element.dataset.manualDesktopX !== undefined && element.dataset.manualDesktopY !== undefined;
+    const centerX = manual ? Number(element.dataset.manualDesktopX) : Number(element.dataset.preferredX);
+    const centerY = manual ? Number(element.dataset.manualDesktopY) : Number(element.dataset.preferredY);
+    const preferredX = width * centerX / 100 - w / 2;
+    const preferredY = imageHeight * centerY / 100 - h / 2;
     let placement: Rectangle | undefined;
-    for (const [dx, dy] of [[0, 0], [0, -9], [0, 9], [-12, 0], [12, 0], [0, -22], [0, 22], [-12, -18], [12, 18]]) {
+    const attempts = manual ? [[0, 0]] : [[0, 0], [0, -9], [0, 9], [-12, 0], [12, 0], [0, -22], [0, 22], [-12, -18], [12, 18]];
+    for (const [dx, dy] of attempts) {
       const rect = { x: Math.max(4, Math.min(width - w - 4, preferredX + dx!)), y: preferredY + dy!, width: w, height: h };
-      if (rect.y >= 4 && rect.y + h <= imageHeight - 4 && !occupied.some((previous) => overlaps(rect, previous))) {
+      if (manual) rect.y = Math.max(4, Math.min(imageHeight - h - 4, rect.y));
+      if (rect.y >= 4 && rect.y + h <= imageHeight - 4 && (manual || !occupied.some((previous) => overlaps(rect, previous)))) {
         placement = rect; break;
       }
     }

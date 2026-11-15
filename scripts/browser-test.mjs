@@ -548,6 +548,57 @@ async function checkEditor(browser) {
   await page.close();
   console.log('PASS editor: native selector contract, unlimited list operations, primary, visibility, names, indoor/outdoor, safe delete, JSON reload persistence');
 }
+async function checkBadgePositionEditor(browser) {
+  const page = await browser.newPage({ viewport: { width: 390, height: 950 }, hasTouch: true });
+  const { card, editor, errors } = await ready(page);
+  await page.locator('#editor-panel > summary').click();
+  await editor.locator('#room-select').selectOption('laundry');
+  await editor.locator('.position-settings > summary').click();
+  await editor.locator('#position-device').selectOption('mobile');
+  const marker = editor.locator('#position-marker');
+  const image = editor.locator('#position-photo');
+  const before = await image.boundingBox();
+  const from = await marker.boundingBox();
+  assert.ok(before && from, 'the editor shows an interactive picture and a badge');
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(before.x + before.width * .44, before.y + before.height * .66, { steps: 8 });
+  await page.mouse.up();
+  let config = await page.evaluate(() => window.hausklimaPreview.getConfig());
+  assert.ok(Math.abs(config.badge_positions.laundry.mobile.x - 44) < 6, 'touch/mouse drag stores normalized X');
+  assert.ok(Math.abs(config.badge_positions.laundry.mobile.y - 66) < 6, 'touch/mouse drag stores normalized Y');
+  assert.equal(config.badge_positions.laundry.desktop, undefined, 'dragging mobile does not affect desktop');
+  await page.waitForFunction(() => window.hausklimaPreview.card.updateComplete);
+  assert.ok(await card.locator('.photo-placement[data-overlay-id="laundry"][data-manual-mobile-x]').count(),
+    'saved phone position reaches the actual image badge');
+  if (process.env.UPDATE_SCREENSHOTS === '1') {
+    await editor.locator('.position-settings').screenshot({ path: `${screenshotDirectory}/badge-position-editor-mobile.png` });
+  }
+  const selectedMobile = structuredClone(config.badge_positions.laundry.mobile);
+  await editor.locator('#position-device').selectOption('desktop');
+  const desktop = editor.locator('#position-marker');
+  await desktop.press('ArrowRight');
+  config = await page.evaluate(() => window.hausklimaPreview.getConfig());
+  assert.equal(config.badge_positions.laundry.desktop.x, 57, 'keyboard nudges desktop separately');
+  assert.deepEqual(config.badge_positions.laundry.mobile, selectedMobile);
+  await page.reload();
+  await page.waitForFunction(() => window.previewReady === true);
+  config = await page.evaluate(() => window.hausklimaPreview.getConfig());
+  assert.deepEqual(config.badge_positions.laundry.mobile, selectedMobile, 'phone position survives page reload');
+  assert.equal(config.badge_positions.laundry.desktop.x, 57, 'desktop position survives page reload');
+  await page.locator('#editor-panel > summary').click();
+  await editor.locator('#room-select').selectOption('laundry');
+  await editor.locator('.position-settings > summary').click();
+  await editor.locator('#position-device').selectOption('desktop');
+  await editor.locator('#position-reset').click();
+  config = await page.evaluate(() => window.hausklimaPreview.getConfig());
+  assert.equal(config.badge_positions.laundry.desktop, undefined, 'reset applies only to selected desktop');
+  assert.deepEqual(config.badge_positions.laundry.mobile, selectedMobile);
+  assert.deepEqual(errors, []);
+  await page.close();
+  console.log('PASS badge positions: mouse drag, keyboard, independent device storage, reload and selective reset');
+}
+
 try {
   await mkdir(screenshotDirectory, { recursive: true });
   assert.equal(createHash('sha256').update(await readFile('src/assets/hausklima-cutaway.webp')).digest('hex'), artworkHash, 'approved image file unchanged');
@@ -562,6 +613,7 @@ try {
   await checkEditor(browser);
   await checkOverlayBehavior(browser);
   await checkSceneSizing(browser);
+  await checkBadgePositionEditor(browser);
   await checkResponsive(browser, 'chromium');
   for (const [width, sectionWidth] of [[360, 480], [1440, 480], [1440, 1100]]) {
     for (const theme of ['light', 'dark']) {

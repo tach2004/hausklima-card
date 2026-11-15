@@ -3,10 +3,11 @@ import { houseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS } from './scene-
 import { formatSensorValue, resolveMeasurements, resolveOverviewGroups } from './metrics';
 import { metricIcon, roomIcon } from './icons';
 import { renderReadingGroups } from './reading-view';
-import type { BuildingConfig, HomeAssistant, RoomConfig } from './types';
+import type { BadgePositionSet, BuildingConfig, HomeAssistant, RoomConfig } from './types';
 export interface PhotoViewOptions {
   outdoorId?: string;
   onOutdoorChange?: (id: string) => void;
+  badgePositions?: Record<string, BadgePositionSet>;
 }
 
 /** Coordinates refer only to the approved, unchanged illustration. */
@@ -48,10 +49,15 @@ export function renderPhotoView(
       </span>` : nothing}
     </button>`;
   };
+  const positionAttrs = (room: RoomConfig) => options.badgePositions?.[room.id];
   const placement = (room: RoomConfig, position: { x: number; y: number; anchorX?: number; anchorY?: number }, category: string) => html`
     <div class="photo-placement" data-overlay-id=${room.id}
       data-anchor-x=${position.anchorX ?? position.x} data-anchor-y=${position.anchorY ?? position.y}
       data-preferred-x=${position.x} data-preferred-y=${position.y}
+      data-manual-desktop-x=${positionAttrs(room)?.desktop?.x ?? nothing}
+      data-manual-desktop-y=${positionAttrs(room)?.desktop?.y ?? nothing}
+      data-manual-mobile-x=${positionAttrs(room)?.mobile?.x ?? nothing}
+      data-manual-mobile-y=${positionAttrs(room)?.mobile?.y ?? nothing}
       style=${`left:${position.x}%;top:${position.y}%;`}>
       ${renderBadge(room, category)}
     </div>`;
@@ -70,6 +76,10 @@ export function renderPhotoView(
     })}
     ${outdoor ? html`<div class="photo-placement photo-outdoor-group" data-overlay-id=${outdoor.id}
       data-anchor-x="86" data-anchor-y="20" data-preferred-x="86" data-preferred-y="20"
+      data-manual-desktop-x=${positionAttrs(outdoor)?.desktop?.x ?? nothing}
+      data-manual-desktop-y=${positionAttrs(outdoor)?.desktop?.y ?? nothing}
+      data-manual-mobile-x=${positionAttrs(outdoor)?.mobile?.x ?? nothing}
+      data-manual-mobile-y=${positionAttrs(outdoor)?.mobile?.y ?? nothing}
       style="left:86%;top:20%;">
       ${outdoors.length > 1 ? html`<label class="photo-outdoor-choice"><span>Außenmessort im Bild</span>
         <select id="photo-outdoor-select" data-outdoor-selector .value=${outdoor.id} aria-label="Außenmessort im Bild"

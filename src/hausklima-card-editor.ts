@@ -4,12 +4,15 @@ import { keyed } from 'lit/directives/keyed.js';
 import { getDefaultConfig, normalizeConfig, resolveBuilding } from './config';
 import {
   addRoom, addSensor, deleteRoom, editRoom, editSensor, removeSensor,
-  setPrimarySensor, setMobileOverview, updateMeasurement,
+  setPrimarySensor, setMobileOverview, saveBadgePosition, resetBadgePosition, updateMeasurement,
 } from './editor-model';
 import { METRIC_LABELS } from './metrics';
 import { METRIC_TYPES } from './types';
 import type { HausKlimaCardConfig, HomeAssistant, MetricType, RoomConfig, SensorConfig } from './types';
 import { editorStyles } from './editor-styles';
+import { houseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS, MOBILE_ROOM_ART_POSITIONS } from './scene-photo';
+import { roomIcon, metricIcon } from './icons';
+import { formatSensorValue, resolveMeasurements } from './metrics';
 
 interface NativeCardConstructor {
   getConfigElement?: () => HTMLElement | Promise<HTMLElement>;
@@ -36,6 +39,7 @@ export class HausKlimaCardEditor extends LitElement {
     _selectorAvailable: { state: true },
     _selectorLoading: { state: true },
     _selectorRevision: { state: true },
+    _positionDevice: { state: true },
   };
 
   declare hass?: HomeAssistant;
@@ -50,6 +54,9 @@ export class HausKlimaCardEditor extends LitElement {
   private _selectorAvailable = !!customElements.get('ha-selector');
   private _selectorLoading = false;
   private _selectorRevision = 0;
+  private _positionDevice: 'desktop' | 'mobile' = 'desktop';
+  private _dragPointer: number | null = null;
+  private _dragCoordinates?: { x: number; y: number };
 
   setConfig(config: unknown): void {
     this._config = normalizeConfig(config);
@@ -121,6 +128,112 @@ export class HausKlimaCardEditor extends LitElement {
   private changeMetric(event: Event): void {
     this._metric = (event.target as HTMLSelectElement).value as MetricType;
     this._error = '';
+  }
+
+  /** Relative coordinates remain stable in Panel, Sections and resized editors. */
+  private scenePosition(room: RoomConfig): { x: number; y: number } | undefined {
+    return (this._positionDevice === 'mobile' ? MOBILE_ROOM_ART_POSITIONS[room.id] : undefined)
+      ?? ROOM_ART_POSITIONS[room.id] ?? GARAGE_ART_POSITIONS[room.id]
+      ?? (room.location === 'outdoor' ? { x: 86, y: 20 } : undefined);
+  }
+
+  private savedPosition(room: RoomConfig): { x: number; y: number } | undefined {
+    return this._config.badge_positions?.[room.id]?.[this._positionDevice] ?? this.scenePosition(room);
+  }
+
+  private positionPointerDown(event: PointerEvent): void {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    event.preventDefault();
+    this._dragPointer = event.pointerId;
+    this._dragCoordinates = undefined;
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  }
+
+  private positionPointerMove(event: PointerEvent): void {
+    if (this._dragPointer !== event.pointerId) return;
+    const image = this.shadowRoot?.querySelector<HTMLImageElement>('#position-photo');
+    const marker = event.currentTarget as HTMLElement;
+    if (!image) return;
+    const bounds = image.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
+    const minX = Math.min(50, marker.offsetWidth / bounds.width * 50);
+    const minY = Math.min(50, marker.offsetHeight / bounds.height * 50);
+    const x = Math.max(minX, Math.min(100 - minX, (event.clientX - bounds.left) / bounds.width * 100));
+    const y = Math.max(minY, Math.min(100 - minY, (event.clientY - bounds.top) / bounds.height * 100));
+    this._dragCoordinates = { x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 };
+    marker.style.left = `${x}%`;
+    marker.style.top = `${y}%`;
+  }
+
+  private positionPointerUp(event: PointerEvent, room: RoomConfig): void {
+    if (this._dragPointer !== event.pointerId) return;
+    this.positionPointerMove(event);
+    this._dragPointer = null;
+    const marker = event.currentTarget as HTMLElement;
+    if (marker.hasPointerCapture(event.pointerId)) marker.releasePointerCapture(event.pointerId);
+    const position = this._dragCoordinates;
+    this._dragCoordinates = undefined;
+    if (position) this.apply(() => saveBadgePosition(this._config, room.id, this._positionDevice, position));
+  }
+
+  private positionKeyDown(event: KeyboardEvent, room: RoomConfig): void {
+    const vectors: Record<string, [number, number]> = {
+      ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
+    };
+    const vector = vectors[event.key];
+    if (!vector) return;
+    event.preventDefault();
+    const current = this.savedPosition(room);
+    if (!current) return;
+    const step = event.shiftKey ? 5 : 1;
+    const x = Math.max(0, Math.min(100, current.x + vector[0] * step));
+    const y = Math.max(0, Math.min(100, current.y + vector[1] * step));
+    this.apply(() => saveBadgePosition(this._config, room.id, this._positionDevice, { x, y }));
+  }
+
+  private renderPositionEditor(room: RoomConfig | undefined) {
+    if (!room) return nothing;
+    const position = this.savedPosition(room);
+    const stored = this._config.badge_positions?.[room.id]?.[this._positionDevice];
+    const measurements = resolveMeasurements(room, this.hass, 'overview')
+      .filter((m) => this._positionDevice === 'desktop' ||
+        (m.type === 'temperature' || m.type === 'relative_humidity') && room.mobile_overview?.[m.type] !== false);
+    return html`<details class="position-settings">
+      <summary>Messwertkästchen im Bild verschieben</summary>
+      <p class="hint">Raum oben auswählen, dann das schwarze Kästchen mit Maus oder Finger ziehen.
+        Desktop und Handy werden unabhängig gespeichert. Alternativ mit den Pfeiltasten bewegen (Umschalt: 5 %).</p>
+      <label class="field" for="position-device"><span>Position für</span>
+        <select id="position-device" .value=${this._positionDevice}
+          @change=${(event: Event) => { this._positionDevice = (event.target as HTMLSelectElement).value as 'desktop' | 'mobile'; }}>
+          <option value="desktop">Desktop</option><option value="mobile">Handy</option>
+        </select>
+      </label>
+      ${position ? html`<div class="position-preview" aria-label="Vorschau der Kästchenposition">
+        <img id="position-photo" src=${houseArtwork} alt="Unveränderte Architekturillustration zur Kästchenpositionierung" />
+        <button type="button" id="position-marker" class="position-marker"
+          style=${`left:${position.x}%;top:${position.y}%;`}
+          aria-label=${`${room.name}: Kästchen verschieben`}
+          @pointerdown=${this.positionPointerDown}
+          @pointermove=${this.positionPointerMove}
+          @pointerup=${(event: PointerEvent) => this.positionPointerUp(event, room)}
+          @pointercancel=${(event: PointerEvent) => { if (event.pointerId === this._dragPointer) { this._dragPointer = null; this._dragCoordinates = undefined; } }}
+          @keydown=${(event: KeyboardEvent) => this.positionKeyDown(event, room)}>
+          <span class="marker-heading">${roomIcon(room)}<span>${room.name}</span></span>
+          ${measurements.length ? measurements.map((metric) => html`<span class="marker-reading">
+            ${metricIcon(metric.type)} <strong>${formatSensorValue(metric.primary, this.hass)}</strong>
+            <small>${metric.primary.unit}</small>
+          </span>`) : nothing}
+        </button>
+      </div>
+      <div class="button-row position-actions">
+        <span class="hint">Aktuelle Position: ${position.x.toFixed(1)} % / ${position.y.toFixed(1)} %</span>
+        <button type="button" id="position-reset" ?disabled=${!stored}
+          @click=${() => this.apply(() => resetBadgePosition(this._config, room.id, this._positionDevice))}>
+          Standardposition wiederherstellen
+        </button>
+      </div>` : html`<p class="hint">Dieser zusätzliche Raum hat noch keinen bestätigten Platz im Hausbild.
+        Er bleibt über die Raumübersicht erreichbar.</p>`}
+    </details>`;
   }
 
   private addLocation(): void {
@@ -285,6 +398,7 @@ export class HausKlimaCardEditor extends LitElement {
               </div>
             ` : nothing}
 
+            ${this.renderPositionEditor(room)}
             <div class="section-heading metric-heading"><span class="step">2</span><h2>Messwerte zuordnen</h2></div>
             <label class="field" for="metric-select"><span>Messart</span>
               <select id="metric-select" .value=${live(this._metric)} @change=${this.changeMetric}>

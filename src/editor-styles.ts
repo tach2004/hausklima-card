@@ -40,6 +40,30 @@ export const editorStyles = css`
   .confirmation p { margin: 7px 0 12px; color: var(--secondary-text-color, #687b81); font-size: 12px; }
   .button-row { display: flex; flex-wrap: wrap; gap: 8px; }
   .error { margin: 0; color: var(--error-color, #b04336); }
+  .position-settings { margin-top: 16px; border: 1px solid var(--divider-color, #dce4e5);
+    border-radius: 12px; padding: 10px 12px 14px; }
+  .position-settings .field { margin: 12px 0; }
+  .position-preview { position: relative; width: 100%; overflow: hidden; border-radius: 12px;
+    background: #35433f; }
+  .position-preview img { display: block; width: 100%; height: auto; aspect-ratio: 1300 / 732;
+    object-fit: contain; pointer-events: none; user-select: none; }
+  .position-marker { position: absolute; transform: translate(-50%, -50%); display: flex;
+    flex-direction: column; align-items: flex-start; gap: 2px;
+    width: max-content; max-width: 46%; min-height: 28px; border-radius: 7px;
+    border: 2px solid #d3eeff; background: rgba(22, 26, 30, .80); color: #fff;
+    padding: 4px 5px; font-size: 10px; line-height: 1.2; font-weight: 500; text-align: left;
+    cursor: grab; touch-action: none; user-select: none; z-index: 4; box-shadow: 0 2px 9px #0008; }
+  .position-marker:active { cursor: grabbing; }
+  .marker-heading, .marker-reading { display: flex; align-items: center; gap: 3px; min-width: 0; width: 100%; }
+  .marker-heading { font-size: inherit; font-weight: 750; overflow-wrap: anywhere; }
+  .marker-heading > span { overflow-wrap: anywhere; min-width: 0; }
+  .position-marker svg { width: 11px; height: 11px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .position-marker .metric-icon.temperature { color: #ffc095; }
+  .position-marker .metric-icon.relative_humidity { color: #8dd6ee; }
+  .position-marker .metric-icon.absolute_humidity { color: #9bdad0; }
+  .marker-reading small { font-size: .85em; }
+  .position-actions { align-items: center; justify-content: space-between; padding-top: 10px; }
+  .position-actions .hint { margin: 0; }
   .new-room-settings { border-top: 1px solid var(--divider-color, #dce4e5); padding-top: 18px; }
   summary { min-height: 44px; display: list-item; cursor: pointer; font-size: 14px; font-weight: 600; line-height: 44px; }
   .new-room-settings .field { margin-top: 14px; }

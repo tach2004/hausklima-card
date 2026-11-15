@@ -168,6 +168,23 @@ export function normalizeConfig(input: unknown): HausKlimaCardConfig {
   if (config.theme_mode !== undefined && (typeof config.theme_mode !== 'string' || !['auto', 'light', 'dark'].includes(config.theme_mode))) {
     throw new Error('theme_mode muss auto, light oder dark sein.');
   }
+  if (config.badge_positions !== undefined) {
+    const all = object(config.badge_positions, 'badge_positions');
+    for (const [id, value] of Object.entries(all)) {
+      if (!/^[a-z0-9_]+$/.test(id)) throw new Error(`badge_positions: ungültige Messort-ID ${id}.`);
+      const positions = object(value, `badge_positions.${id}`);
+      for (const [device, location] of Object.entries(positions)) {
+        if (device !== 'desktop' && device !== 'mobile') throw new Error(`badge_positions.${id}: unbekanntes Gerät ${device}.`);
+        const position = object(location, `badge_positions.${id}.${device}`);
+        for (const axis of ['x', 'y']) {
+          const coordinate = position[axis];
+          if (typeof coordinate !== 'number' || !Number.isFinite(coordinate) || coordinate < 0 || coordinate > 100) {
+            throw new Error(`badge_positions.${id}.${device}.${axis} muss zwischen 0 und 100 liegen.`);
+          }
+        }
+      }
+    }
+  }
   if (config.building !== undefined) validateBuilding(config.building);
   return structuredClone({ ...getDefaultConfig(), ...config }) as HausKlimaCardConfig;
 }
