@@ -90,4 +90,4 @@ jobs:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
           gh release create "v$RELEASE_VERSION" dist/hausklima-card.js \
-            --verify-tag --generate-notes --title "HausKlima Card v$RELEASE_VERSION"
+            --verify-tag --generate-notes --title "v$RELEASE_VERSION"
