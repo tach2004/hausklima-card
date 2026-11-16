@@ -28,6 +28,8 @@ export interface SensorConfig {
   name?: string;
   /** Include this source in the overview; omitted retains the legacy primary. */
   show_in_overview?: boolean;
+  /** Mobile-only visibility for this exact source; omitted keeps legacy primary-only phone badges. */
+  show_on_mobile?: boolean;
   /** Same names join readings into one source group within this location. */
   overview_group?: string;
 }
@@ -141,6 +143,7 @@ export interface ResolvedSensor {
   status: SensorStatus;
   is_primary: boolean;
   show_in_overview: boolean;
+  show_on_mobile?: boolean;
   overview_group?: string;
 }
 

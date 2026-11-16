@@ -73,6 +73,25 @@ export function setMobileOverview(config: HausKlimaCardConfig, roomId: string,
   });
 }
 
+/** A source may be displayed on the phone regardless of desktop's overview
+ *  checkbox. Enabling it also enables its parent phone metric to avoid an
+ *  apparently ineffective checkbox, but never changes the desktop settings.
+ */
+export function setMobileSensorOverview(config: HausKlimaCardConfig, roomId: string,
+  metric: MetricType, entity: string, shown: boolean): HausKlimaCardConfig {
+  return changeBuilding(config, (building) => {
+    const room = requireRoom(building, roomId);
+    const measurement = requireMeasurement(room, metric);
+    const sensor = measurement.sensors.find((item) => item.entity === entity);
+    if (!sensor) throw new Error('Der ausgewählte Sensor existiert nicht mehr.');
+    sensor.show_on_mobile = shown;
+    if (shown) {
+      room.mobile_overview ??= {};
+      room.mobile_overview[metric] = true;
+    }
+  });
+}
+
 export function addRoom(config: HausKlimaCardConfig, input: NewRoom): HausKlimaCardConfig {
   return changeBuilding(config, (building) => {
     const roomName = name(input.name);

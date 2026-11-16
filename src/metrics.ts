@@ -82,6 +82,7 @@ function resolveSensor(sensor: SensorConfig, primary: string, type: MetricType, 
     status,
     is_primary: sensor.entity === primary,
     show_in_overview: sensor.show_in_overview ?? sensor.entity === primary,
+    ...(sensor.show_on_mobile !== undefined ? { show_on_mobile: sensor.show_on_mobile } : {}),
     ...(sensor.overview_group ? { overview_group: sensor.overview_group.trim() } : {}),
   };
 }
@@ -105,6 +106,27 @@ export function resolveMeasurements(room: RoomConfig, hass?: HomeAssistant, scop
       visible, show_in_overview: showInOverview,
       ...(measurement.position ? { position: measurement.position } : {}),
     }];
+  });
+}
+
+/** Phone-specific sources, independent from desktop source selection.
+ *  An existing config without per-source switches retains its historical
+ *  primary-only reading for each enabled phone metric.
+ */
+export function resolveMobileReadings(room: RoomConfig, hass?: HomeAssistant): {
+  type: MetricType; sensor: ResolvedSensor; sourceLabel?: string;
+}[] {
+  return resolveMeasurements(room, hass, 'visible').flatMap((measurement) => {
+    if (!isMobileOverviewEnabled(room, measurement.type)) return [];
+    const sources = measurement.sensors.filter((sensor) =>
+      sensor.show_on_mobile ?? (measurement.show_in_overview && sensor.is_primary));
+    return sources.map((sensor) => ({
+      type: measurement.type,
+      sensor,
+      ...((sources.length > 1 || !sensor.is_primary)
+        ? { sourceLabel: sensor.overview_group || sensor.name }
+        : {}),
+    }));
   });
 }
 

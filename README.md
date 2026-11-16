@@ -181,6 +181,14 @@ Für **jede unterstützte Messart** (Temperatur, relative und absolute Luftfeuch
 Eine zusätzliche Funktion zum **freien Verschieben und separaten Speichern der Kästchenpositionen** wird bewusst als **eigener PR** umgesetzt, damit die Positionierungslogik unabhängig geprüft werden kann.
 
 
+### Einzelne Sensorquellen auf dem Handy auswählen
+
+Zusätzlich zum Messart-Haken oben gibt es jetzt **bei jedem Sensor** den eigenen Schalter **„Handy – diesen Sensor anzeigen“**. Das gilt für **alle sieben Messarten** und für jede beliebige Anzahl zugeordneter Quellen, etwa Außentemperatur von Homematic, Ecowitt und Vitodens. Mehrere eingeschaltete Sensorquellen derselben Messart erscheinen auf dem iPhone getrennt, jeweils mit Messwert, Einheit, Messart-Icon und Quellenbezeichnung. Die bisherige kompakte Einzelwert-Anzeige bleibt bei einer einzigen Standardquelle erhalten.
+
+**Abwärtskompatibel:** Ohne neue Auswahl bleibt für aktivierte mobile Messarten ausschließlich die Standardquelle sichtbar. Weitere Quellen werden erst durch ihren jeweiligen Handy-Haken eingeblendet. Ein explizites Ausschalten unterdrückt auch die Standardquelle auf dem Handy. Das Einschalten einer Quelle aktiviert deren übergeordneten Messart-Haken fürs Handy automatisch. Wird die gesamte Messart fürs Handy ausgeschaltet, erscheinen keine ihrer Quellen im Handy-Kästchen. Die übergeordnete Einstellung **„Messart in Übersichten aktiv“** bleibt dagegen der allgemeine Sichtbarkeitsschalter.
+
+Der Handy-Haken ist **unabhängig vom Desktop-Haken „Haupt – in Übersicht“**. Selbst eine auf dem Desktop nicht angezeigte Quelle kann ausdrücklich fürs Handy eingeschaltet werden, während sämtliche Quellen wie bisher in den Details erhalten bleiben. Die Änderung betrifft weder die Desktop-Darstellung noch das Hausbild oder die gespeicherten Bildpositionen. Konfiguriert wird der zusätzliche optionale Wert `show_on_mobile: true | false` pro `building.rooms[].measurements.<messart>.sensors[]`-Eintrag. Bestehende Konfigurationen benötigen keine Migration.
+
 ## Kästchenpositionen selbst verschieben (eigener Folge-PR)
 
 Im visuellen Lovelace-Karteneditor unter **Raum oder Messort** den gewünschten Eintrag wählen und **Messwertkästchen im Bild verschieben** öffnen. Dort **Desktop** oder **Handy** wählen und das dunkle Kästchen auf der **unveränderten Originalillustration** mit der Maus oder mit dem Finger verschieben. Für präzise Schritte sind auch die Pfeiltasten möglich (mit Umschalttaste 5 Prozentpunkte statt einem). **Standardposition wiederherstellen** setzt nur den ausgewählten Messort und den gewählten Gerätetyp zurück.

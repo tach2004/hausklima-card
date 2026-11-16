@@ -156,6 +156,45 @@ describe('Lovelace card integration', () => {
     expect(() => normalizeConfig({ ...config, building: invalidValue })).toThrow(/mobile_overview/);
   });
 
+  it('shows selected mobile sources independently per metric, including sources hidden on desktop', async () => {
+    const building = getDefaultBuilding();
+    const outdoor = building.rooms.find((r) => r.id === 'garage')!;
+    outdoor.measurements = {
+      temperature: { sensors: [
+        { entity: 'sensor.test_homematic', name: 'HM Außentemperatur', overview_group: 'Homematic' },
+        { entity: 'sensor.test_ecowitt', name: 'Ecowitt Außentemperatur', overview_group: 'Ecowitt', show_in_overview: true },
+        { entity: 'sensor.test_vitodens', name: 'Kessel Außentemperatur', overview_group: 'Vitodens', show_in_overview: false },
+      ], primary: 'sensor.test_ecowitt' },
+      relative_humidity: { sensors: [{ entity: 'sensor.test_rh' }] },
+    };
+    const hass = { states: {
+      'sensor.test_homematic': { state: '3.4', attributes: { unit_of_measurement: '°C' } },
+      'sensor.test_ecowitt': { state: '3.6', attributes: { unit_of_measurement: '°C' } },
+      'sensor.test_vitodens': { state: '3.8', attributes: { unit_of_measurement: '°C' } },
+      'sensor.test_rh': { state: '83', attributes: { unit_of_measurement: '%' } },
+    } };
+    const card = await createCard({ ...getDefaultConfig(), building }, hass);
+    const badge = () => find(card, '.photo-air[data-room-id="garage"]');
+    const phoneEntities = () => [...badge().querySelectorAll('.photo-mobile-reading')].map((node) => node.getAttribute('data-reading-entity'));
+    const desktopBefore = [...badge().querySelectorAll('.photo-metric')].map((node) => node.textContent?.trim());
+    expect(phoneEntities()).toEqual(['sensor.test_ecowitt', 'sensor.test_rh']); // back-compat
+    const mixed = structuredClone(building);
+    const room = mixed.rooms.find((r) => r.id === 'garage')!;
+    room.measurements!.temperature!.sensors[0]!.show_on_mobile = true;
+    room.measurements!.temperature!.sensors[1]!.show_on_mobile = false;
+    room.measurements!.temperature!.sensors[2]!.show_on_mobile = true;
+    room.measurements!.relative_humidity!.sensors[0]!.show_on_mobile = false;
+    card.setConfig({ ...getDefaultConfig(), building: mixed });
+    await card.updateComplete;
+    expect(phoneEntities()).toEqual(['sensor.test_homematic', 'sensor.test_vitodens']);
+    expect([...badge().querySelectorAll('.photo-mobile-source')].map((node) => node.textContent)).toEqual(['Homematic', 'Vitodens']);
+    expect([...badge().querySelectorAll('.photo-metric')].map((node) => node.textContent?.trim())).toEqual(desktopBefore);
+    expect((await openRoom(card, 'garage')).querySelectorAll('.sensor-row')).toHaveLength(4);
+    const invalid = structuredClone(mixed);
+    invalid.rooms.find((r) => r.id === 'garage')!.measurements!.temperature!.sensors[0]!.show_on_mobile = 'yes' as unknown as boolean;
+    expect(() => normalizeConfig({ ...getDefaultConfig(), building: invalid })).toThrow(/show_on_mobile/);
+  });
+
   it('binds desktop and phone overlay position overrides without affecting sensors', async () => {
     const config = { ...getDefaultConfig(), badge_positions: {
       laundry: { desktop: { x: 20, y: 80 }, mobile: { x: 60, y: 65 } },

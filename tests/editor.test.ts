@@ -170,6 +170,62 @@ describe('Lovelace editor', () => {
     expect(input(restored, 'mobile-metric-visible').checked).toBe(true);
   });
 
+  it('provides separate phone toggles for each source across all seven types', async () => {
+    const building = getDefaultBuilding();
+    const outdoor = building.rooms.find((r) => r.id === 'laundry')!;
+    outdoor.measurements = {};
+    for (const type of METRIC_TYPES) outdoor.measurements[type] = {
+      sensors: [
+        { entity: `sensor.${type}_hm`, overview_group: 'Homematic' },
+        { entity: `sensor.${type}_ec`, overview_group: 'Ecowitt', show_in_overview: true },
+      ],
+      primary: `sensor.${type}_ec`,
+    };
+    const original = { ...getDefaultConfig(), building };
+    const editor = await createEditor(original);
+    const updates: HausKlimaCardConfig[] = [];
+    editor.addEventListener('config-changed', (event) => updates.push((event as CustomEvent<{ config: HausKlimaCardConfig }>).detail.config));
+    const roomSelect = editor.shadowRoot!.querySelector<HTMLSelectElement>('#room-select')!;
+    roomSelect.value = 'laundry';
+    roomSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await editor.updateComplete;
+    const metricSelect = editor.shadowRoot!.querySelector<HTMLSelectElement>('#metric-select')!;
+    for (const type of METRIC_TYPES) {
+      metricSelect.value = type;
+      metricSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      await editor.updateComplete;
+      const second = editor.shadowRoot!.querySelector<HTMLInputElement>(
+        `[data-action="sensor-mobile"][data-entity="sensor.${type}_hm"]`)!;
+      const primary = editor.shadowRoot!.querySelector<HTMLInputElement>(
+        `[data-action="sensor-mobile"][data-entity="sensor.${type}_ec"]`)!;
+      expect(second).not.toBeNull();
+      expect(primary).not.toBeNull();
+      expect(second.checked).toBe(false);
+      expect(primary.checked).toBe(type === 'temperature' || type === 'relative_humidity');
+      second.checked = true;
+      second.dispatchEvent(new Event('change', { bubbles: true }));
+      await editor.updateComplete;
+      const current = updates[updates.length - 1]!.building!.rooms.find((r) => r.id === 'laundry')!;
+      expect(current.mobile_overview?.[type]).toBe(true);
+      expect(current.measurements![type]!.sensors[0]!.show_on_mobile).toBe(true);
+      expect(current.measurements![type]!.sensors[0]!.show_in_overview).toBeUndefined();
+      expect(current.measurements![type]!.sensors[1]!.show_in_overview).toBe(true);
+    }
+    const saved = updates[updates.length - 1]!;
+    expect(original.building.rooms.find((r) => r.id === 'laundry')!.mobile_overview).toBeUndefined();
+    const restored = await createEditor(saved);
+    const select = restored.shadowRoot!.querySelector<HTMLSelectElement>('#room-select')!;
+    select.value = 'laundry';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await restored.updateComplete;
+    const metric = restored.shadowRoot!.querySelector<HTMLSelectElement>('#metric-select')!;
+    metric.value = 'voc';
+    metric.dispatchEvent(new Event('change', { bubbles: true }));
+    await restored.updateComplete;
+    expect(restored.shadowRoot!.querySelector<HTMLInputElement>(
+      '[data-action="sensor-mobile"][data-entity="sensor.voc_hm"]')?.checked).toBe(true);
+  });
+
   it('edits the selected overlay position using keyboard arrows and preserves other device', async () => {
     const editor = await createEditor();
     const events: HausKlimaCardConfig[] = [];
