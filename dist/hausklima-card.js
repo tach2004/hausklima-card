@@ -1,5 +1,5 @@
 /*! HausKlima Card v0.1.11 | MIT License | https://github.com/tach2004/hausklima-card */
-var Ci=Object.defineProperty;var $=(n,e)=>()=>(n&&(e=n(n=0)),e);var Ei=(n,e)=>{for(var t in e)Ci(n,t,{get:e[t],enumerable:!0})};var Ce,Ee,Ge,bt,me,vt,P,xt,Ue,qe=$(()=>{/**
+var Ci=Object.defineProperty;var $=(n,e,t)=>()=>{if(t)throw t[0];try{return n&&(e=n(n=0)),e}catch(i){throw t=[i],i}};var Ei=(n,e)=>{for(var t in e)Ci(n,t,{get:e[t],enumerable:!0})};var Ce,Ee,Ge,bt,me,vt,P,xt,Ue,qe=$(()=>{/**
  * @license
  * Copyright 2019 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause

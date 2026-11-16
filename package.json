@@ -24,8 +24,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
-    "esbuild": "^0.27.0",
-    "happy-dom": "^20.0.10",
+    "esbuild": "^0.28.2",
+    "happy-dom": "^21.0.4",
     "typescript": "^5.9.3",
     "vitest": "^4.0.9"
   }

@@ -4,3 +4,13 @@ coverage/
 playwright-report/
 test-results/
 *.tsbuildinfo
+# Private configuration and credentials (tracked files must be removed separately).
+.env
+.env.*
+!.env.example
+**/secrets.yaml
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
