@@ -652,6 +652,72 @@ async function checkEditor(browser) {
   await page.close();
   console.log('PASS editor: native selector contract, unlimited list operations, primary, visibility, names, indoor/outdoor, safe delete, JSON reload persistence');
 }
+
+async function checkOutdoorMobileBadgeWidth(browser) {
+  for (const width of [360, 390, 402, 430]) {
+    const page = await browser.newPage({ viewport: { width, height: 900 }, hasTouch: true });
+    const { card, errors, external } = await ready(page);
+    await page.evaluate(() => {
+      const config = window.hausklimaPreview.getConfig();
+      const outdoor = config.building.rooms.find((room) => room.id === 'demo_outdoor');
+      for (const sensor of outdoor.measurements.temperature.sensors) sensor.show_on_mobile = true;
+      for (const sensor of outdoor.measurements.relative_humidity.sensors) sensor.show_on_mobile = true;
+      outdoor.mobile_overview = { ...outdoor.mobile_overview, pressure_relative: true };
+      for (const sensor of outdoor.measurements.pressure_relative.sensors) sensor.show_on_mobile = true;
+      window.hausklimaPreview.setConfig(config);
+    });
+    await assertLayout(page, card, `outdoor-multiple-sources/${width}`);
+    const geometry = await card.locator('.photo-outdoor-group').evaluate((placement) => {
+      const badge = placement.querySelector('.photo-badge');
+      const box = badge.getBoundingClientRect();
+      const stage = placement.closest('.photo-stage').getBoundingClientRect();
+      const selector = placement.querySelector('select')?.getBoundingClientRect();
+      const rows = [...badge.querySelectorAll('.photo-mobile-reading')].map((row) => {
+        const value = row.querySelector('strong');
+        const unit = row.querySelector('small');
+        const label = row.querySelector('.photo-mobile-source');
+        return {
+          valueLeft: value.getBoundingClientRect().left,
+          valueRight: value.getBoundingClientRect().right,
+          valueTextWidth: value.scrollWidth,
+          valueClientWidth: value.clientWidth,
+          unitRight: unit?.getBoundingClientRect().right,
+          unitTextWidth: unit?.scrollWidth,
+          unitClientWidth: unit?.clientWidth,
+          labelRight: label?.getBoundingClientRect().right,
+        };
+      });
+      return {
+        badgeWidth: box.width, boxLeft: box.left, boxRight: box.right,
+        stageLeft: stage.left, stageRight: stage.right,
+        selectorLeft: selector?.left, selectorRight: selector?.right,
+        rows,
+      };
+    });
+    assert.ok(geometry.badgeWidth > 105, `${width}: outdoor panel grows beyond compact 95px badge width (actual ${geometry.badgeWidth}px)`);
+    assert.ok(geometry.boxLeft >= geometry.stageLeft - 1 && geometry.boxRight <= geometry.stageRight + 1,
+      `${width}: outdoor panel stays inside the picture`);
+    assert.ok(geometry.selectorLeft >= geometry.boxLeft - 1 && geometry.selectorRight <= geometry.boxRight + 1,
+      `${width}: outdoor location selector fits the same panel width`);
+    assert.equal(geometry.rows.length, 6, `${width}: three temperatures, two humidity sources and one pressure stay visible`);
+    for (const row of geometry.rows) {
+      assert.ok(row.valueLeft >= geometry.boxLeft - 1 && row.valueRight <= geometry.boxRight - 1,
+        `${width}: full outdoor value fits inside the badge`);
+      assert.ok(row.valueTextWidth <= row.valueClientWidth + 1, `${width}: value text is not clipped`);
+      if (row.unitRight !== undefined) {
+        assert.ok(row.unitRight <= geometry.boxRight - 1, `${width}: outdoor unit fits inside the badge`);
+        assert.ok(row.unitTextWidth <= row.unitClientWidth + 1, `${width}: unit text is not clipped`);
+      }
+      if (row.labelRight !== undefined) assert.ok(row.labelRight <= row.valueLeft + 1,
+        `${width}: truncated source name never overlaps the value`);
+    }
+    assert.deepEqual(errors, [], `${width}: no JavaScript errors`);
+    assert.deepEqual(external, [], `${width}: no external requests`);
+    await page.close();
+  }
+  console.log('PASS outdoor mobile badge width: several sources, unclipped values/units, selector and responsive positions');
+}
+
 async function checkPhoneSourceToggles(browser) {
   const page = await browser.newPage({ viewport: { width: 402, height: 880 }, hasTouch: true });
   const { card, editor, errors } = await ready(page);
@@ -856,6 +922,7 @@ try {
   await checkOverlayBehavior(browser);
   await checkSceneSizing(browser);
   await checkPhoneSourceToggles(browser);
+  await checkOutdoorMobileBadgeWidth(browser);
   await checkBadgePositionEditor(browser);
   await checkResponsive(browser, 'chromium');
   for (const [width, sectionWidth] of [[360, 480], [1440, 480], [1440, 1100]]) {

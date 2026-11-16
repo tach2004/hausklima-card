@@ -161,6 +161,11 @@ export const photoStyles = css`
       width: 100%; min-height: 28px; font-size: 10px;
       background: #263039; color: #fff; border-color: #ffffff60;
     }
+    /* Multiple outdoor sources may share a badge; truncate only their labels,
+       never the numeric values or sensor units. Other mobile badges stay compact. */
+    .photo-outdoor-group .photo-mobile-reading { width: 100%; flex-wrap: nowrap; }
+    .photo-outdoor-group .photo-mobile-source { min-width: 0; max-width: none; flex: 1 1 auto; }
+    .photo-outdoor-group .photo-mobile-reading :is(strong, small) { flex: 0 0 auto; white-space: nowrap; }
     .photo-mobile-climate { display: flex; flex-direction: column; gap: 0; min-width: 0; max-width: 100%; }
     .photo-mobile-name {
       display: flex; gap: 2px; align-items: center; color: #fff; font-size: calc(var(--hk-badge-font-mobile, 9px) * .9); font-weight: 750;
