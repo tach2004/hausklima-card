@@ -14,11 +14,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: npm
+      - name: Reject public personal email addresses on PR commits
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          while IFS= read -r commit; do
+            for email in "$(git show -s --format=%ae "$commit")" "$(git show -s --format=%ce "$commit")"; do
+              case "$email" in
+                *@users.noreply.github.com) ;;
+                *)
+                  echo "::error::A PR commit contains a non-anonymized Git author/committer email. Configure your GitHub noreply address."
+                  exit 1
+                  ;;
+              esac
+            done
+          done < <(git rev-list --no-merges "$PR_BASE..$PR_HEAD")
       - run: npm ci
+      - name: Dependency vulnerability audit (all severities)
+        run: npm audit --audit-level=low
+      - name: Scan tracked source files for secrets and private email addresses
+        run: node scripts/check-repository-privacy.mjs
       - run: npm run check
       - run: npm test
       - run: node --test scripts/next-version.test.mjs
