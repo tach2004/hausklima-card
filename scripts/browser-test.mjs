@@ -675,7 +675,6 @@ async function checkOutdoorMobileBadgeWidth(browser) {
       const rows = [...badge.querySelectorAll('.photo-mobile-reading')].map((row) => {
         const value = row.querySelector('strong');
         const unit = row.querySelector('small');
-        const label = row.querySelector('.photo-mobile-source');
         return {
           valueLeft: value.getBoundingClientRect().left,
           valueRight: value.getBoundingClientRect().right,
@@ -684,13 +683,23 @@ async function checkOutdoorMobileBadgeWidth(browser) {
           unitRight: unit?.getBoundingClientRect().right,
           unitTextWidth: unit?.scrollWidth,
           unitClientWidth: unit?.clientWidth,
-          labelRight: label?.getBoundingClientRect().right,
         };
       });
       return {
         badgeWidth: box.width, boxLeft: box.left, boxRight: box.right,
         stageLeft: stage.left, stageRight: stage.right,
         selectorLeft: selector?.left, selectorRight: selector?.right,
+        groups: [...badge.querySelectorAll('.photo-mobile-source-group')].map((group) => {
+          const heading = group.querySelector('.photo-mobile-source-heading');
+          const firstReading = group.querySelector('.photo-mobile-reading');
+          return {
+            name: heading?.textContent.trim(),
+            metrics: [...group.querySelectorAll('.photo-mobile-reading')].map((row) => row.getAttribute('data-metric')),
+            headingBottom: heading?.getBoundingClientRect().bottom,
+            firstReadingTop: firstReading?.getBoundingClientRect().top,
+            headingOverflow: heading.scrollWidth > heading.clientWidth + 1,
+          };
+        }),
         rows,
       };
     });
@@ -700,6 +709,15 @@ async function checkOutdoorMobileBadgeWidth(browser) {
     assert.ok(geometry.selectorLeft >= geometry.boxLeft - 1 && geometry.selectorRight <= geometry.boxRight + 1,
       `${width}: outdoor location selector fits the same panel width`);
     assert.equal(geometry.rows.length, 6, `${width}: three temperatures, two humidity sources and one pressure stay visible`);
+    assert.deepEqual(geometry.groups.map((group) => [group.name, ...group.metrics]), [
+      ['Homematic', 'temperature', 'relative_humidity'],
+      ['Ecowitt', 'temperature', 'relative_humidity', 'pressure_relative'],
+      ['Vitodens', 'temperature'],
+    ], `${width}: group by source with temperature and humidity on separate lines`);
+    for (const group of geometry.groups) {
+      assert.ok(group.headingBottom <= group.firstReadingTop + 1, `${width}: heading above readings`);
+      assert.equal(group.headingOverflow, false, `${width}: source heading wraps without clipping`);
+    }
     for (const row of geometry.rows) {
       assert.ok(row.valueLeft >= geometry.boxLeft - 1 && row.valueRight <= geometry.boxRight - 1,
         `${width}: full outdoor value fits inside the badge`);
@@ -708,8 +726,6 @@ async function checkOutdoorMobileBadgeWidth(browser) {
         assert.ok(row.unitRight <= geometry.boxRight - 1, `${width}: outdoor unit fits inside the badge`);
         assert.ok(row.unitTextWidth <= row.unitClientWidth + 1, `${width}: unit text is not clipped`);
       }
-      if (row.labelRight !== undefined) assert.ok(row.labelRight <= row.valueLeft + 1,
-        `${width}: truncated source name never overlaps the value`);
     }
     assert.deepEqual(errors, [], `${width}: no JavaScript errors`);
     assert.deepEqual(external, [], `${width}: no external requests`);
@@ -742,7 +758,7 @@ async function checkPhoneSourceToggles(browser) {
     'sensor.demo_outdoor_ecowitt_temperature',
     'sensor.demo_outdoor_vitodens_temperature',
   ]);
-  assert.deepEqual(await names().locator('.photo-mobile-source').allTextContents(), ['Homematic', 'Ecowitt', 'Vitodens'],
+  assert.deepEqual(await badge.locator('.photo-mobile-source-heading').allTextContents(), ['Homematic', 'Ecowitt', 'Vitodens'],
     'multiple sources show their own group name on the phone');
   assert.deepEqual(await badge.locator('.photo-metric').allTextContents(), before, 'desktop sources are independent');
   await ecowitt.uncheck();

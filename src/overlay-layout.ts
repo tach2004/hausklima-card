@@ -98,7 +98,7 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
       const widthFraction = isOutdoor ? .46 : isWideRoom ? .27 : .205;
       const widthLimit = Math.min(maxBadgeWidth, width * widthFraction);
       const multiSourceOutdoor = isOutdoor && (
-        element.querySelector('.photo-mobile-source') !== null
+        element.querySelectorAll('.photo-mobile-source-group').length > 1
         || element.querySelectorAll('.photo-mobile-reading').length > 2);
       element.style.width = multiSourceOutdoor ? `${widthLimit}px` : 'max-content';
       element.style.maxWidth = `${widthLimit}px`;
