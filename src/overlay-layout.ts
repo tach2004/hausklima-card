@@ -90,8 +90,18 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
         dock.push(element);
         continue;
       }
-      element.style.width = 'max-content';
-      element.style.maxWidth = `${Math.min(id === 'bedroom' || id === 'storage' ? 105 : 95, width * (id === 'bedroom' || id === 'storage' ? .27 : .205))}px`;
+      const isOutdoor = element.classList.contains('photo-outdoor-group');
+      const isWideRoom = id === 'bedroom' || id === 'storage';
+      // Outdoor source names, values and units need more room than compact room badges.
+      // Keep the maximum proportional to the picture width on narrow phones.
+      const maxBadgeWidth = isOutdoor ? 168 : isWideRoom ? 105 : 95;
+      const widthFraction = isOutdoor ? .46 : isWideRoom ? .27 : .205;
+      const widthLimit = Math.min(maxBadgeWidth, width * widthFraction);
+      const multiSourceOutdoor = isOutdoor && (
+        element.querySelector('.photo-mobile-source') !== null
+        || element.querySelectorAll('.photo-mobile-reading').length > 2);
+      element.style.width = multiSourceOutdoor ? `${widthLimit}px` : 'max-content';
+      element.style.maxWidth = `${widthLimit}px`;
       const w = element.offsetWidth, h = element.offsetHeight;
       const fallback = mobileCenters[id];
       const fallbackX = fallback?.x ?? Number(element.dataset.preferredX);
@@ -122,7 +132,8 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
       }
     }
     let maxBottom = imageHeight;
-    for (const [index, element] of dock.entries()) {
+    const regularDocks = dock.filter((element) => !element.classList.contains('photo-outdoor-group'));
+    for (const [index, element] of regularDocks.entries()) {
       element.classList.add('is-docked');
       element.style.width = 'max-content';
       element.style.maxWidth = `${Math.min(120, width / 3 - 8)}px`;
@@ -137,6 +148,21 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
       if (id === 'garage_cabinet' || id === 'garage_battery_pylontech' || id === 'garage_battery_litime') {
         lines.push({ element, rect: { x: x - element.offsetWidth / 2, y: y - h / 2, width: element.offsetWidth, height: h } });
       }
+    }
+    // A densely populated outdoor badge may need to leave the picture.
+    // Give it a separate, right-aligned row instead of squeezing it into a
+    // three-column equipment dock and hiding the temperatures or their units.
+    for (const element of dock.filter((item) => item.classList.contains('photo-outdoor-group'))) {
+      element.classList.add('is-docked');
+      const outdoorWidth = Math.min(168, width * .46);
+      element.style.width = `${outdoorWidth}px`;
+      element.style.maxWidth = `${outdoorWidth}px`;
+      const h = element.offsetHeight;
+      const x = width - outdoorWidth / 2 - 4;
+      const y = maxBottom + 8 + h / 2;
+      element.style.left = `${x}px`;
+      element.style.top = `${y}px`;
+      maxBottom = y + h / 2 + 8;
     }
     stage.style.height = `${maxBottom}px`;
     drawLeaders(svg, lines, width, imageHeight, maxBottom);
