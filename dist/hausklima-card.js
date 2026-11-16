@@ -1,4 +1,4 @@
-/*! HausKlima Card v0.1.11 | MIT License | https://github.com/tach2004/hausklima-card */
+/*! HausKlima Card v0.1.12 | MIT License | https://github.com/tach2004/hausklima-card */
 var Ti=Object.defineProperty;var k=(n,e,t)=>()=>{if(t)throw t[0];try{return n&&(e=n(n=0)),e}catch(i){throw t=[i],i}};var Hi=(n,e)=>{for(var t in e)Ti(n,t,{get:e[t],enumerable:!0})};var Se,Ae,Xe,yt,me,$t,D,kt,Ye,Ze=k(()=>{/**
  * @license
  * Copyright 2019 Google LLC
