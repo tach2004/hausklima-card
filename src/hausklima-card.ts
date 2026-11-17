@@ -149,12 +149,11 @@ export class HausKlimaCard extends LitElement {
     const layout = createLayout(building);
     const shapes = layout.shapes.filter((shape) => shape.level !== 'garage' && shape.room.location !== 'outdoor');
     const drawnIds = new Set(shapes.map((shape) => shape.room.id));
-    const garages = building.rooms.filter((room) => room.location !== 'outdoor' && building.levels.find((level) => level.id === room.level_id)?.building_id === 'garage');
-    const garageIds = new Set(garages.map((room) => room.id));
+    // Garage, individual devices and outside locations get normal room tiles too.
     const themeMode = config.theme_mode ?? 'auto';
     const darkMode = themeMode === 'auto' ? this.hass?.themes?.darkMode : themeMode === 'dark';
     const resolvedTheme = typeof darkMode === 'boolean' ? (darkMode ? 'dark' : 'light') : 'inherit';
-    const others = building.rooms.filter((room) => !drawnIds.has(room.id) && !garageIds.has(room.id) && room.location !== 'outdoor');
+    const overviewRooms = [...shapes.map((shape) => shape.room), ...building.rooms.filter((room) => !drawnIds.has(room.id))];
     const selected = building.rooms.find((room) => room.id === this._selected);
     return html`<ha-card data-theme-mode=${themeMode} data-theme-resolved=${resolvedTheme}
       style=${`--hk-chip: rgba(22, 26, 30, ${config.chip_opacity ?? 0.72}); --hk-scene-max-width: ${config.scene_max_width ?? 1400}px; --hk-badge-font-desktop: ${config.badge_font_desktop ?? 12}px; --hk-badge-font-mobile: ${config.badge_font_mobile ?? 9}px;`}>
@@ -167,11 +166,9 @@ export class HausKlimaCard extends LitElement {
       <div class="photo-lower">
         <section class="rooms-section ${this._showRooms ? 'expanded' : ''}" aria-label="Raumübersicht">
           <div class="section-title"><h2>Räume</h2><span>Antippen für alle Sensorquellen</span></div>
-          <div class="room-list house-room-list">${shapes.map((shape, index) => this.renderRoomTile(shape.room, building, index + 1))}</div>
+          <div class="room-list house-room-list">${overviewRooms.map((room, index) => this.renderRoomTile(room, building, index + 1))}</div>
         </section>
       </div>
-      ${others.length ? html`<section class="other-rooms" aria-label="Weitere Räume"><div class="section-title"><h2>Weitere Räume</h2><span>Alle Messorte, auch außerhalb der Hausansicht</span></div>
-        <div class="room-list">${others.map((room) => this.renderRoomTile(room, building))}</div></section>` : nothing}
       ${config.show_dimensions ? this.renderBuildingDetails(building) : nothing}
     </ha-card>`;
   }

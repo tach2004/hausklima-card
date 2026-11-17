@@ -24,6 +24,14 @@ async function ready(page, path = '/?demo=1') {
   return { errors, external, card: page.locator('hausklima-card'), editor: page.locator('hausklima-card-editor') };
 }
 async function selectRoom(page, card, id, touch = false) {
+  // Intentionally overlapping image badges cannot all receive touch events.
+  // The normal room tiles are the accessible, stable alternate entry point.
+  const overviewTile = card.locator(`.house-room-list [data-select-room="${id}"]`);
+  if (touch && await overviewTile.isVisible()) {
+    await overviewTile.click();
+    await card.locator(`.room-detail[data-room-id="${id}"]`).waitFor();
+    return;
+  }
   const tile = card.locator(`[data-select-room="${id}"]:visible`).first();
   if (!await tile.count()) {
     // On desktop the permanent outdoor tiles are intentionally gone.
@@ -64,12 +72,7 @@ async function assertLayout(page, card, name) {
   for (let i = 0; i < panels.length; i++) {
     assert.equal(panels[i].opacity, '1', `${name}: text/icons stay opaque`);
     assert.ok(panels[i].metrics > 0, `${name}: no empty black panel`);
-    for (let j = i + 1; j < panels.length; j++) {
-      const a = panels[i], b = panels[j];
-      const overlapX = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
-      const overlapY = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
-      assert.ok(overlapX <= 1 || overlapY <= 1, `${name}: metric panels ${a.id}/${b.id} overlap`);
-    }
+    // Overlapping boxes are allowed at exact user-selected coordinates.
   }
   const invalid = await card.locator('.photo-metric strong, .reading strong, .source-value strong').evaluateAll((nodes) =>
     nodes.flatMap((node) => {
@@ -299,7 +302,7 @@ async function checkOverlayBehavior(browser) {
     const imageBounds = await card.locator('.photo-image').boundingBox();
     const targetBounds = await target.boundingBox();
     assert.ok(Math.abs(targetBounds.x + targetBounds.width / 2 - imageBounds.x - imageBounds.width * anchor.x / 100) < 2, 'object target keeps its image anchor');
-    assert.ok(Math.abs(targetBounds.y + targetBounds.height / 2 - imageBounds.y - imageBounds.height * anchor.y / 100) < 2, 'object target stays on image when stage extends for docks');
+    assert.ok(Math.abs(targetBounds.y + targetBounds.height / 2 - imageBounds.y - imageBounds.height * anchor.y / 100) < 2, 'object target stays on the image');
     await panel.click();
     await card.locator(`.room-detail[data-room-id="${id}"]`).waitFor();
     assert.equal(await card.locator('.room-detail .sensor-row').count(), 2);
@@ -688,6 +691,8 @@ async function checkOutdoorMobileBadgeWidth(browser) {
       return {
         badgeWidth: box.width, boxLeft: box.left, boxRight: box.right,
         stageLeft: stage.left, stageRight: stage.right,
+        placementCenterPercent: (placement.getBoundingClientRect().left + placement.getBoundingClientRect().width / 2 - stage.left) / stage.width * 100,
+        autoDocked: placement.classList.contains('is-docked'),
         selectorLeft: selector?.left, selectorRight: selector?.right,
         groups: [...badge.querySelectorAll('.photo-mobile-source-group')].map((group) => {
           const heading = group.querySelector('.photo-mobile-source-heading');
@@ -706,8 +711,11 @@ async function checkOutdoorMobileBadgeWidth(browser) {
     assert.ok(geometry.badgeWidth >= 40, `${width}: outdoor panel remains readable (actual ${geometry.badgeWidth}px)`);
     assert.ok(geometry.badgeWidth <= Math.min(360, geometry.stageRight - geometry.stageLeft - 8) + 1,
       `${width}: outdoor panel respects picture width without an arbitrary 168px limit`);
-    assert.ok(geometry.boxLeft >= geometry.stageLeft - 1 && geometry.boxRight <= geometry.stageRight + 1,
-      `${width}: outdoor panel stays inside the picture`);
+    // The user's fixed 86% center is authoritative, even for a wide label.
+    // A box may extend across an image edge until manually repositioned.
+    assert.ok(Math.abs(geometry.placementCenterPercent - 86) < .15,
+      `${width}: outdoor panel stays centered at configured 86%, not automatically clamped`);
+    assert.equal(geometry.autoDocked, false, `${width}: no automatic outdoor docking`);
     assert.ok(geometry.selectorLeft >= geometry.boxLeft - 1 && geometry.selectorRight <= geometry.boxRight + 1,
       `${width}: outdoor location selector fits the same panel width`);
     assert.equal(geometry.rows.length, 6, `${width}: three temperatures, two humidity sources and one pressure stay visible`);
@@ -785,8 +793,16 @@ async function checkOutdoorNaturalWidth(browser) {
     });
     assert.ok(long.width > short.width + 14,
       `${viewportWidth}: longer source labels enlarge the badge naturally (short ${short.width}, long ${long.width})`);
-    assert.ok(long.left >= long.imageLeft - 1 && long.right <= long.imageRight + 1,
-      `${viewportWidth}: dynamically-sized outdoor badge fits inside the picture`);
+    // The outdoor anchor is fixed at 86% whether or not its text crosses
+    // a picture edge; only the user may move it.
+    const location = await card.locator('.photo-outdoor-group').evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      const image = node.closest('.photo-stage').querySelector('.photo-image').getBoundingClientRect();
+      return (rect.left + rect.width / 2 - image.left) / image.width * 100;
+    });
+    assert.ok(Math.abs(location - 86) < .15,
+      `${viewportWidth}: outdoor center is unchanged by longer labels`);
+    assert.equal(long.docked, false, `${viewportWidth}: no automatic outdoor dock`);
     assert.ok(long.width <= Math.min(360, long.imageRight - long.imageLeft - 8) + 1,
       `${viewportWidth}: named outdoor badge respects available horizontal width`);
     if (viewportWidth <= 1000) {
@@ -881,6 +897,66 @@ async function checkPhoneSourceToggles(browser) {
   console.log('PASS phone source selection: Homematic, Ecowitt, Vitodens, RH, pressure, desktop isolation, persistence');
 }
 
+
+async function checkPinnedPositionsAndAllRooms(browser) {
+  for (const width of [390, 1280]) {
+    const page = await browser.newPage({ viewport: { width, height: 900 }, hasTouch: width < 768 });
+    const { card, errors } = await ready(page);
+    await page.evaluate(() => {
+      const config = window.hausklimaPreview.getConfig();
+      config.badge_positions = { ...config.badge_positions,
+        laundry: { desktop: { x: 54.2, y: 72.6 }, mobile: { x: 50, y: 60 } },
+        workshop: { desktop: { x: 54.2, y: 72.6 }, mobile: { x: 50, y: 60 } },
+        garage_battery_litime: { desktop: { x: 94.5, y: 89 }, mobile: { x: 94.5, y: 89 } } };
+      window.hausklimaPreview.setConfig(config);
+    });
+    await page.evaluate(async () => {
+      await window.hausklimaPreview.card.updateComplete;
+      await new Promise(requestAnimationFrame);
+      await new Promise(requestAnimationFrame);
+    });
+    const geometry = await card.locator('.photo-stage').evaluate((stage) => {
+      const image = stage.querySelector('.photo-image').getBoundingClientRect();
+      const get = (id) => {
+        const node = stage.querySelector(`.photo-placement[data-overlay-id="${id}"]`);
+        const rect = node.getBoundingClientRect();
+        return { x: (rect.left + rect.width / 2 - image.left) / image.width * 100,
+          y: (rect.top + rect.height / 2 - image.top) / image.height * 100,
+          docked: node.classList.contains('is-docked') };
+      };
+      return { imageHeight: image.height, stageHeight: stage.getBoundingClientRect().height,
+        laundry: get('laundry'), workshop: get('workshop'), battery: get('garage_battery_litime') };
+    });
+    const expected = width < 768 ? { x: 50, y: 60 } : { x: 54.2, y: 72.6 };
+    for (const id of ['laundry', 'workshop']) {
+      assert.ok(Math.abs(geometry[id].x - expected.x) < .1 &&
+        Math.abs(geometry[id].y - expected.y) < .1,
+        `${width}: ${id} keeps its exact manually set center despite overlap`);
+      assert.equal(geometry[id].docked, false, 'nothing is moved to a dock');
+    }
+    assert.ok(Math.abs(geometry.battery.x - 94.5) < .1 && Math.abs(geometry.battery.y - 89) < .1,
+      `${width}: garage battery never shifts from its configured center; measured ${JSON.stringify(geometry.battery)}`);
+    assert.ok(Math.abs(geometry.stageHeight - geometry.imageHeight) < 2,
+      `${width}: no dark extension below the image`);
+    if (width < 768) {
+      const tiles = card.locator('.house-room-list .room-tile');
+      assert.equal(await tiles.count(), demoConfig.building.rooms.length,
+        'all rooms, garage and outdoor locations use the same overview tiles');
+      for (const id of ['garage', 'garage_cabinet', 'garage_battery_pylontech',
+        'garage_battery_litime', 'demo_outdoor', 'demo_outdoor_north']) {
+        const tile = card.locator(`.house-room-list .room-tile[data-select-room="${id}"]`);
+        assert.equal(await tile.count(), 1, `${id} has a normal room card below the image`);
+        await tile.click();
+        await card.locator(`.room-detail[data-room-id="${id}"]`).waitFor();
+        await card.getByRole('button', { name: 'Raumdetails schließen' }).click();
+      }
+    }
+    assert.deepEqual(errors, []);
+    await page.close();
+  }
+  console.log('PASS exact user coordinates, intentional overlaps, garage/outdoor room tiles, no dark dock');
+}
+
 async function checkBadgePositionEditor(browser) {
   const page = await browser.newPage({ viewport: { width: 390, height: 950 }, hasTouch: true });
   const { card, editor, errors } = await ready(page);
@@ -899,6 +975,12 @@ async function checkBadgePositionEditor(browser) {
   const before = await image.boundingBox();
   const from = await marker.boundingBox();
   assert.ok(before && from, 'the editor shows an interactive picture and a badge');
+  const editorImage = await image.getAttribute('src');
+  const realImage = await card.locator('.photo-image').getAttribute('src');
+  assert.equal(editorImage, realImage, 'position editor and card use the same artwork bytes');
+  const previewRatio = await image.evaluate((node) => node.getBoundingClientRect().width / node.getBoundingClientRect().height);
+  const realRatio = await card.locator('.photo-image').evaluate((node) => node.getBoundingClientRect().width / node.getBoundingClientRect().height);
+  assert.ok(Math.abs(previewRatio - realRatio) < .001, 'editor and card use the same image aspect ratio');
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
   await page.mouse.move(before.x + before.width * .44, before.y + before.height * .66, { steps: 8 });
@@ -910,11 +992,19 @@ async function checkBadgePositionEditor(browser) {
   await settlePhoto();
   assert.ok(await card.locator('.photo-placement[data-overlay-id="laundry"][data-manual-mobile-x]').count(),
     'saved phone position reaches the actual image badge');
+  const exact = await card.locator('.photo-placement[data-overlay-id="laundry"]').evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    const bounds = node.closest('.photo-stage').querySelector('.photo-image').getBoundingClientRect();
+    return { x: (rect.left + rect.width / 2 - bounds.left) / bounds.width * 100,
+      y: (rect.top + rect.height / 2 - bounds.top) / bounds.height * 100 };
+  });
+  assert.ok(Math.abs(exact.x - config.badge_positions.laundry.mobile.x) < .15 &&
+    Math.abs(exact.y - config.badge_positions.laundry.mobile.y) < .15,
+  'actual overlay center agrees with editor percentage coordinates');
   if (process.env.UPDATE_SCREENSHOTS === '1') {
     await editor.locator('.position-settings').screenshot({ path: `${screenshotDirectory}/badge-position-editor-mobile.png` });
   }
-  // Moving a manually positioned GARAGE badge changes its own line endpoint.
-  // This must also work when it comes off the default three-column dock.
+  // A manually positioned garage badge keeps its exact point; the connector follows.
   const deviceId = 'garage_battery_pylontech';
   const leader = card.locator(`.photo-leaders path[data-leader-room="${deviceId}"]`);
   const originalLeader = await leader.getAttribute('d');
@@ -941,7 +1031,7 @@ async function checkBadgePositionEditor(browser) {
   }, deviceId);
   await settlePhoto();
   assert.equal(await leader.getAttribute('d'), movedLeader, 'desktop position does not change phone connector');
-  // Resetting the custom phone placement returns the line to its docked end.
+  // Resetting returns exactly to the original image point, never a dock.
   // Await the actual Lit render and both animation frames; testing the mere
   // existence of updateComplete previously raced with the reflow.
   await page.evaluate((id) => {
@@ -975,8 +1065,16 @@ async function checkBadgePositionEditor(browser) {
         endY <= bounds.bottom - stageBounds.top + 2,
     };
   }, deviceId);
-  assert.deepEqual(resetConnection, { auto: true, docked: true, connected: true },
-    'reset restores automatic mobile dock placement and reconnects to its current position');
+  assert.deepEqual(resetConnection, { auto: true, docked: false, connected: true },
+    'reset restores original image position without docking');
+  // Typed percentages are saved precisely and separately for phone and desktop.
+  const xInput = editor.locator('#position-x');
+  const yInput = editor.locator('#position-y');
+  await xInput.fill('41.3'); await xInput.press('Tab');
+  await yInput.fill('62.7'); await yInput.press('Tab');
+  config = await page.evaluate(() => window.hausklimaPreview.getConfig());
+  assert.deepEqual(config.badge_positions.laundry.mobile, { x: 41.3, y: 62.7 },
+    'typed mobile percentages persist exactly');
   const selectedMobile = structuredClone(config.badge_positions.laundry.mobile);
   await editor.locator('#position-device').selectOption('desktop');
   const desktop = editor.locator('#position-marker');
@@ -984,11 +1082,15 @@ async function checkBadgePositionEditor(browser) {
   config = await page.evaluate(() => window.hausklimaPreview.getConfig());
   assert.equal(config.badge_positions.laundry.desktop.x, 57, 'keyboard nudges desktop separately');
   assert.deepEqual(config.badge_positions.laundry.mobile, selectedMobile);
+  const desktopX = editor.locator('#position-x');
+  await desktopX.fill('32.5'); await desktopX.press('Tab');
+  config = await page.evaluate(() => window.hausklimaPreview.getConfig());
+  assert.equal(config.badge_positions.laundry.desktop.x, 32.5, 'desktop X can be typed independently');
   await page.reload();
   await page.waitForFunction(() => window.previewReady === true);
   config = await page.evaluate(() => window.hausklimaPreview.getConfig());
   assert.deepEqual(config.badge_positions.laundry.mobile, selectedMobile, 'phone position survives page reload');
-  assert.equal(config.badge_positions.laundry.desktop.x, 57, 'desktop position survives page reload');
+  assert.equal(config.badge_positions.laundry.desktop.x, 32.5, 'desktop position survives page reload');
   await page.locator('#editor-panel > summary').click();
   await editor.locator('#room-select').selectOption('laundry');
   await editor.locator('.position-settings > summary').click();
@@ -1020,6 +1122,7 @@ try {
   await checkOutdoorMobileBadgeWidth(browser);
   await checkOutdoorNaturalWidth(browser);
   await checkBadgePositionEditor(browser);
+  await checkPinnedPositionsAndAllRooms(browser);
   await checkResponsive(browser, 'chromium');
   for (const [width, sectionWidth] of [[360, 480], [1440, 480], [1440, 1100]]) {
     for (const theme of ['light', 'dark']) {

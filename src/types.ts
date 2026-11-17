@@ -19,6 +19,7 @@ export const METRIC_TYPES = [
   'voc',
   'pressure_relative',
   'pressure_absolute',
+  'condensation_risk',
 ] as const;
 
 export type MetricType = (typeof METRIC_TYPES)[number];

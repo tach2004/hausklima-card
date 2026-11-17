@@ -118,6 +118,7 @@ export const photoStyles = css`
   .photo-metric-icon.absolute_humidity { color: #9bdad0; }
   .photo-metric-icon.co2 { color: #b5d998; }
   .photo-metric-icon.voc { color: #d7c0f0; }
+  .photo-metric-icon.condensation_risk { color: #f2b0a3; }
   .photo-mobile-climate { display: none; }
   .photo-badge.name-only { padding: 4px; background: transparent; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .photo-badge.name-only .photo-room-name { color: #263238; text-shadow: 0 1px 3px #fff, 0 0 8px #fff; }
@@ -143,7 +144,8 @@ export const photoStyles = css`
   .photo-dock-note[hidden] { display: none; }
   @container hausklima (max-width: 1000px) {
     /* Dark, connected dock under the unmodified illustration for overflow badges. */
-    .photo-stage { background: #3f4d49; }
+    /* No dark extra dock under the photo: all overlays use their own coordinates. */
+    .photo-stage { background: var(--hk-paper, #e6e6e0); }
     .photo-image { border-radius: 12px; }
     .photo-placement { display: block; z-index: 3; }
     .photo-badge.mobile-climate {
@@ -206,6 +208,7 @@ export const photoStyles = css`
     .mobile-reading-icon.absolute_humidity { color: #9bdad0; }
     .mobile-reading-icon.co2 { color: #b5d998; }
     .mobile-reading-icon.voc { color: #d7c0f0; }
+    .mobile-reading-icon.condensation_risk { color: #f2b0a3; }
     .mobile-reading-icon.pressure_relative, .mobile-reading-icon.pressure_absolute { color: #b6c9f0; }
     .mobile-reading-icon :is(svg, .hk-icon) { width: 1em; height: 1em; }
     /* Same three garage-object connectors as desktop. The layout engine moves

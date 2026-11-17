@@ -122,7 +122,7 @@ describe('Lovelace card integration', () => {
       .map((el) => el.getAttribute('data-metric'));
     const desktopCount = () => find(card, '.photo-room[data-room-id="laundry"]').querySelectorAll('.photo-metric').length;
     expect(readings()).toEqual(['temperature', 'relative_humidity']); // Old dashboard default
-    expect(desktopCount()).toBe(7);
+    expect(desktopCount()).toBe(8);
     const optIn = structuredClone(building);
     const room = optIn.rooms.find((r) => r.id === 'laundry')!;
     room.mobile_overview = {
@@ -133,19 +133,20 @@ describe('Lovelace card integration', () => {
       voc: true,
       pressure_relative: true,
       pressure_absolute: true,
+      condensation_risk: true,
     };
     card.setConfig(normalizeConfig({ ...config, building: optIn }));
     await card.updateComplete;
     expect(readings()).toEqual([
-      'relative_humidity', 'absolute_humidity', 'co2', 'voc', 'pressure_relative', 'pressure_absolute',
+      'relative_humidity', 'absolute_humidity', 'co2', 'voc', 'pressure_relative', 'pressure_absolute', 'condensation_risk',
     ]);
-    expect(desktopCount()).toBe(7); // desktop sees all regardless of mobile toggle
+    expect(desktopCount()).toBe(8); // desktop sees all regardless of mobile toggle
     for (const type of METRIC_TYPES.filter((type) => type !== 'temperature')) {
       const row = find(card, `.photo-room[data-room-id="laundry"] .photo-mobile-reading[data-metric="${type}"]`);
       expect(row.querySelector('svg')).not.toBeNull();
     }
     const detail = await openRoom(card, 'laundry');
-    expect(detail.querySelectorAll('.sensor-row')).toHaveLength(7); // hidden phone temp remains in details
+    expect(detail.querySelectorAll('.sensor-row')).toHaveLength(8); // hidden phone temp remains in details
     const valid = normalizeConfig({ ...config, building: optIn });
     expect(valid.building!.rooms.find((r) => r.id === 'laundry')!.mobile_overview?.voc).toBe(true);
     const invalidType = structuredClone(optIn);
@@ -267,12 +268,12 @@ describe('Lovelace card integration', () => {
     }
   });
 
-  it('keeps hidden additional rooms reachable through the separate overview', async () => {
+  it('keeps hidden additional rooms reachable through the shared room overview', async () => {
     const building = getDefaultBuilding();
     building.rooms.push({ id: 'additional_room', name: 'Weiterer Raum', level_id: 'ground_floor', visible: false, width_m: null });
     const card = await createCard({ ...getDefaultConfig(), building });
     expect(card.shadowRoot?.querySelector('.photo-stage [data-room-id="additional_room"]')).toBeNull();
-    const button = find<HTMLButtonElement>(card, '.other-rooms [data-select-room="additional_room"]');
+    const button = find<HTMLButtonElement>(card, '.house-room-list [data-select-room="additional_room"]');
     expect(button.textContent).toContain('Weiterer Raum');
     button.click();
     await card.updateComplete;
@@ -438,7 +439,7 @@ describe('Lovelace card integration', () => {
     await card.updateComplete;
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
     expect(find(card, '.rooms-section').classList.contains('expanded')).toBe(true);
-    expect(card.shadowRoot?.querySelectorAll('.house-room-list [data-select-room]')).toHaveLength(8);
+    expect(card.shadowRoot?.querySelectorAll('.house-room-list [data-select-room]')).toHaveLength(getDefaultBuilding().rooms.length);
     expect(card.shadowRoot?.querySelector('.photo-air[data-select-room="garage"]')).not.toBeNull();
   });
 
