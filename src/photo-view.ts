@@ -1,6 +1,6 @@
 import { css, html, nothing } from 'lit';
 import { houseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS } from './scene-photo';
-import { formatSensorValue, resolveMobileReadings, resolveOverviewGroups } from './metrics';
+import { formatSensorValue, resolveMobileReadings, resolveMobileOutdoorGroups, resolveOverviewGroups } from './metrics';
 import { metricIcon, roomIcon } from './icons';
 import { renderReadingGroups } from './reading-view';
 import type { BadgePositionSet, BuildingConfig, HomeAssistant, RoomConfig } from './types';
@@ -30,6 +30,14 @@ export function renderPhotoView(
   const renderBadge = (room: RoomConfig, category: string) => {
     const groups = resolveOverviewGroups(room, hass);
     const climate = resolveMobileReadings(room, hass);
+    const outdoorGroups = room.location === 'outdoor' ? resolveMobileOutdoorGroups(room, hass) : [];
+    const mobileReading = ({ type, sensor, sourceLabel }: (typeof climate)[number], showSource = true) => html`
+      <span class="photo-mobile-reading" data-metric=${type} data-reading-entity=${sensor.entity}>
+        <span class="mobile-reading-icon ${type}" aria-hidden="true">${metricIcon(type)}</span>
+        ${showSource && sourceLabel ? html`<span class="photo-mobile-source" title=${sourceLabel}>${sourceLabel}</span>` : nothing}
+        <strong>${formatSensorValue(sensor, hass)}</strong>
+        ${sensor.status === 'available' && sensor.unit ? html`<small>${sensor.unit}</small>` : nothing}
+      </span>`;
     return html`<button class="photo-badge ${category} ${groups.length ? 'with-metrics' : 'name-only'} ${climate.length ? 'mobile-climate' : 'mobile-no-climate'}"
       data-room-id=${room.id} data-select-room=${room.id} type="button"
       aria-pressed=${String(selectedRoomId === room.id)} aria-label=${`${room.name}: Details öffnen`}
@@ -38,13 +46,11 @@ export function renderPhotoView(
       ${renderReadingGroups(room, hass, true)}
       ${climate.length ? html`<span class="photo-mobile-climate">
         ${showNames ? html`<span class="photo-mobile-name">${roomIcon(room)}<span>${room.name}</span></span>` : nothing}
-        ${climate.map(({ type, sensor, sourceLabel }) => html`
-          <span class="photo-mobile-reading" data-metric=${type} data-reading-entity=${sensor.entity}>
-            <span class="mobile-reading-icon ${type}" aria-hidden="true">${metricIcon(type)}</span>
-            ${sourceLabel ? html`<span class="photo-mobile-source" title=${sourceLabel}>${sourceLabel}</span>` : nothing}
-            <strong>${formatSensorValue(sensor, hass)}</strong>
-            ${sensor.status === 'available' && sensor.unit ? html`<small>${sensor.unit}</small>` : nothing}
-          </span>`)}
+        ${room.location === 'outdoor' ? outdoorGroups.map((group) => html`
+          <span class="photo-mobile-source-group" data-mobile-source-group=${group.name}>
+            <span class="photo-mobile-source-heading" title=${group.name}>${group.name}</span>
+            ${group.readings.map((reading) => mobileReading(reading, false))}
+          </span>`) : climate.map((reading) => mobileReading(reading))}
       </span>` : nothing}
     </button>`;
   };
@@ -161,10 +167,17 @@ export const photoStyles = css`
       width: 100%; min-height: 28px; font-size: 10px;
       background: #263039; color: #fff; border-color: #ffffff60;
     }
-    /* Multiple outdoor sources may share a badge; truncate only their labels,
-       never the numeric values or sensor units. Other mobile badges stay compact. */
+    /* Outdoor phone badges: one source heading, then temperature, humidity and
+       optional measurements on their own lines. Other badges stay unchanged. */
+    .photo-outdoor-group .photo-mobile-climate { gap: 4px; }
+    .photo-mobile-source-group { display: flex; flex-direction: column; gap: 2px; min-width: 0; max-width: 100%; }
+    .photo-mobile-source-group + .photo-mobile-source-group { border-top: 1px solid #ffffff55; padding-top: 5px; }
+    .photo-mobile-source-heading {
+      display: block; max-width: 100%; overflow-wrap: anywhere;
+      color: #fff; font-size: calc(var(--hk-badge-font-mobile, 9px) * .95);
+      font-weight: 750; line-height: 1.2;
+    }
     .photo-outdoor-group .photo-mobile-reading { width: 100%; flex-wrap: nowrap; }
-    .photo-outdoor-group .photo-mobile-source { min-width: 0; max-width: none; flex: 1 1 auto; }
     .photo-outdoor-group .photo-mobile-reading :is(strong, small) { flex: 0 0 auto; white-space: nowrap; }
     .photo-mobile-climate { display: flex; flex-direction: column; gap: 0; min-width: 0; max-width: 100%; }
     .photo-mobile-name {

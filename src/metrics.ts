@@ -130,6 +130,23 @@ export function resolveMobileReadings(room: RoomConfig, hass?: HomeAssistant): {
   });
 }
 
+/** Keep phone outdoor readings grouped by a matching source label; never invent relationships. */
+export function resolveMobileOutdoorGroups(room: RoomConfig, hass?: HomeAssistant): {
+  name: string; readings: ReturnType<typeof resolveMobileReadings>;
+}[] {
+  const groups = new Map<string, { name: string; readings: ReturnType<typeof resolveMobileReadings> }>();
+  for (const reading of resolveMobileReadings(room, hass)) {
+    const name = reading.sensor.overview_group?.trim() || reading.sensor.name.trim() || reading.sensor.entity;
+    let group = groups.get(name);
+    if (!group) {
+      group = { name, readings: [] };
+      groups.set(name, group);
+    }
+    group.readings.push(reading);
+  }
+  return [...groups.values()];
+}
+
 /** Full, selected source readings, grouped only within the requested location. */
 export function resolveOverviewGroups(room: RoomConfig, hass?: HomeAssistant): OverviewGroup[] {
   const groups = new Map<string, OverviewGroup>();
