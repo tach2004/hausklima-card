@@ -15,7 +15,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "node scripts/run-unit-tests.mjs",
     "dev": "node scripts/dev.mjs",
     "test:browser": "node scripts/browser-test.mjs"
   },
@@ -26,7 +26,6 @@
     "@playwright/test": "^1.56.1",
     "esbuild": "^0.28.2",
     "happy-dom": "^21.0.4",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.9"
+    "typescript": "^5.9.3"
   }
 }

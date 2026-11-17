@@ -1,5 +1,5 @@
 // DEMO-WERTE: Sensorzustände und Entity-IDs in dieser Testdatei sind synthetische Testdaten.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from '../scripts/unit-test-compat';
 import { getDefaultConfig, normalizeConfig, resolveBuilding } from '../src/config';
 import { getDefaultBuilding } from '../src/defaults';
 import { formatSensorValue, resolveMeasurements, resolveOverviewGroups, sensorStatusLabel } from '../src/metrics';

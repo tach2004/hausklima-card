@@ -8,6 +8,8 @@ import { iconStyles, metricIcon, roomIcon } from './icons';
 import { readingStyles, renderReadingGroups } from './reading-view';
 import type { BuildingConfig, HausKlimaCardConfig, HomeAssistant, ResolvedMeasurement, RoomConfig } from './types';
 import { cardStyles } from './styles';
+import { isFrontRoom, resolveSideBuilding } from './front-view';
+import type { HouseSide } from './front-view';
 
 const formatDimension = (value: number) => value.toLocaleString('de-DE', { maximumFractionDigits: 2 });
 const arrowIcon = () => html`<svg class="arrow-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M 4 12 12 4 M 4 4 h 8 v 8" /></svg>`;
@@ -19,12 +21,18 @@ export class HausKlimaCard extends LitElement {
     _selected: { state: true },
     _showRooms: { state: true },
     _outdoorId: { state: true },
+    _side: { state: true },
+    _turningPhase: { state: true },
   };
   declare hass?: HomeAssistant;
   private _config?: HausKlimaCardConfig;
   private _selected?: string;
   private _showRooms = false;
   private _outdoorId?: string;
+  /** Default is the original, unchanged rear view. */
+  private _side: HouseSide = 'rear';
+  private _turningPhase?: 'out' | 'in';
+  private turnTimer?: ReturnType<typeof setTimeout>;
   private photoResize?: ResizeObserver;
   private photoImage?: HTMLImageElement;
   private photoFrame?: number;
@@ -51,6 +59,7 @@ export class HausKlimaCard extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    if (this.turnTimer !== undefined) clearTimeout(this.turnTimer);
     this.photoResize?.disconnect();
     this.photoImage = undefined;
     if (this.photoFrame !== undefined) cancelAnimationFrame(this.photoFrame);
@@ -58,7 +67,8 @@ export class HausKlimaCard extends LitElement {
 
   setConfig(config: unknown): void {
     this._config = normalizeConfig(config);
-    if (!resolveBuilding(this._config).rooms.some((room) => room.id === this._selected)) this._selected = undefined;
+    if (!resolveSideBuilding(this._config, resolveBuilding(this._config), this._side).rooms
+      .some((room) => room.id === this._selected)) this._selected = undefined;
   }
 
   static async getConfigElement(): Promise<HTMLElement> {
@@ -73,6 +83,17 @@ export class HausKlimaCard extends LitElement {
 
   getCardSize(): number { return Math.ceil((this.clientHeight || 680) / 50); }
   getGridOptions() { return { columns: 12, rows: 'auto', min_columns: 6 }; }
+
+  private toggleHouseSide(): void {
+    if (this._turningPhase) return;
+    this._turningPhase = 'out';
+    this.turnTimer = setTimeout(() => {
+      this._side = this._side === 'rear' ? 'front' : 'rear';
+      this._selected = undefined;
+      this._turningPhase = 'in';
+      this.turnTimer = setTimeout(() => { this._turningPhase = undefined; this.turnTimer = undefined; }, 230);
+    }, 210);
+  }
 
   private selectRoom(room: RoomConfig): void {
     this._selected = room.id;
@@ -145,22 +166,38 @@ export class HausKlimaCard extends LitElement {
   protected render() {
     if (!this._config) return nothing;
     const config = this._config;
-    const building = resolveBuilding(config);
-    const layout = createLayout(building);
-    const shapes = layout.shapes.filter((shape) => shape.level !== 'garage' && shape.room.location !== 'outdoor');
+    const building = resolveSideBuilding(config, resolveBuilding(config), this._side);
+    const rear = this._side === 'rear';
+    const shapes = rear
+      ? createLayout(building).shapes.filter((shape) => shape.level !== 'garage' && shape.room.location !== 'outdoor')
+      : [];
     const drawnIds = new Set(shapes.map((shape) => shape.room.id));
+    const orderedFront = rear ? [] : building.rooms.filter(isFrontRoom);
     // Garage, individual devices and outside locations get normal room tiles too.
     const themeMode = config.theme_mode ?? 'auto';
     const darkMode = themeMode === 'auto' ? this.hass?.themes?.darkMode : themeMode === 'dark';
     const resolvedTheme = typeof darkMode === 'boolean' ? (darkMode ? 'dark' : 'light') : 'inherit';
-    const overviewRooms = [...shapes.map((shape) => shape.room), ...building.rooms.filter((room) => !drawnIds.has(room.id))];
+    const orderedRooms = rear ? shapes.map((shape) => shape.room) : orderedFront;
+    const overviewRooms = [...orderedRooms,
+      ...building.rooms.filter((room) => !drawnIds.has(room.id) && !orderedRooms.some((entry) => entry.id === room.id))];
     const selected = building.rooms.find((room) => room.id === this._selected);
     return html`<ha-card data-theme-mode=${themeMode} data-theme-resolved=${resolvedTheme}
       style=${`--hk-chip: rgba(22, 26, 30, ${config.chip_opacity ?? 0.72}); --hk-scene-max-width: ${config.scene_max_width ?? 1400}px; --hk-badge-font-desktop: ${config.badge_font_desktop ?? 12}px; --hk-badge-font-mobile: ${config.badge_font_mobile ?? 9}px;`}>
       <header class="card-header"><div class="card-title"><span class="home-icon" aria-hidden="true">⌂</span>${config.title ? html`<h1>${config.title}</h1>` : nothing}</div>
         <button class="overview-toggle" aria-expanded=${String(this._showRooms)} @click=${() => { this._showRooms = !this._showRooms; }}>Räume <span>${building.rooms.length}</span></button></header>
       <div class="photo-main">
-        ${renderPhotoView(building, this.hass, config.show_room_names ?? true, (room) => this.selectRoom(room), this._selected, { outdoorId: this._outdoorId, onOutdoorChange: (id) => { this._outdoorId = id; }, badgePositions: config.badge_positions })}
+        <div class="house-side-wrapper ${this._turningPhase ? `flip-${this._turningPhase}` : ''}">
+          ${renderPhotoView(building, this.hass, config.show_room_names ?? true,
+            (room) => this.selectRoom(room), this._selected,
+            { side: this._side, outdoorId: this._outdoorId,
+              onOutdoorChange: (id) => { this._outdoorId = id; },
+              badgePositions: rear ? config.badge_positions : config.front_badge_positions })}
+        </div>
+        <button class="house-side-button" data-house-side-switch type="button"
+          aria-label=${this._side === 'rear' ? 'Zur Vorderansicht drehen' : 'Zur Rückansicht drehen'}
+          @click=${() => this.toggleHouseSide()} ?disabled=${Boolean(this._turningPhase)}>
+          <span aria-hidden="true">⟳</span> ${this._side === 'rear' ? 'Vorderansicht' : 'Rückansicht'}
+        </button>
         ${selected ? this.renderDetails(selected, building) : nothing}
       </div>
       <div class="photo-lower">

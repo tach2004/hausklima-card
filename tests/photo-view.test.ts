@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from '../scripts/unit-test-compat';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import '../src/index';

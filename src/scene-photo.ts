@@ -1,7 +1,24 @@
 import artwork from './assets/hausklima-cutaway.webp';
+import frontArtwork from './assets/hausklima-front.webp';
 
 /** Generic architectural illustration, not an exact image of the user's property. */
 export const houseArtwork = artwork;
+export const frontHouseArtwork = frontArtwork;
+
+export const FRONT_ROOM_ART_POSITIONS: Readonly<Record<string, {x:number; y:number}>> = {
+  front_office: { x:36.5, y:43 }, front_bath_attic: { x:49, y:43 },
+  front_heating: { x:59, y:43 }, front_stairs_attic: { x:67, y:43 },
+  front_balcony: { x:82, y:43 },
+  front_guest_room: { x:37, y:70 }, front_bath_ground: { x:50, y:70 },
+  front_stairs_ground: { x:67, y:70 }, front_living_room: { x:81, y:70 },
+};
+export const FRONT_MOBILE_ROOM_ART_POSITIONS = FRONT_ROOM_ART_POSITIONS;
+export const FRONT_GARAGE_ART_POSITIONS: Readonly<Record<string,{x:number;y:number;anchorX:number;anchorY:number}>> = {
+  garage: {x:15,y:63,anchorX:15,anchorY:69},
+  garage_cabinet: {x:6.5,y:87,anchorX:9.4,anchorY:73.5},
+  garage_battery_pylontech: {x:15.5,y:87,anchorX:17.2,anchorY:73.5},
+  garage_battery_litime: {x:24.5,y:87,anchorX:24.6,anchorY:73.5},
+};
 
 /** Screen-space positions in the illustration; labels and data remain separate HTML. */
 export const ROOM_ART_POSITIONS: Readonly<Record<string, { x: number; y: number }>> = {

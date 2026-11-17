@@ -126,6 +126,10 @@ export interface HausKlimaCardConfig {
   badge_font_mobile?: number;
   /** Individually persisted per-location positions, keyed by stable room ID. */
   badge_positions?: Record<string, BadgePositionSet>;
+  /** Independent front-facing rooms; garage/outdoor entities always come from building.rooms. */
+  front_rooms?: RoomConfig[];
+  /** Front-facing image positions, separate even for shared garage/outdoor locations. */
+  front_badge_positions?: Record<string, BadgePositionSet>;
   /** Visual theme of this card; auto follows Home Assistant's active theme. */
   theme_mode?: 'auto' | 'light' | 'dark';
   building?: BuildingConfig;

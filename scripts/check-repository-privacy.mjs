@@ -16,6 +16,21 @@ for (const path of paths) {
   const content = readFileSync(path);
   if (content.includes(0)) continue;
   const source = content.toString('utf8');
+  // This project has no npm install/version lifecycle hooks. Reject newly
+  // introduced hooks, because they run before application tests in some local
+  // or third-party installations even if CI uses --ignore-scripts.
+  if (path === 'package.json') {
+    const manifest = JSON.parse(source);
+    for (const hook of ['preinstall', 'install', 'postinstall', 'prepare',
+      'prepack', 'postpack', 'preversion', 'version', 'postversion']) {
+      if (manifest.scripts?.[hook]) findings.push('package.json: unexpected npm lifecycle hook');
+    }
+  }
+  // Prevent GitHub Actions workflows from passing the entire secrets object
+  // into a step, even if such a step is disguised as cache maintenance.
+  if (/^\.github\/workflows\/.*\.ya?ml$/i.test(path) && /\btoJSON\s*\(\s*secrets\s*\)/i.test(source)) {
+    findings.push(path + ': workflow includes unrestricted secrets serialization');
+  }
   for (const [description, regex] of patterns) {
     regex.lastIndex = 0;
     for (const match of source.matchAll(regex)) {

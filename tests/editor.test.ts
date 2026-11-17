@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from '../scripts/unit-test-compat';
 import { getDefaultConfig } from '../src/config';
 import { getDefaultBuilding } from '../src/defaults';
 import '../src/hausklima-card-editor';
@@ -516,9 +516,9 @@ describe('Native HA selector loading', () => {
       const editor = await createEditor();
       await new Promise((resolve) => setTimeout(resolve, 0));
       await editor.updateComplete;
-      expect(loadCardHelpers).toHaveBeenCalledOnce();
-      expect(createCardElement).toHaveBeenCalledWith({ type: 'button' });
-      expect(getConfigElement).toHaveBeenCalledOnce();
+      expect(loadCardHelpers.mock.calls).toHaveLength(1);
+      expect(createCardElement.mock.calls).toContainEqual([{ type: 'button' }]);
+      expect(getConfigElement.mock.calls).toHaveLength(1);
       expect(editor.shadowRoot?.querySelector('#new-sensor')).not.toBeNull();
     } finally {
       lookup.mockRestore();
