@@ -22,7 +22,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Prepare current main and version tags
         shell: bash
@@ -39,7 +39,7 @@ jobs:
 
       - name: Install & verify
         run: |
-          npm ci
+          npm ci --ignore-scripts
           node --test scripts/next-version.test.mjs
           npm run check
           npm test
@@ -71,6 +71,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -79,8 +80,11 @@ jobs:
             git commit -m "chore(release): v$RELEASE_VERSION (after PR #$PR_NUMBER)"
           fi
           git tag -a "v$RELEASE_VERSION" -m "HausKlima Card v$RELEASE_VERSION"
-          git push origin HEAD:main
-          git push origin "v$RELEASE_VERSION"
+          # Credentials are unavailable to all earlier npm/test/build steps.
+          # Use the short-lived token only during publication; do not persist it.
+          PUSH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=$PUSH_HEADER" push origin HEAD:main
+          git -c "http.https://github.com/.extraheader=$PUSH_HEADER" push origin "v$RELEASE_VERSION"
 
       - name: Publish GitHub Release with HACS-compatible JS
         shell: bash

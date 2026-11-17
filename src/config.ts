@@ -169,24 +169,44 @@ export function normalizeConfig(input: unknown): HausKlimaCardConfig {
   if (config.theme_mode !== undefined && (typeof config.theme_mode !== 'string' || !['auto', 'light', 'dark'].includes(config.theme_mode))) {
     throw new Error('theme_mode muss auto, light oder dark sein.');
   }
-  if (config.badge_positions !== undefined) {
-    const all = object(config.badge_positions, 'badge_positions');
+  for (const field of ['badge_positions', 'front_badge_positions'] as const) {
+    if (config[field] === undefined) continue;
+    const all = object(config[field], field);
     for (const [id, value] of Object.entries(all)) {
-      if (!/^[a-z0-9_]+$/.test(id)) throw new Error(`badge_positions: ungültige Messort-ID ${id}.`);
-      const positions = object(value, `badge_positions.${id}`);
+      if (!/^[a-z0-9_]+$/.test(id)) throw new Error(`${field}: ungültige Messort-ID ${id}.`);
+      const positions = object(value, `${field}.${id}`);
       for (const [device, location] of Object.entries(positions)) {
-        if (device !== 'desktop' && device !== 'mobile') throw new Error(`badge_positions.${id}: unbekanntes Gerät ${device}.`);
-        const position = object(location, `badge_positions.${id}.${device}`);
+        if (device !== 'desktop' && device !== 'mobile') throw new Error(`${field}.${id}: unbekanntes Gerät ${device}.`);
+        const position = object(location, `${field}.${id}.${device}`);
         for (const axis of ['x', 'y']) {
           const coordinate = position[axis];
           if (typeof coordinate !== 'number' || !Number.isFinite(coordinate) || coordinate < 0 || coordinate > 100) {
-            throw new Error(`badge_positions.${id}.${device}.${axis} muss zwischen 0 und 100 liegen.`);
+            throw new Error(`${field}.${id}.${device}.${axis} muss zwischen 0 und 100 liegen.`);
           }
         }
       }
     }
   }
   if (config.building !== undefined) validateBuilding(config.building);
+  if (config.front_rooms !== undefined) {
+    const frontRooms = entriesWithUniqueIds(config.front_rooms, 'front_rooms');
+    const allowedLevels = new Set(['ground_floor', 'attic']);
+    frontRooms.forEach((room, index) => {
+      const path = `front_rooms[${index}]`;
+      if (!/^front_[a-z0-9_]+$/.test(room.id as string)) throw new Error(`${path}.id muss mit front_ beginnen.`);
+      if (!allowedLevels.has(room.level_id as string)) throw new Error(`${path}.level_id muss Erd- oder Dachgeschoss sein.`);
+      if (room.location !== undefined && room.location !== 'indoor') throw new Error(`${path}.location muss indoor sein.`);
+      boolean(room.visible, `${path}.visible`);
+      positive(room.width_m, `${path}.width_m`, true);
+      if (room.measurements !== undefined) validateMeasurements(room.measurements, `${path}.measurements`);
+      if (room.mobile_overview !== undefined) {
+        for (const [metric, value] of Object.entries(object(room.mobile_overview, `${path}.mobile_overview`))) {
+          if (!(METRIC_TYPES as readonly string[]).includes(metric)) throw new Error(`${path}.mobile_overview: unbekannte Messart ${metric}.`);
+          boolean(value, `${path}.mobile_overview.${metric}`);
+        }
+      }
+    });
+  }
   return structuredClone({ ...getDefaultConfig(), ...config }) as HausKlimaCardConfig;
 }
 

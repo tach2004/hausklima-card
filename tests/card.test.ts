@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from '../scripts/unit-test-compat';
 import '../src/index';
 import { HausKlimaCard } from '../src/hausklima-card';
 import { getDefaultConfig, normalizeConfig } from '../src/config';

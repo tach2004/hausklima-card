@@ -13,6 +13,7 @@ const screenshotDirectory = process.env.UPDATE_SCREENSHOTS === '1' ? 'docs/scree
 const launched = [];
 const webkitDisabled = process.env.SKIP_WEBKIT === '1';
 const artworkHash = 'fc840fd3cdd7ec1ecbae75a475c14674eafa28e99d7c43888ce6ffef7cbbef98';
+const frontArtworkHash = '5b0f981d8c1daff922769eb3cc34f094a377acbfe487a4d898e4900696093f7b';
 const overlaySelector = '.photo-badge.with-metrics';
 
 async function ready(page, path = '/?demo=1') {
@@ -957,6 +958,82 @@ async function checkPinnedPositionsAndAllRooms(browser) {
   console.log('PASS exact user coordinates, intentional overlaps, garage/outdoor room tiles, no dark dock');
 }
 
+
+async function checkTwoHouseSides(browser) {
+  for (const width of [402, 1280]) {
+    const page = await browser.newPage({ viewport: { width, height: 920 }, hasTouch: width <= 500 });
+    const { card, editor, errors, external } = await ready(page);
+    const rearImage = await card.locator('.photo-image').getAttribute('src');
+    assert.equal(await card.locator('.photo-stage').getAttribute('data-scene-side'), 'rear', 'default is the existing rear');
+    assert.equal(await card.locator('.photo-placement[data-overlay-id="front_office"]').count(), 0,
+      'front rooms are not leaked into the rear');
+    const rearRooms = await card.locator('.photo-room[data-room-id]').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-room-id')));
+    assert.ok(rearRooms.includes('bedroom') && rearRooms.includes('laundry'));
+    const original = await page.evaluate(() => window.hausklimaPreview.getConfig());
+    await card.locator('[data-house-side-switch]').click();
+    await page.waitForFunction(() => window.hausklimaPreview.card.shadowRoot.querySelector('.photo-stage')?.dataset.sceneSide === 'front');
+    await page.waitForTimeout(270);
+    const frontImage = await card.locator('.photo-image').getAttribute('src');
+    assert.notEqual(frontImage, rearImage, 'front artwork is different but rear artwork remains unchanged');
+    assert.equal(await card.locator('[data-house-side-switch]').textContent().then((s) => s.includes('Rückansicht')), true);
+    assert.equal(await card.locator('.photo-room[data-room-id^="front_"]').count(), 9,
+      'nine front rooms, no cellar or rear-room duplicates');
+    assert.equal(await card.locator('.photo-placement[data-overlay-id="laundry"]').count(), 0);
+    const frontBuildings = await card.locator('.photo-placement[data-overlay-id="garage"], .photo-outdoor-group').evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const bounds = node.closest('.photo-stage').getBoundingClientRect();
+        const box = node.getBoundingClientRect();
+        return { id: node.getAttribute('data-overlay-id'), x: (box.left + box.width / 2 - bounds.left) / bounds.width * 100 };
+      }));
+    assert.ok(frontBuildings.some((item) => item.id === 'garage' && item.x < 35),
+      'garage appears on the left side on front');
+    assert.ok(frontBuildings.some((item) => item.id === 'demo_outdoor' && item.x < 35),
+      'existing outside source appears left and is shared');
+    assert.equal(await card.locator('.photo-placement[data-overlay-id="garage_battery_pylontech"]').count(), 1);
+    assert.equal(await card.locator('.photo-placement[data-overlay-id="garage_cabinet"]').count(), 1);
+    await assertLayout(page, card, `front-side/${width}`);
+
+    // The same native editor includes every original room setting for each side.
+    await page.locator('#editor-panel > summary').click();
+    await editor.locator('#editor-house-side').selectOption('front');
+    const options = await editor.locator('#room-select option').evaluateAll((nodes) => nodes.map((n) => n.value));
+    assert.ok(options.includes('front_office') && !options.includes('bedroom'),
+      'front editor uses distinct room IDs');
+    assert.ok(options.includes('garage') && options.includes('demo_outdoor'),
+      'garage and outdoor sensor configurations appear once in both editors');
+    await editor.locator('#room-select').selectOption('front_office');
+    await editor.locator('#metric-select').selectOption('temperature');
+    await editor.locator('#new-sensor').evaluate((node) =>
+      node.dispatchEvent(new CustomEvent('value-changed', {
+        detail: { value: 'sensor.demo_front_office_temperature' }, bubbles: true, composed: true,
+      })));
+    let config = await page.evaluate(() => window.hausklimaPreview.getConfig());
+    assert.equal(config.front_rooms.find((room) => room.id === 'front_office').measurements.temperature.sensors[0].entity,
+      'sensor.demo_front_office_temperature', 'front editor persists its own source');
+    assert.deepEqual(config.building.rooms.find((room) => room.id === 'bedroom'),
+      original.building.rooms.find((room) => room.id === 'bedroom'), 'rear room settings are unchanged');
+    await editor.locator('.position-settings > summary').click();
+    await editor.locator('#position-x').fill('34.2');
+    await editor.locator('#position-x').press('Tab');
+    config = await page.evaluate(() => window.hausklimaPreview.getConfig());
+    assert.equal(config.front_badge_positions.front_office.desktop.x, 34.2);
+    assert.deepEqual(config.badge_positions, original.badge_positions,
+      'front position update does not affect any rear position');
+    await editor.locator('#editor-house-side').selectOption('rear');
+    const rearOptions = await editor.locator('#room-select option').evaluateAll((nodes) => nodes.map((n) => n.value));
+    assert.ok(rearOptions.includes('bedroom') && !rearOptions.includes('front_office'),
+      'rear editor settings remain isolated');
+    await card.locator('[data-house-side-switch]').click();
+    await page.waitForFunction(() => window.hausklimaPreview.card.shadowRoot.querySelector('.photo-stage')?.dataset.sceneSide === 'rear');
+    await page.waitForTimeout(270);
+    assert.equal(await card.locator('.photo-image').getAttribute('src'), rearImage, 'original rear graphic restored');
+    assert.deepEqual(errors, [], `${width}: no runtime errors`);
+    assert.deepEqual(external, [], `${width}: no external data requests`);
+    await page.close();
+  }
+  console.log('PASS house flip: rear default, clean front graphic, shared garage/outdoors, independent front sensors/editor/coordinates');
+}
+
 async function checkBadgePositionEditor(browser) {
   const page = await browser.newPage({ viewport: { width: 390, height: 950 }, hasTouch: true });
   const { card, editor, errors } = await ready(page);
@@ -1123,6 +1200,7 @@ try {
   await checkOutdoorNaturalWidth(browser);
   await checkBadgePositionEditor(browser);
   await checkPinnedPositionsAndAllRooms(browser);
+  await checkTwoHouseSides(browser);
   await checkResponsive(browser, 'chromium');
   for (const [width, sectionWidth] of [[360, 480], [1440, 480], [1440, 1100]]) {
     for (const theme of ['light', 'dark']) {

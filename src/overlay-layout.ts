@@ -1,4 +1,4 @@
-import { MOBILE_ROOM_ART_POSITIONS } from './scene-photo';
+import { MOBILE_ROOM_ART_POSITIONS, FRONT_MOBILE_ROOM_ART_POSITIONS } from './scene-photo';
 interface Rectangle { x: number; y: number; width: number; height: number; }
 /** Draw device-anchor to badge-edge connectors after every responsive reflow.
  *  No static coordinates: manually moved badges are measured in their new location.
@@ -78,7 +78,9 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
         : Math.min(width - 8, element.querySelector('.has-named-groups') ? 360 : 220);
       element.style.maxWidth = `${Math.max(0, limit)}px`;
     }
-    const fallback = mobile ? MOBILE_ROOM_ART_POSITIONS[id] : undefined;
+    const fallback = mobile
+      ? (stage.dataset.sceneSide === 'front' ? FRONT_MOBILE_ROOM_ART_POSITIONS[id] : MOBILE_ROOM_ART_POSITIONS[id])
+      : undefined;
     const manualX = element.dataset[mobile ? 'manualMobileX' : 'manualDesktopX'];
     const manualY = element.dataset[mobile ? 'manualMobileY' : 'manualDesktopY'];
     const x = manualX === undefined || manualY === undefined

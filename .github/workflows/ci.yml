@@ -16,6 +16,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
@@ -38,9 +39,8 @@ jobs:
               esac
             done
           done < <(git rev-list --no-merges "$PR_BASE..$PR_HEAD")
-      - run: npm ci
-      - name: Dependency vulnerability audit (all severities)
-        run: npm audit --audit-level=low
+      - name: Install locked dependencies without lifecycle hooks
+        run: npm ci --ignore-scripts
       - name: Scan tracked source files for secrets and private email addresses
         run: node scripts/check-repository-privacy.mjs
       - run: npm run check
@@ -55,3 +55,7 @@ jobs:
         env:
           SKIP_WEBKIT: "1"
         run: npm run test:browser
+      # Preserve the full fail-on-vulnerability gate, but allow all functionality
+      # tests to run and report their outcomes before an upstream audit blocks CI.
+      - name: Dependency vulnerability audit (all severities)
+        run: npm audit --audit-level=low

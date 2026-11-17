@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from '../scripts/unit-test-compat';
 import { resolveMobileOutdoorGroups } from '../src/metrics';
 import type { RoomConfig } from '../src/types';
 

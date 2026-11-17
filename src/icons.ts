@@ -30,6 +30,15 @@ export function roomIcon(room: Pick<RoomConfig, 'id' | 'location'>) {
     garage_cabinet: svg`<rect x="5" y="2" width="14" height="20" rx="1"/><path d="M12 5 9 11h6l-3 6M16 17v2"/>`,
     battery: svg`<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 5V2h8v3M7 11h4m-2-2v4m6-2h3"/>`,
     outdoor: svg`<circle cx="9" cy="8" r="4"/><path d="M9 1V0M3 3 2 2m14 1 1-1M1 8H0m18 0h2M5 14a4 4 0 1 0 0 8h12a5 5 0 0 0 0-10 6 6 0 0 0-11 2Z"/>`,
+    front_guest_room: svg`<path d="M3 19V8m18 11V8M3 15h18M5 11V5h14v6M5 10h14v5H5Z"/>`,
+    front_bath_ground: svg`<path d="M3 12h18v3a6 6 0 0 1-6 6H9a6 6 0 0 1-6-6zm2 9-1 2m15-2 1 2"/>`,
+    front_bath_attic: svg`<path d="M3 12h18v3a6 6 0 0 1-6 6H9a6 6 0 0 1-6-6zm2 9-1 2m15-2 1 2"/>`,
+    front_stairs_ground: svg`<path d="M2 21h5v-5h5v-5h5V6h5"/>`,
+    front_stairs_attic: svg`<path d="M2 21h5v-5h5v-5h5V6h5"/>`,
+    front_office: svg`<rect x="2" y="3" width="20" height="13" rx="2"/><path d="M12 16v4m-5 0h10"/>`,
+    front_heating: svg`<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M8 7h8M8 11h8M10 17h4"/>`,
+    front_balcony: svg`<path d="M3 8h18v12H3zM7 8V3h10v5m-10 5h10M12 13v7"/>`,
+    front_living_room: svg`<path d="M5 12V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v5M3 11a2 2 0 0 1 4 0v4h10v-4a2 2 0 0 1-4 0v8H3Z"/>`,
     generic: svg`<path d="m2 11 10-9 10 9M5 9v13h14V9M10 22v-8h4v8"/>`,
   };
   const key = room.location === 'outdoor' ? 'outdoor'

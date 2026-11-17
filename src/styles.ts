@@ -138,7 +138,24 @@ export const cardStyles = css`
   .building-details ul { padding-left: 17px; margin: 0 0 20px; }
 
   /* Full scene width follows the configured limit and the actual HA container. */
-  .photo-main { min-width: 0; padding: 10px 24px 12px; }
+  .photo-main { position: relative; min-width: 0; padding: 10px 24px 12px; }
+  .house-side-wrapper { transform-style: preserve-3d; perspective: 1200px; }
+  .house-side-wrapper.flip-out .photo-overview { animation: hk-turn-out .21s ease-in both; }
+  .house-side-wrapper.flip-in .photo-overview { animation: hk-turn-in .23s ease-out both; }
+  @keyframes hk-turn-out { to { transform: perspective(1200px) rotateY(87deg); opacity: .6; } }
+  @keyframes hk-turn-in { from { transform: perspective(1200px) rotateY(-87deg); opacity: .6; } to { transform: perspective(1200px) rotateY(0); opacity: 1; } }
+  .house-side-button { position: absolute; top: 24px; left: 38px; z-index: 10;
+    display: inline-flex; align-items: center; gap: 7px; border: 1px solid #ffffff77;
+    border-radius: 25px; padding: 8px 12px; min-height: 36px; cursor: pointer;
+    color: #fff; font-size: 12px; font-weight: 750; line-height: 1;
+    background: var(--hk-chip, rgba(22,26,30,.72)); box-shadow: 0 2px 10px #0006; }
+  .house-side-button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .house-side-button:disabled { cursor: wait; opacity: .65; }
+  .house-side-button > span { font-size: 18px; }
+  @media (prefers-reduced-motion: reduce) {
+    .house-side-wrapper.flip-out .photo-overview,
+    .house-side-wrapper.flip-in .photo-overview { animation: none; }
+  }
   .photo-lower { width: 100%; max-width: var(--hk-scene-max-width, 1400px); margin: auto; padding: 0 0 20px; }
   .photo-lower .location-column {
     display: none; /* Source overview appears exclusively in the photo on all devices. */
@@ -217,6 +234,7 @@ export const cardStyles = css`
   }
   @container hausklima (max-width: 780px) {
     .photo-main { padding: 8px 12px; }
+    .house-side-button { top: 16px; left: 20px; font-size: 10px; min-height: 29px; padding: 5px 8px; }
     .photo-lower .rooms-section { display: block; padding: 12px 0 16px; }
     .photo-lower .location-column { grid-template-columns: 1fr; gap: 12px; }
     .photo-lower .location-block { padding: 13px; }

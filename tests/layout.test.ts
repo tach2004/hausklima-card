@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from '../scripts/unit-test-compat';
 import { getDefaultBuilding } from '../src/defaults';
 import { createLayout, DRAWING_SCALE } from '../src/layout';
 

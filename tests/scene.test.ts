@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from '../scripts/unit-test-compat';
 import { nothing, render } from 'lit';
 import { getDefaultBuilding } from '../src/defaults';
 import { renderHouseScene } from '../src/house-scene';

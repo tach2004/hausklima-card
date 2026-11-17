@@ -1,5 +1,7 @@
 import { css, html, nothing } from 'lit';
-import { houseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS } from './scene-photo';
+import { houseArtwork, frontHouseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS,
+  FRONT_ROOM_ART_POSITIONS, FRONT_GARAGE_ART_POSITIONS } from './scene-photo';
+import type { HouseSide } from './front-view';
 import { formatSensorValue, resolveMobileReadings, resolveMobileOutdoorGroups, resolveOverviewGroups } from './metrics';
 import { metricIcon, roomIcon } from './icons';
 import { renderReadingGroups } from './reading-view';
@@ -8,6 +10,7 @@ export interface PhotoViewOptions {
   outdoorId?: string;
   onOutdoorChange?: (id: string) => void;
   badgePositions?: Record<string, BadgePositionSet>;
+  side?: HouseSide;
 }
 
 /** Coordinates refer only to the approved, unchanged illustration. */
@@ -19,8 +22,11 @@ export function renderPhotoView(
   selectedRoomId?: string,
   options: PhotoViewOptions = {},
 ) {
-  const rooms = building.rooms.filter((room) => ROOM_ART_POSITIONS[room.id] && room.visible && room.location !== 'outdoor');
-  const devices = building.rooms.filter((room) => GARAGE_ART_POSITIONS[room.id] && room.location !== 'outdoor');
+  const front = options.side === 'front';
+  const roomPositions = front ? FRONT_ROOM_ART_POSITIONS : ROOM_ART_POSITIONS;
+  const garagePositions = front ? FRONT_GARAGE_ART_POSITIONS : GARAGE_ART_POSITIONS;
+  const rooms = building.rooms.filter((room) => roomPositions[room.id] && room.visible && room.location !== 'outdoor');
+  const devices = building.rooms.filter((room) => garagePositions[room.id] && room.location !== 'outdoor');
   const outdoors = building.rooms.filter((room) => room.location === 'outdoor' &&
     (resolveOverviewGroups(room, hass).length || resolveMobileReadings(room, hass).length));
   const outdoor = outdoors.find((room) => room.id === options.outdoorId) ?? outdoors[0];
@@ -66,26 +72,28 @@ export function renderPhotoView(
       style=${`left:${position.x}%;top:${position.y}%;`}>
       ${renderBadge(room, category)}
     </div>`;
-  return html`<div class="photo-overview"><div class="photo-stage">
-    <img class="photo-image" src=${houseArtwork}
-      alt="Gestaltete Hausansicht mit Dachgeschoss, Erdgeschoss und Keller sowie freistehender Garage mit Schaltschrank links und zwei Batterien rechts. Die Einrichtung ist illustrativ." />
+  return html`<div class="photo-overview"><div class="photo-stage" data-scene-side=${front ? 'front' : 'rear'}>
+    <img class="photo-image" src=${front ? frontHouseArtwork : houseArtwork}
+      alt=${front
+        ? 'Illustrative Vorderansicht mit Erd- und Dachgeschoss, Bad, Büro, Heizungsraum, Eingang, Balkon und Garage links.'
+        : 'Gestaltete Hausansicht mit Dachgeschoss, Erdgeschoss und Keller sowie freistehender Garage mit Schaltschrank links und zwei Batterien rechts. Die Einrichtung ist illustrativ.'} />
     <svg class="photo-leaders" aria-hidden="true"></svg>
-    ${rooms.map((room) => placement(room, ROOM_ART_POSITIONS[room.id]!, 'photo-room'))}
-    ${devices.map((room) => placement(room, GARAGE_ART_POSITIONS[room.id]!, room.id === 'garage'
+    ${rooms.map((room) => placement(room, roomPositions[room.id]!, 'photo-room'))}
+    ${devices.map((room) => placement(room, garagePositions[room.id]!, room.id === 'garage'
       ? `photo-air ${resolveOverviewGroups(room, hass).length ? 'photo-garage' : ''}` : 'photo-device'))}
     ${devices.map((room) => {
-      const point = GARAGE_ART_POSITIONS[room.id]!;
+      const point = garagePositions[room.id]!;
       return html`<button class="photo-object-target" type="button" data-select-room=${room.id} data-anchor-x=${point.anchorX} data-anchor-y=${point.anchorY}
         style=${`left:${point.anchorX}%;top:${point.anchorY}%;`}
         aria-label=${`${room.name}: Messwerte und Sensorquellen öffnen`} @click=${() => onSelect(room)}><span></span></button>`;
     })}
     ${outdoor ? html`<div class="photo-placement photo-outdoor-group" data-overlay-id=${outdoor.id}
-      data-anchor-x="86" data-anchor-y="20" data-preferred-x="86" data-preferred-y="20"
+      data-anchor-x=${front ? 12 : 86} data-anchor-y="20" data-preferred-x=${front ? 12 : 86} data-preferred-y="20"
       data-manual-desktop-x=${positionAttrs(outdoor)?.desktop?.x ?? nothing}
       data-manual-desktop-y=${positionAttrs(outdoor)?.desktop?.y ?? nothing}
       data-manual-mobile-x=${positionAttrs(outdoor)?.mobile?.x ?? nothing}
       data-manual-mobile-y=${positionAttrs(outdoor)?.mobile?.y ?? nothing}
-      style="left:86%;top:20%;">
+      style=${`left:${front ? 12 : 86}%;top:20%;`}>
       ${outdoors.length > 1 ? html`<label class="photo-outdoor-choice"><span>Außenmessort im Bild</span>
         <select id="photo-outdoor-select" data-outdoor-selector .value=${outdoor.id} aria-label="Außenmessort im Bild"
           @change=${(event: Event) => options.onOutdoorChange?.((event.target as HTMLSelectElement).value)}>

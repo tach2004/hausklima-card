@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from '../scripts/unit-test-compat';
 import { normalizeConfig, getDefaultConfig } from '../src/config';
 import { getDefaultBuilding } from '../src/defaults';
 import { formatSensorValue, resolveMeasurements, resolveMobileReadings } from '../src/metrics';

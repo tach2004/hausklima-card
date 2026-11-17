@@ -2,6 +2,9 @@ import { LitElement, html, nothing } from 'lit';
 import { live } from 'lit/directives/live.js';
 import { keyed } from 'lit/directives/keyed.js';
 import { getDefaultConfig, normalizeConfig, resolveBuilding } from './config';
+import { applyFrontEdit, frontEditorConfig, isFrontRoom, isSharedLocation,
+  resolveSideBuilding } from './front-view';
+import type { HouseSide } from './front-view';
 import {
   addRoom, addSensor, deleteRoom, editRoom, editSensor, removeSensor,
   setPrimarySensor, setMobileOverview, setMobileSensorOverview, saveBadgePosition, resetBadgePosition, updateMeasurement,
@@ -10,7 +13,8 @@ import { METRIC_LABELS } from './metrics';
 import { METRIC_TYPES } from './types';
 import type { HausKlimaCardConfig, HomeAssistant, MetricType, RoomConfig, SensorConfig } from './types';
 import { editorStyles } from './editor-styles';
-import { houseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS, MOBILE_ROOM_ART_POSITIONS } from './scene-photo';
+import { houseArtwork, frontHouseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS, MOBILE_ROOM_ART_POSITIONS,
+  FRONT_ROOM_ART_POSITIONS, FRONT_GARAGE_ART_POSITIONS, FRONT_MOBILE_ROOM_ART_POSITIONS } from './scene-photo';
 import { roomIcon, metricIcon } from './icons';
 import { formatSensorValue, isMobileOverviewEnabled, resolveMeasurements, resolveMobileReadings } from './metrics';
 
@@ -40,6 +44,7 @@ export class HausKlimaCardEditor extends LitElement {
     _selectorLoading: { state: true },
     _selectorRevision: { state: true },
     _positionDevice: { state: true },
+    _editorSide: { state: true },
   };
 
   declare hass?: HomeAssistant;
@@ -55,12 +60,13 @@ export class HausKlimaCardEditor extends LitElement {
   private _selectorLoading = false;
   private _selectorRevision = 0;
   private _positionDevice: 'desktop' | 'mobile' = 'desktop';
+  private _editorSide: HouseSide = 'rear';
   private _dragPointer: number | null = null;
   private _dragCoordinates?: { x: number; y: number };
 
   setConfig(config: unknown): void {
     this._config = normalizeConfig(config);
-    const rooms = resolveBuilding(this._config).rooms;
+    const rooms = this.activeBuilding().rooms;
     if (!rooms.some((room) => room.id === this._roomId)) this._roomId = rooms[0]?.id ?? '';
     this._confirmDelete = false;
     this._error = '';
@@ -102,6 +108,18 @@ export class HausKlimaCardEditor extends LitElement {
     if (levelSelect && [...levelSelect.options].some((option) => option.value === this._newRoomLevel)) levelSelect.value = this._newRoomLevel;
   }
 
+  private activeBuilding() {
+    return resolveSideBuilding(this._config, resolveBuilding(this._config), this._editorSide);
+  }
+
+  private changeEditorSide(event: Event): void {
+    this._editorSide = (event.target as HTMLSelectElement).value as HouseSide;
+    const rooms = this.activeBuilding().rooms;
+    this._roomId = rooms[0]?.id ?? '';
+    this._confirmDelete = false;
+    this._error = '';
+  }
+
   private commit(next: HausKlimaCardConfig): void {
     this._config = normalizeConfig(next);
     this._error = '';
@@ -111,12 +129,27 @@ export class HausKlimaCardEditor extends LitElement {
   }
 
   private apply(change: () => HausKlimaCardConfig): void {
-    try { this.commit(change()); }
-    catch (error) { this._error = error instanceof Error ? error.message : 'Die Änderung konnte nicht übernommen werden.'; }
+    if (this._editorSide === 'rear') {
+      try { this.commit(change()); }
+      catch (error) { this._error = error instanceof Error ? error.message : 'Die Änderung konnte nicht übernommen werden.'; }
+      return;
+    }
+    const original = this._config;
+    const rear = resolveBuilding(original);
+    try {
+      this._config = frontEditorConfig(original, rear);
+      const updated = change();
+      this._config = original;
+      this.commit(applyFrontEdit(original, rear, updated));
+    } catch (error) {
+      this._config = original;
+      this._error = error instanceof Error ? error.message : 'Die Änderung konnte nicht übernommen werden.';
+    }
   }
 
   private updateBase(key: 'title' | 'show_dimensions' | 'show_room_names' | 'chip_opacity' | 'scene_max_width' | 'theme_mode' | 'badge_font_desktop' | 'badge_font_mobile', value: string | boolean | number): void {
-    this.apply(() => ({ ...this._config, [key]: value }));
+    try { this.commit({ ...this._config, [key]: value }); }
+    catch (error) { this._error = error instanceof Error ? error.message : 'Einstellung ungültig.'; }
   }
 
   private changeRoom(event: Event): void {
@@ -132,13 +165,19 @@ export class HausKlimaCardEditor extends LitElement {
 
   /** Relative coordinates remain stable in Panel, Sections and resized editors. */
   private scenePosition(room: RoomConfig): { x: number; y: number } | undefined {
+    if (this._editorSide === 'front') {
+      return (this._positionDevice === 'mobile' ? FRONT_MOBILE_ROOM_ART_POSITIONS[room.id] : undefined)
+        ?? FRONT_ROOM_ART_POSITIONS[room.id] ?? FRONT_GARAGE_ART_POSITIONS[room.id]
+        ?? (room.location === 'outdoor' ? { x: 12, y: 20 } : undefined);
+    }
     return (this._positionDevice === 'mobile' ? MOBILE_ROOM_ART_POSITIONS[room.id] : undefined)
       ?? ROOM_ART_POSITIONS[room.id] ?? GARAGE_ART_POSITIONS[room.id]
       ?? (room.location === 'outdoor' ? { x: 86, y: 20 } : undefined);
   }
 
   private savedPosition(room: RoomConfig): { x: number; y: number } | undefined {
-    return this._config.badge_positions?.[room.id]?.[this._positionDevice] ?? this.scenePosition(room);
+    const positions = this._editorSide === 'front' ? this._config.front_badge_positions : this._config.badge_positions;
+    return positions?.[room.id]?.[this._positionDevice] ?? this.scenePosition(room);
   }
 
   private positionPointerDown(event: PointerEvent): void {
@@ -207,7 +246,8 @@ export class HausKlimaCardEditor extends LitElement {
   private renderPositionEditor(room: RoomConfig | undefined) {
     if (!room) return nothing;
     const position = this.savedPosition(room);
-    const stored = this._config.badge_positions?.[room.id]?.[this._positionDevice];
+    const positions = this._editorSide === 'front' ? this._config.front_badge_positions : this._config.badge_positions;
+    const stored = positions?.[room.id]?.[this._positionDevice];
     const measurements = this._positionDevice === 'desktop'
       ? resolveMeasurements(room, this.hass, 'overview').map((m) => ({ type: m.type, sensor: m.primary }))
       : resolveMobileReadings(room, this.hass);
@@ -222,7 +262,7 @@ export class HausKlimaCardEditor extends LitElement {
         </select>
       </label>
       ${position ? html`<div class="position-preview" aria-label="Vorschau der Kästchenposition">
-        <img id="position-photo" src=${houseArtwork} alt="Unveränderte Architekturillustration zur Kästchenpositionierung" />
+        <img id="position-photo" src=${this._editorSide === 'front' ? frontHouseArtwork : houseArtwork} alt="Unveränderte Architekturillustration zur Kästchenpositionierung" />
         <button type="button" id="position-marker" class="position-marker"
           style=${`left:${position.x}%;top:${position.y}%;`}
           aria-label=${`${room.name}: Kästchen verschieben`}
@@ -264,10 +304,36 @@ export class HausKlimaCardEditor extends LitElement {
   }
 
   private addLocation(): void {
+    if (this._editorSide === 'front' && this._newRoomKind === 'indoor') {
+      const front = this.activeBuilding();
+      const label = this._newRoomName.trim();
+      if (!label) { this._error = 'Raumname darf nicht leer sein.'; return; }
+      if (front.rooms.some((room) => room.name.trim().toLocaleLowerCase() === label.toLocaleLowerCase())) {
+        this._error = 'Ein Raum mit diesem Namen existiert bereits.'; return;
+      }
+      let index = 1;
+      while (front.rooms.some((room) => room.id === `front_room_${index}`)) index++;
+      const room: RoomConfig = { id: `front_room_${index}`, name: label,
+        level_id: this._newRoomLevel === 'attic' ? 'attic' : 'ground_floor',
+        visible: false, width_m: null, location: 'indoor' };
+      try {
+        this.commit({ ...this._config, front_rooms: [...front.rooms.filter(isFrontRoom), room] });
+        this._roomId = room.id; this._newRoomName = '';
+      } catch (error) { this._error = error instanceof Error ? error.message : 'Raum konnte nicht hinzugefügt werden.'; }
+      return;
+    }
     const building = resolveBuilding(this._config);
     const before = new Set(building.rooms.map((room) => room.id));
     const level = building.levels.find((candidate) => candidate.id === this._newRoomLevel && candidate.building_id === 'house')
       ?? building.levels.find((candidate) => candidate.building_id === 'house');
+    if (this._editorSide === 'front' && this._newRoomKind === 'outdoor') {
+      try {
+        this.commit(addRoom(this._config, { name: this._newRoomName, location: 'outdoor' }));
+        this._roomId = resolveBuilding(this._config).rooms.find((room) => !before.has(room.id))?.id ?? this._roomId;
+        this._newRoomName = '';
+      } catch (error) { this._error = error instanceof Error ? error.message : 'Messort konnte nicht hinzugefügt werden.'; }
+      return;
+    }
     this.apply(() => addRoom(this._config, {
       name: this._newRoomName,
       location: this._newRoomKind,
@@ -280,9 +346,12 @@ export class HausKlimaCardEditor extends LitElement {
   }
 
   private deleteLocation(room: RoomConfig): void {
+    if (this._editorSide === 'front' && isSharedLocation(room)) {
+      this._error = 'Gemeinsame Garage und Außenmessorte nur in der Rückansicht entfernen.'; return;
+    }
     this.apply(() => deleteRoom(this._config, room.id));
     if (this._error) return;
-    this._roomId = resolveBuilding(this._config).rooms[0]?.id ?? '';
+    this._roomId = this.activeBuilding().rooms[0]?.id ?? '';
     this._confirmDelete = false;
   }
 
@@ -358,10 +427,11 @@ export class HausKlimaCardEditor extends LitElement {
   }
 
   protected render() {
-    const building = resolveBuilding(this._config);
+    const building = this.activeBuilding();
     const room = building.rooms.find((candidate) => candidate.id === this._roomId);
     const measurement = room?.measurements?.[this._metric];
-    const houseLevels = building.levels.filter((level) => level.building_id === 'house');
+    const houseLevels = building.levels.filter((level) => level.building_id === 'house'
+      && (this._editorSide === 'rear' || level.id !== 'basement'));
     const overview = measurement?.show_in_overview ?? true;
     return html`
       <div class="editor">
@@ -410,6 +480,15 @@ export class HausKlimaCardEditor extends LitElement {
         </section>
 
         <section class="room-settings" aria-label="Räume und Sensoren">
+          <label class="field" for="editor-house-side"><span>Hausseite konfigurieren</span>
+            <select id="editor-house-side" .value=${this._editorSide} @change=${this.changeEditorSide}>
+              <option value="rear">Rückansicht (bestehende Räume)</option>
+              <option value="front">Vorderansicht (eigene Räume, gemeinsame Garage/Außen)</option>
+            </select>
+          </label>
+          <p class="hint">Räume und Sensoren werden pro Hausseite getrennt gespeichert.
+            Garage, Batterien, Schaltschrank und Außenmessorte verwenden dieselben Sensorquellen;
+            die Positionen ihrer Kästchen bleiben unabhängig.</p>
           <div class="section-heading"><span class="step">1</span><h2>Raum oder Messort</h2></div>
           <label class="field" for="room-select"><span>Raum auswählen</span>
             <select id="room-select" .value=${live(this._roomId)} @change=${this.changeRoom}>
@@ -422,9 +501,13 @@ export class HausKlimaCardEditor extends LitElement {
                 <input id="room-name" type="text" .value=${room.name}
                   @change=${(event: Event) => this.apply(() => editRoom(this._config, room.id, { name: (event.target as HTMLInputElement).value }))} />
               </label>
-              <button id="delete-room" type="button" class="text-button danger" @click=${() => { this._confirmDelete = true; }}>Raum entfernen</button>
+              ${this._editorSide === 'front' && isSharedLocation(room) ? nothing
+                : html`<button id="delete-room" type="button" class="text-button danger"
+                  @click=${() => { this._confirmDelete = true; }}>Raum entfernen</button>`}
             </div>
-            <p class="hint">${room.location === 'outdoor' ? 'Außenmessort · eigener Bereich außerhalb des Hauses.' : `${room.level_id === 'garage' ? 'Garage · eigenständiger Klimamessort' : `${building.levels.find((level) => level.id === room.level_id)?.name ?? 'Weiterer Raum'} · ${room.visible ? 'im Gebäudeschnitt vorgesehen' : 'in der separaten Raumübersicht'}`}.`}</p>
+            <p class="hint">${this._editorSide === 'front' && isSharedLocation(room)
+              ? 'Gemeinsame Messstelle: Sensorzuordnungen gelten auf beiden Seiten; Kästchenposition nur für diese Ansicht.'
+              : room.location === 'outdoor' ? 'Außenmessort · eigener Bereich außerhalb des Hauses.' : `${room.level_id === 'garage' ? 'Garage · eigenständiger Klimamessort' : `${building.levels.find((level) => level.id === room.level_id)?.name ?? 'Weiterer Raum'} · ${room.visible ? 'im Gebäudeschnitt vorgesehen' : 'in der separaten Raumübersicht'}`}.`}</p>
             ${this._confirmDelete ? html`
               <div class="confirmation" role="alert">
                 <strong>„${room.name}“ mit allen Sensorzuordnungen entfernen?</strong>
@@ -479,7 +562,8 @@ export class HausKlimaCardEditor extends LitElement {
 
         <details class="new-room-settings">
           <summary>Raum oder Außenmessort hinzufügen</summary>
-          <p class="hint">Zusätzliche Räume erscheinen in der separaten Übersicht. Hausmaße und vorhandene Garage werden nicht dupliziert oder verändert.</p>
+          <p class="hint">Neue Räume der Vorderansicht bekommen eigene Sensorzuordnungen. Garage und Außenmessorte
+            werden nicht dupliziert. Der Keller gehört zur Rückansicht.</p>
           <label class="field" for="new-room-kind"><span>Art des Messorts</span>
             <select id="new-room-kind" .value=${live(this._newRoomKind)}
               @change=${(event: Event) => { this._newRoomKind = (event.target as HTMLSelectElement).value as 'indoor' | 'outdoor'; }}>
