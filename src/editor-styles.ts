@@ -8,7 +8,7 @@ export const editorStyles = css`
   .base-settings { display: grid; gap: 12px; padding-bottom: 18px; border-bottom: 1px solid var(--divider-color, #dce4e5); }
   .field { display: grid; gap: 8px; font-size: 13px; font-weight: 500; min-width: 0; }
   .field small { font-size: 11px; color: var(--secondary-text-color, #687b81); font-weight: 400; }
-  input[type='text'], select { width: 100%; min-width: 0; min-height: 46px; border: 1px solid var(--divider-color, #dce4e5); border-radius: 9px; padding: 10px 12px; background: var(--input-fill-color, var(--card-background-color, #fff)); color: inherit; font: inherit; }
+  input[type='text'], input[type='number'], select { width: 100%; min-width: 0; min-height: 46px; border: 1px solid var(--divider-color, #dce4e5); border-radius: 9px; padding: 10px 12px; background: var(--input-fill-color, var(--card-background-color, #fff)); color: inherit; font: inherit; }
   button, input, select { font: inherit; }
   .chip-opacity, .scene-width { gap: 10px; }
   .chip-opacity input[type='range'], .scene-width input[type='range'], .badge-font input[type='range'] { display: block; width: 100%; min-height: 44px; margin: 0; cursor: pointer; accent-color: var(--primary-color, #2b8279); touch-action: pan-y; }
@@ -43,8 +43,9 @@ export const editorStyles = css`
   .position-settings { margin-top: 16px; border: 1px solid var(--divider-color, #dce4e5);
     border-radius: 12px; padding: 10px 12px 14px; }
   .position-settings .field { margin: 12px 0; }
+  /* The position preview uses the exact same image and percent origin as the card. */
   .position-preview { position: relative; width: 100%; overflow: hidden; border-radius: 12px;
-    background: #35433f; }
+    background: transparent; }
   .position-preview img { display: block; width: 100%; height: auto; aspect-ratio: 1300 / 732;
     object-fit: contain; pointer-events: none; user-select: none; }
   .position-marker { position: absolute; transform: translate(-50%, -50%); display: flex;
@@ -62,6 +63,8 @@ export const editorStyles = css`
   .position-marker .metric-icon.relative_humidity { color: #8dd6ee; }
   .position-marker .metric-icon.absolute_humidity { color: #9bdad0; }
   .marker-reading small { font-size: .85em; }
+  .position-coordinates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+  .position-coordinates .field { margin: 0; }
   .position-actions { align-items: center; justify-content: space-between; padding-top: 10px; }
   .position-actions .hint { margin: 0; }
   .new-room-settings { border-top: 1px solid var(--divider-color, #dce4e5); padding-top: 18px; }

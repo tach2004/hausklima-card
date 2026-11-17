@@ -11,6 +11,7 @@ export function metricIcon(type: MetricType) {
     voc: svg`<path d="M3 8h12a3 3 0 1 0-3-3M3 12h16a3 3 0 1 1-3 3M3 16h5a3 3 0 1 1-3 3"/>`,
     pressure_relative: svg`<path d="M5 18a9 9 0 1 1 14 0M12 13l5-6M5 13h2m3-8 1 2m7 6h1"/><text x="6" y="22" stroke="none" fill="currentColor" font-size="7">rel</text>`,
     pressure_absolute: svg`<path d="M5 18a9 9 0 1 1 14 0M12 13l5-6M5 13h2m3-8 1 2m7 6h1"/><text x="5" y="22" stroke="none" fill="currentColor" font-size="7">abs</text>`,
+    condensation_risk: svg`<path d="M12 2C9 7 5 11 5 15a7 7 0 0 0 14 0c0-4-4-8-7-13Z"/><path d="M12 10v5m0 3h.01" stroke-width="2"/>`,
   };
   return svg`<svg class="climate-icon metric-icon ${type}" data-icon=${type} viewBox="0 0 24 24" aria-hidden="true">${shapes[type]}</svg>`;
 }
@@ -46,5 +47,6 @@ export const iconStyles = css`
   .metric-icon.co2 { color: #b5d998; }
   .metric-icon.voc { color: #d7c0f0; }
   .metric-icon.pressure_relative, .metric-icon.pressure_absolute { color: #c4d7ef; }
+  .metric-icon.condensation_risk { color: #f2b0a3; }
   .room-icon { width: 15px; height: 15px; color: inherit; }
 `;

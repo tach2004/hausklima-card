@@ -9,11 +9,12 @@ export const METRIC_LABELS: Record<MetricType, string> = {
   voc: 'VOC',
   pressure_relative: 'Luftdruck relativ',
   pressure_absolute: 'Luftdruck absolut',
+  condensation_risk: 'Kondensationsrisiko',
 };
 
 /** Phone-only switches are independent of the desktop overview and details.
  * Older dashboards keep the original compact temperature/RH default. The
- * five extra measurement types are explicit opt-ins to avoid overcrowding.
+ * additional measurement types are explicit opt-ins to avoid overcrowding.
  */
 export function isMobileOverviewEnabled(room: RoomConfig, type: MetricType): boolean {
   return room.mobile_overview?.[type] ?? (type === 'temperature' || type === 'relative_humidity');
@@ -34,6 +35,12 @@ export function sensorStatusLabel(status: SensorStatus): string {
 export function formatSensorValue(sensor: ResolvedSensor, hass?: HomeAssistant): string {
   if (sensor.status !== 'available' || sensor.value === null) return sensorStatusLabel(sensor.status);
   const raw = sensor.value;
+  // No invented risk calculation: use the configured Home Assistant entity.
+  // For a binary risk entity, on/off conventionally means active/inactive.
+  if (sensor.metric_type === 'condensation_risk' && sensor.entity.startsWith('binary_sensor.')) {
+    if (raw === 'on') return 'Risiko';
+    if (raw === 'off') return 'Kein Risiko';
+  }
   const numeric = raw.trim().match(/^([+-]?)(?:(\d+)(?:\.(\d*))?|\.(\d+))(?:[eE]([+-]?\d+))?$/);
   if (!numeric || !Number.isFinite(Number(raw))) return raw;
 

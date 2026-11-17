@@ -119,7 +119,7 @@ describe('Lovelace editor', () => {
     expect(latestConfig().building!.rooms.find((room) => room.id === 'laundry')!.mobile_overview?.temperature).toBe(false);
   });
 
-  it('shows a phone checkbox for all seven types, persists opt-ins and updates position previews', async () => {
+  it('shows a phone checkbox for all eight types, persists opt-ins and updates position previews', async () => {
     const building = getDefaultBuilding();
     const laundry = building.rooms.find((room) => room.id === 'laundry')!;
     laundry.measurements = {};
@@ -149,14 +149,14 @@ describe('Lovelace editor', () => {
     const device = editor.shadowRoot!.querySelector<HTMLSelectElement>('#position-device')!;
     device.value = 'mobile'; device.dispatchEvent(new Event('change', { bubbles: true }));
     await editor.updateComplete;
-    expect(editor.shadowRoot!.querySelectorAll('.position-marker .marker-reading')).toHaveLength(7);
+    expect(editor.shadowRoot!.querySelectorAll('.position-marker .marker-reading')).toHaveLength(8);
     metricSelect.value = 'voc'; metricSelect.dispatchEvent(new Event('change', { bubbles: true }));
     await editor.updateComplete;
     const vocCheckbox = input(editor, 'mobile-metric-visible');
     expect(vocCheckbox.checked).toBe(true);
     vocCheckbox.checked = false; vocCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
     await editor.updateComplete;
-    expect(editor.shadowRoot!.querySelectorAll('.position-marker .marker-reading')).toHaveLength(6);
+    expect(editor.shadowRoot!.querySelectorAll('.position-marker .marker-reading')).toHaveLength(7);
     const saved = events[events.length - 1]!;
     expect(saved.building!.rooms.find((room) => room.id === 'laundry')!.mobile_overview?.co2).toBe(true);
     expect(saved.building!.rooms.find((room) => room.id === 'laundry')!.mobile_overview?.voc).toBe(false);
@@ -170,7 +170,7 @@ describe('Lovelace editor', () => {
     expect(input(restored, 'mobile-metric-visible').checked).toBe(true);
   });
 
-  it('provides separate phone toggles for each source across all seven types', async () => {
+  it('provides separate phone toggles for each source across all eight types', async () => {
     const building = getDefaultBuilding();
     const outdoor = building.rooms.find((r) => r.id === 'laundry')!;
     outdoor.measurements = {};

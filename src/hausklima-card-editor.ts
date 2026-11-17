@@ -156,10 +156,9 @@ export class HausKlimaCardEditor extends LitElement {
     if (!image) return;
     const bounds = image.getBoundingClientRect();
     if (!bounds.width || !bounds.height) return;
-    const minX = Math.min(50, marker.offsetWidth / bounds.width * 50);
-    const minY = Math.min(50, marker.offsetHeight / bounds.height * 50);
-    const x = Math.max(minX, Math.min(100 - minX, (event.clientX - bounds.left) / bounds.width * 100));
-    const y = Math.max(minY, Math.min(100 - minY, (event.clientY - bounds.top) / bounds.height * 100));
+    // Same 0–100% center coordinates as the live image, including at edges.
+    const x = Math.max(0, Math.min(100, (event.clientX - bounds.left) / bounds.width * 100));
+    const y = Math.max(0, Math.min(100, (event.clientY - bounds.top) / bounds.height * 100));
     this._dragCoordinates = { x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 };
     marker.style.left = `${x}%`;
     marker.style.top = `${y}%`;
@@ -191,6 +190,20 @@ export class HausKlimaCardEditor extends LitElement {
     this.apply(() => saveBadgePosition(this._config, room.id, this._positionDevice, { x, y }));
   }
 
+  private updatePositionCoordinate(event: Event, room: RoomConfig, axis: 'x' | 'y'): void {
+    const input = event.target as HTMLInputElement;
+    const value = Number(input.value);
+    if (!input.value.trim() || !Number.isFinite(value) || value < 0 || value > 100) {
+      this._error = 'Kästchenposition: Bitte einen Wert zwischen 0 und 100 % eingeben.';
+      input.value = this.savedPosition(room)?.[axis].toFixed(1) ?? '';
+      return;
+    }
+    const current = this.savedPosition(room);
+    if (!current) return;
+    this.apply(() => saveBadgePosition(this._config, room.id, this._positionDevice,
+      { ...current, [axis]: Math.round(value * 100) / 100 }));
+  }
+
   private renderPositionEditor(room: RoomConfig | undefined) {
     if (!room) return nothing;
     const position = this.savedPosition(room);
@@ -201,7 +214,7 @@ export class HausKlimaCardEditor extends LitElement {
     return html`<details class="position-settings">
       <summary>Messwertkästchen im Bild verschieben</summary>
       <p class="hint">Raum oben auswählen, dann das schwarze Kästchen mit Maus oder Finger ziehen.
-        Desktop und Handy werden unabhängig gespeichert. Alternativ mit den Pfeiltasten bewegen (Umschalt: 5 %).</p>
+        Desktop und Handy werden unabhängig gespeichert. X-/Y-Werte können direkt eingegeben werden. Überlappende Kästchen werden nicht automatisch verschoben. Alternativ Pfeiltasten verwenden (Umschalt: 5 %).</p>
       <label class="field" for="position-device"><span>Position für</span>
         <select id="position-device" .value=${this._positionDevice}
           @change=${(event: Event) => { this._positionDevice = (event.target as HTMLSelectElement).value as 'desktop' | 'mobile'; }}>
@@ -226,6 +239,18 @@ export class HausKlimaCardEditor extends LitElement {
             <small>${metric.sensor.unit}</small>
           </span>`) : nothing}
         </button>
+      </div>
+      <div class="position-coordinates" role="group" aria-label="Kästchenposition in Prozent">
+        <label class="field" for="position-x">Horizontal (X) in %
+          <input id="position-x" type="number" min="0" max="100" step="0.1"
+            .value=${position.x.toFixed(1)}
+            @change=${(event: Event) => this.updatePositionCoordinate(event, room, 'x')} />
+        </label>
+        <label class="field" for="position-y">Vertikal (Y) in %
+          <input id="position-y" type="number" min="0" max="100" step="0.1"
+            .value=${position.y.toFixed(1)}
+            @change=${(event: Event) => this.updatePositionCoordinate(event, room, 'y')} />
+        </label>
       </div>
       <div class="button-row position-actions">
         <span class="hint">Aktuelle Position: ${position.x.toFixed(1)} % / ${position.y.toFixed(1)} %</span>
@@ -287,7 +312,7 @@ export class HausKlimaCardEditor extends LitElement {
         ${keyed(`${room.id}:${this._metric}:${sensor.entity}:${this._selectorRevision}`, html`<ha-selector
           data-sensor-entity=${sensor.entity}
           .hass=${this.hass}
-          .selector=${{ entity: { filter: { domain: 'sensor' } } }}
+          .selector=${{ entity: { filter: { domain: this._metric === 'condensation_risk' ? ['sensor', 'binary_sensor'] : 'sensor' } } }}
           .value=${sensor.entity}
           .label=${`Sensor ${index + 1} auswählen`}
           .required=${false}
@@ -436,7 +461,7 @@ export class HausKlimaCardEditor extends LitElement {
             ${this._selectorAvailable ? html`
               <div class="add-sensor" data-picker-revision=${this._selectorRevision}>
                 ${keyed(this._selectorRevision, html`<ha-selector id="new-sensor" .hass=${this.hass}
-                  .selector=${{ entity: { filter: { domain: 'sensor' } } }}
+                  .selector=${{ entity: { filter: { domain: this._metric === 'condensation_risk' ? ['sensor', 'binary_sensor'] : 'sensor' } } }}
                   .value=${undefined} .label=${measurement?.sensors.length ? 'Weiteren Sensor auswählen' : 'Sensor auswählen'}
                   .required=${false}
                   @value-changed=${(event: SelectorEvent) => this.sensorChanged(event, room)}

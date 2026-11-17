@@ -202,3 +202,12 @@ Drei Garagengeräte liegen auf dem Handy standardmäßig als kleine Reihe direkt
 Auch auf dem Handy verbinden jetzt wieder **drei feine Linien** die Kästchen von **Schaltschrank, Pylontech und LiTime** mit den korrekten Geräten im freigegebenen Bild. Das Linienende wird **nach jeder neuen Anordnung** aus dem aktuellen Rechteck des Messwertkästchens berechnet. Das umfasst gespeicherte, per Editor verschobene Handypositionen, eine neue Kartenbreite und den Reset. Linien erscheinen nur für Messorte mit tatsächlich dargestelltem Klimakästchen und berühren vorzugsweise die nächste Kästchenkante.
 
 Der Editor-Regler **Schriftgröße der Kästchen – Handy** unterstützt nun **5–16 px in 0,5-px-Schritten** statt mindestens 8 px. Ein Wert unter 8 px kann auf hochauflösenden Displays praktisch zu klein sein; Standard 9 px bleibt erhalten. Diese Einstellung betrifft nur das Hausbild, nicht die Raumdetails oder Desktop-Schrift.
+
+
+### Kondensationsrisiko
+
+Die Messart **Kondensationsrisiko** kann wie Temperatur oder Feuchte für jeden Raum, Außenmessort und Garagenbereich einem vorhandenen Home-Assistant-`sensor` oder `binary_sensor` zugeordnet werden. Sie ist unabhängig für Desktop und Handy aktivierbar. Bei einem `binary_sensor` wird `on` als „Risiko“ und `off` als „Kein Risiko“ angezeigt. Andere Sensorzustände werden übernommen.
+
+**Es erfolgt keine eigene Kondensationsberechnung:** Für ein belastbares Risiko ist zusätzlich zur Lufttemperatur und Luftfeuchtigkeit die Temperatur der betroffenen Oberfläche oder ein entsprechend konfigurierter Risikosensor nötig.
+
+Positionen sind Mittelpunktkoordinaten in **0–100 % der unveränderten Illustration**, für Desktop und Handy getrennt. X/Y lassen sich durch Ziehen, Pfeiltasten und direkte Prozent-Eingabe ändern. Auch bei Überlappung wird kein Kästchen automatisch verschoben. Außenmessorte, Garage, Batterien und Schaltschrank erscheinen als normale Raumkarten unter der Illustration.
