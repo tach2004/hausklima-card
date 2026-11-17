@@ -92,15 +92,13 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
       }
       const isOutdoor = element.classList.contains('photo-outdoor-group');
       const isWideRoom = id === 'bedroom' || id === 'storage';
-      // Outdoor source names, values and units need more room than compact room badges.
-      // Keep the maximum proportional to the picture width on narrow phones.
-      const maxBadgeWidth = isOutdoor ? 168 : isWideRoom ? 105 : 95;
-      const widthFraction = isOutdoor ? .46 : isWideRoom ? .27 : .205;
-      const widthLimit = Math.min(maxBadgeWidth, width * widthFraction);
-      const multiSourceOutdoor = isOutdoor && (
-        element.querySelectorAll('.photo-mobile-source-group').length > 1
-        || element.querySelectorAll('.photo-mobile-reading').length > 2);
-      element.style.width = multiSourceOutdoor ? `${widthLimit}px` : 'max-content';
+      // Same content-sized width as desktop for outdoor sources, constrained only
+      // by the picture edge and desktop's 360px named-group safety limit.
+      // The separate compact room/device limits deliberately stay unchanged.
+      const widthLimit = isOutdoor
+        ? Math.min(width - 8, 360)
+        : Math.min(isWideRoom ? 105 : 95, width * (isWideRoom ? .27 : .205));
+      element.style.width = 'max-content';
       element.style.maxWidth = `${widthLimit}px`;
       const w = element.offsetWidth, h = element.offsetHeight;
       const fallback = mobileCenters[id];
@@ -149,16 +147,14 @@ export function layoutPhotoOverlays(stage: HTMLElement): void {
         lines.push({ element, rect: { x: x - element.offsetWidth / 2, y: y - h / 2, width: element.offsetWidth, height: h } });
       }
     }
-    // A densely populated outdoor badge may need to leave the picture.
-    // Give it a separate, right-aligned row instead of squeezing it into a
-    // three-column equipment dock and hiding the temperatures or their units.
+    // Keep the same content-sized width when a tall outdoor group needs its
+    // own dock row; never stretch it to a fixed proportion of the image width.
     for (const element of dock.filter((item) => item.classList.contains('photo-outdoor-group'))) {
       element.classList.add('is-docked');
-      const outdoorWidth = Math.min(168, width * .46);
-      element.style.width = `${outdoorWidth}px`;
-      element.style.maxWidth = `${outdoorWidth}px`;
-      const h = element.offsetHeight;
-      const x = width - outdoorWidth / 2 - 4;
+      element.style.width = 'max-content';
+      element.style.maxWidth = `${Math.min(width - 8, 360)}px`;
+      const w = element.offsetWidth, h = element.offsetHeight;
+      const x = width - w / 2 - 4;
       const y = maxBottom + 8 + h / 2;
       element.style.left = `${x}px`;
       element.style.top = `${y}px`;

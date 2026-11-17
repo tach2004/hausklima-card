@@ -703,7 +703,9 @@ async function checkOutdoorMobileBadgeWidth(browser) {
         rows,
       };
     });
-    assert.ok(geometry.badgeWidth > 105, `${width}: outdoor panel grows beyond compact 95px badge width (actual ${geometry.badgeWidth}px)`);
+    assert.ok(geometry.badgeWidth >= 40, `${width}: outdoor panel remains readable (actual ${geometry.badgeWidth}px)`);
+    assert.ok(geometry.badgeWidth <= Math.min(360, geometry.stageRight - geometry.stageLeft - 8) + 1,
+      `${width}: outdoor panel respects picture width without an arbitrary 168px limit`);
     assert.ok(geometry.boxLeft >= geometry.stageLeft - 1 && geometry.boxRight <= geometry.stageRight + 1,
       `${width}: outdoor panel stays inside the picture`);
     assert.ok(geometry.selectorLeft >= geometry.boxLeft - 1 && geometry.selectorRight <= geometry.boxRight + 1,
@@ -732,6 +734,83 @@ async function checkOutdoorMobileBadgeWidth(browser) {
     await page.close();
   }
   console.log('PASS outdoor mobile badge width: several sources, unclipped values/units, selector and responsive positions');
+}
+
+/** Content-driven sizing is independent of the number of sources and viewport. */
+async function checkOutdoorNaturalWidth(browser) {
+  for (const viewportWidth of [360, 402, 1280]) {
+    const page = await browser.newPage({ viewport: { width: viewportWidth, height: 950 }, hasTouch: viewportWidth < 768 });
+    const { card, errors, external } = await ready(page);
+    const settle = async () => page.evaluate(async () => {
+      await window.hausklimaPreview.card.updateComplete;
+      await new Promise(requestAnimationFrame);
+      await new Promise(requestAnimationFrame);
+      await new Promise(requestAnimationFrame);
+    });
+    const applyNames = async (labels) => {
+      await page.evaluate((mapping) => {
+        const config = window.hausklimaPreview.getConfig();
+        const room = config.building.rooms.find((item) => item.id === 'demo_outdoor');
+        for (const metric of Object.values(room.measurements)) {
+          for (const sensor of metric.sensors) {
+            if (sensor.overview_group && mapping[sensor.overview_group]) sensor.overview_group = mapping[sensor.overview_group];
+          }
+        }
+        for (const sensor of room.measurements.temperature.sensors) sensor.show_on_mobile = true;
+        for (const sensor of room.measurements.relative_humidity.sensors) sensor.show_on_mobile = true;
+        window.hausklimaPreview.setConfig(config);
+      }, labels);
+      await settle();
+    };
+    // First compare a compact version with the same sources and values.
+    await applyNames({ Homematic: 'HM', Ecowitt: 'Eco', Vitodens: 'VD' });
+    const short = await card.locator('.photo-outdoor-group').evaluate((node) => ({
+      width: node.getBoundingClientRect().width,
+      docked: node.classList.contains('is-docked'),
+    }));
+    await applyNames({ HM: 'Homematic Außentemperaturfühler',
+      Eco: 'Ecowitt WS90 Wetterstation', VD: 'Vitodens Außensensor' });
+    const long = await card.locator('.photo-outdoor-group').evaluate((node) => {
+      const box = node.getBoundingClientRect();
+      const image = node.closest('.photo-stage').getBoundingClientRect();
+      return {
+        width: box.width, left: box.left, right: box.right,
+        imageLeft: image.left, imageRight: image.right,
+        docked: node.classList.contains('is-docked'),
+        headings: [...node.querySelectorAll('.photo-mobile-source-heading')].map((element) => ({
+          text: element.textContent.trim(),
+          clipped: element.scrollWidth > element.clientWidth + 1,
+        })),
+      };
+    });
+    assert.ok(long.width > short.width + 14,
+      `${viewportWidth}: longer source labels enlarge the badge naturally (short ${short.width}, long ${long.width})`);
+    assert.ok(long.left >= long.imageLeft - 1 && long.right <= long.imageRight + 1,
+      `${viewportWidth}: dynamically-sized outdoor badge fits inside the picture`);
+    assert.ok(long.width <= Math.min(360, long.imageRight - long.imageLeft - 8) + 1,
+      `${viewportWidth}: named outdoor badge respects available horizontal width`);
+    if (viewportWidth <= 1000) {
+      assert.deepEqual(long.headings.map((h) => h.text),
+        ['Homematic Außentemperaturfühler', 'Ecowitt WS90 Wetterstation', 'Vitodens Außensensor'],
+        `${viewportWidth}: all mobile source names remain present`);
+      assert.ok(long.headings.every((h) => !h.clipped), `${viewportWidth}: no source title is cut off`);
+    }
+    if (viewportWidth > 1000) {
+      const groups = await card.locator('.photo-outdoor .named-group .group-readings').evaluateAll((nodes) =>
+        nodes.map((group) => [...group.querySelectorAll('.photo-metric')].map((row) => ({
+          x: row.getBoundingClientRect().x,
+          y: row.getBoundingClientRect().y,
+        }))));
+      assert.ok(groups.every((rows) => rows.every((row, i) =>
+        i === 0 || row.y > rows[i - 1].y && Math.abs(row.x - rows[i - 1].x) < 2)),
+      `${viewportWidth}: outdoor desktop readings remain stacked, one measurement per line`);
+    }
+    await assertLayout(page, card, `outdoor-dynamic-width/${viewportWidth}`);
+    assert.deepEqual(errors, [], `${viewportWidth}: no browser errors`);
+    assert.deepEqual(external, [], `${viewportWidth}: no external runtime requests`);
+    await page.close();
+  }
+  console.log('PASS content-sized outdoor badges: short vs long names, picture bounds, mobile/desktop');
 }
 
 async function checkPhoneSourceToggles(browser) {
@@ -939,6 +1018,7 @@ try {
   await checkSceneSizing(browser);
   await checkPhoneSourceToggles(browser);
   await checkOutdoorMobileBadgeWidth(browser);
+  await checkOutdoorNaturalWidth(browser);
   await checkBadgePositionEditor(browser);
   await checkResponsive(browser, 'chromium');
   for (const [width, sectionWidth] of [[360, 480], [1440, 480], [1440, 1100]]) {
