@@ -191,12 +191,8 @@ export class HausKlimaCard extends LitElement {
             (room) => this.selectRoom(room), this._selected,
             { side: this._side, outdoorId: this._outdoorId,
               onOutdoorChange: (id) => { this._outdoorId = id; },
-              badgePositions: resolveSideBadgePositions(config, resolveBuilding(config), this._side) })}
-          <button class="house-side-button" data-house-side-switch type="button"
-          aria-label=${this._side === 'rear' ? 'Zur Vorderansicht drehen' : 'Zur Rückansicht drehen'}
-          @click=${() => this.toggleHouseSide()} ?disabled=${Boolean(this._turningPhase)}>
-          <span aria-hidden="true">⟳</span> ${this._side === 'rear' ? 'Vorderansicht' : 'Rückansicht'}
-          </button>
+              badgePositions: resolveSideBadgePositions(config, resolveBuilding(config), this._side),
+              onToggleSide: () => this.toggleHouseSide(), turning: Boolean(this._turningPhase) })}
         </div>
         ${selected ? this.renderDetails(selected, building) : nothing}
       </div>

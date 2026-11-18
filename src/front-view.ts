@@ -24,9 +24,10 @@ export const isSharedLocation = (room: RoomConfig): boolean =>
   room.location === 'outdoor' || room.level_id === 'garage';
 export const isFrontRoom = (room: RoomConfig): boolean => room.id.startsWith('front_');
 
-/** Garage, batteries, cabinet and outdoor locations have canonical rear badge
- * coordinates shared by both facade images. Legacy front-side values for those
- * shared IDs are ignored rather than silently overriding existing positions.
+/** The garage remains on the RIGHT in the original landscape on both sides.
+ * Garage, batteries, cabinet and outdoor locations use the same canonical rear
+ * sensor configuration, desktop/mobile overlay coordinates and device anchors.
+ * Legacy front-side values for these IDs cannot override the originals.
  */
 export function resolveSideBadgePositions(
   config: HausKlimaCardConfig, rear: BuildingConfig, side: HouseSide,

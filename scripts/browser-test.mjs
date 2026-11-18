@@ -960,7 +960,7 @@ async function checkPinnedPositionsAndAllRooms(browser) {
 
 
 async function checkTwoHouseSides(browser) {
-  for (const width of [402, 1280]) {
+  for (const width of [402, 1280, 1700]) {
     const page = await browser.newPage({ viewport: { width, height: 920 }, hasTouch: width <= 500 });
     const { card, editor, errors, external } = await ready(page);
     const rearImage = await card.locator('.photo-image').getAttribute('src');
@@ -994,6 +994,16 @@ async function checkTwoHouseSides(browser) {
       'outdoor group stays in the right-side area on the front');
     assert.equal(await card.locator('.photo-placement[data-overlay-id="garage_battery_pylontech"]').count(), 1);
     assert.equal(await card.locator('.photo-placement[data-overlay-id="garage_cabinet"]').count(), 1);
+    const sharedDeviceCoordinates = await card.locator('.photo-placement, .photo-outdoor-group').evaluateAll((nodes) =>
+      nodes.filter((node) => ['garage', 'garage_cabinet', 'garage_battery_pylontech',
+        'garage_battery_litime', 'demo_outdoor'].includes(node.dataset.overlayId))
+        .map((node) => ({ id: node.dataset.overlayId,
+          desktopX: node.dataset.manualDesktopX, mobileX: node.dataset.manualMobileX,
+          preferredX: node.dataset.preferredX, preferredY: node.dataset.preferredY }))
+        .sort((a, b) => a.id.localeCompare(b.id)));
+    assert.equal(sharedDeviceCoordinates.length, 5, 'all five shared garage/outside devices are displayed');
+    assert.ok(sharedDeviceCoordinates.every((device) => Number(device.preferredX) > 70),
+      'shared garage and outside remain on the RIGHT in front view');
     const facadeAlignment = await card.locator('.photo-stage').evaluate((stage) => {
       const front = stage.querySelector('.photo-front-house-layer');
       return {
@@ -1006,11 +1016,14 @@ async function checkTwoHouseSides(browser) {
     assert.ok(facadeAlignment.width > 0, 'front facade layer has a rendered width');
     const switchGeometry = await card.locator('.house-side-wrapper').evaluate((frame) => {
       const img = frame.querySelector('.photo-image').getBoundingClientRect();
-      const button = frame.querySelector('[data-house-side-switch]').getBoundingClientRect();
-      return { inside: button.left >= img.left + 5 && button.top >= img.top + 5 &&
-        button.right <= img.right - 5 && button.bottom <= img.bottom - 5,
+      const control = frame.querySelector('[data-house-side-switch]');
+      const button = control.getBoundingClientRect();
+      return { anchoredInImage: control.parentElement.classList.contains('photo-stage'),
+        inside: button.left >= img.left + 5 && button.top >= img.top + 5 &&
+          button.right <= img.right - 5 && button.bottom <= img.bottom - 5,
         width: img.width };
     });
+    assert.equal(switchGeometry.anchoredInImage, true, `${width}: side switch belongs to the real picture container`);
     assert.equal(switchGeometry.inside, true, `${width}: side switch stays inside the actual image`);
     const outdoorFonts = await card.locator('.photo-outdoor').evaluate((badge) => {
       const desktop = badge.querySelector('.source-group-name');
@@ -1022,8 +1035,8 @@ async function checkTwoHouseSides(browser) {
         mobile: parseFloat(getComputedStyle(mobile).fontSize),
         mobileReading: parseFloat(getComputedStyle(mobileReading).fontSize) };
     });
-    assert.ok(Math.abs(outdoorFonts.desktop - outdoorFonts.metric) < .2,
-      `${width}: desktop outdoor group names match reading type size`);
+    assert.ok(outdoorFonts.desktop >= outdoorFonts.metric && outdoorFonts.desktop < outdoorFonts.metric * 1.2,
+      `${width}: outdoor desktop source headings are as readable as readings`);
     assert.ok(Math.abs(outdoorFonts.mobile - outdoorFonts.mobileReading) < .2,
       `${width}: phone outdoor group names match reading type size`);
     await assertLayout(page, card, `front-side/${width}`);

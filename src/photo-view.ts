@@ -11,6 +11,8 @@ export interface PhotoViewOptions {
   onOutdoorChange?: (id: string) => void;
   badgePositions?: Record<string, BadgePositionSet>;
   side?: HouseSide;
+  onToggleSide?: () => void;
+  turning?: boolean;
 }
 
 /** Coordinates refer only to the approved, unchanged illustration. */
@@ -78,6 +80,11 @@ export function renderPhotoView(
         ? 'Vorderansicht mit Erd- und Dachgeschoss, Büro, Bad, Eingang, Balkon und Garage rechts.'
         : 'Gestaltete Hausansicht mit Dachgeschoss, Erdgeschoss und Keller sowie Garage mit Schaltschrank und zwei Batterien.'} />
     ${front ? html`<img class="photo-front-house-layer" src=${frontHouseArtwork} alt="" aria-hidden="true" />` : nothing}
+    ${options.onToggleSide ? html`<button class="house-side-button" data-house-side-switch type="button"
+      aria-label=${front ? 'Zur Rückansicht drehen' : 'Zur Vorderansicht drehen'}
+      @click=${options.onToggleSide} ?disabled=${Boolean(options.turning)}>
+      <span aria-hidden="true">⟳</span> ${front ? 'Rückansicht' : 'Vorderansicht'}
+    </button>` : nothing}
     <svg class="photo-leaders" aria-hidden="true"></svg>
     ${rooms.map((room) => placement(room, roomPositions[room.id]!, 'photo-room'))}
     ${devices.map((room) => placement(room, garagePositions[room.id]!, room.id === 'garage'
@@ -143,8 +150,12 @@ export const photoStyles = css`
   .photo-device .photo-metric small { font-size: calc(var(--hk-badge-font-desktop, 12px) * .833); }
   .photo-device .photo-room-name { font-size: calc(var(--hk-badge-font-desktop, 12px) * .917); }
   .photo-outdoor { width: 100%; }
-  /* Only the outdoor source headings change; the sensor readings retain their font. */
-  .photo-outdoor .source-group-name { font-size: calc(var(--hk-badge-font-desktop, 12px) * 1.0833); font-weight: 750; }
+  /* The outdoor source name is at least as prominent as its readings on
+     desktop, matching the mobile grouping. Room and value fonts are untouched. */
+  .photo-outdoor .source-group-name {
+    font-size: calc(var(--hk-badge-font-desktop, 12px) * 1.16);
+    font-weight: 750; line-height: 1.25;
+  }
   /* Outdoor readings are one per line on desktop too. This avoids an overly
      wide max-content flex row and matches the vertically grouped phone badge. */
   .photo-outdoor .group-rows .named-group .group-readings {
