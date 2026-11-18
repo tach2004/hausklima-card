@@ -1191,6 +1191,95 @@ async function checkContinuousBadgeDragging(browser) {
   console.log('PASS continuous dragging: desktop mouse, mobile mouse and real touch, reflow without snapping');
 }
 
+
+/** All photo badges, not only Outdoor, must have a consistent reading stack
+ * and heading scale. The real screenshots showed the cabinet group "1" with
+ * three metrics in one line; test the rendered boxes, not just DOM classes. */
+async function checkUnifiedBadgeGroups(browser) {
+  for (const width of [390, 1280]) {
+    const page = await browser.newPage({ viewport: { width, height: 1100 }, hasTouch: width <= 1000 });
+    const { card, errors, external } = await ready(page);
+    await page.evaluate(() => {
+      const config = window.hausklimaPreview.getConfig();
+      const hass = structuredClone(window.hausklimaPreview.card.hass.states);
+      const ids = ['garage_cabinet', 'garage_battery_pylontech', 'bedroom'];
+      for (const id of ids) {
+        const room = config.building.rooms.find((candidate) => candidate.id === id);
+        room.name = id === 'garage_cabinet' ? 'Schrank' : room.name;
+        const source = (name, type) => {
+          const entity = `sensor.demo_group_${id}_${name}_${type}`;
+          hass[entity] = {
+            state: type === 'temperature' ? '13.9' : type === 'relative_humidity' ? '64.4' : '7.7',
+            attributes: { unit_of_measurement: type === 'temperature' ? '°C' :
+              type === 'relative_humidity' ? '%' : 'g/m³' },
+          };
+          return { entity, overview_group: name, show_in_overview: true, show_on_mobile: true };
+        };
+        room.measurements = {
+          temperature: { sensors: [source('1', 'temperature'), source('2', 'temperature')] },
+          relative_humidity: { sensors: [source('1', 'relative_humidity'), source('2', 'relative_humidity')] },
+          absolute_humidity: { sensors: [source('1', 'absolute_humidity')] },
+        };
+        room.mobile_overview = { absolute_humidity: true };
+      }
+      window.hausklimaPreview.setConfig(config);
+      window.hausklimaPreview.setStates(hass);
+    });
+    await page.evaluate(async () => {
+      await window.hausklimaPreview.card.updateComplete;
+      await new Promise(requestAnimationFrame);
+      await new Promise(requestAnimationFrame);
+    });
+    const measured = await card.evaluate((element, width) => {
+      const root = element.shadowRoot;
+      const box = (id) => root.querySelector(`.photo-badge[data-room-id="${id}"]`);
+      const outdoors = box('demo_outdoor');
+      const outdoorDesktop = parseFloat(getComputedStyle(outdoors.querySelector('.source-group-name')).fontSize);
+      const outdoorMobile = parseFloat(getComputedStyle(outdoors.querySelector('.photo-mobile-source-heading')).fontSize);
+      const labels = ['garage_cabinet', 'garage_battery_pylontech', 'bedroom'];
+      return labels.map((id) => {
+        const badge = box(id);
+        const desktopGroups = [...badge.querySelectorAll('.named-group')];
+        const mobileGroups = [...badge.querySelectorAll('.photo-mobile-source-group')];
+        const header = badge.querySelector(width <= 1000 ? '.photo-mobile-name' : '.photo-room-name');
+        const groupNames = badge.querySelectorAll(width <= 1000 ? '.photo-mobile-source-heading' : '.source-group-name');
+        const sensorStack = (group, selector) => {
+          const metrics = [...group.querySelectorAll(selector)].map((node) => node.getBoundingClientRect());
+          return { count: metrics.length, stacked: metrics.every((rect, i) =>
+            i === 0 || rect.top >= metrics[i - 1].bottom - .65) };
+        };
+        return {
+          id, heading: parseFloat(getComputedStyle(header).fontSize),
+          groupLabels: [...groupNames].map((node) => ({
+            name: node.textContent.trim(),
+            size: parseFloat(getComputedStyle(node).fontSize),
+          })),
+          exteriorFont: width <= 1000 ? outdoorMobile : outdoorDesktop,
+          desktopStack: desktopGroups.map((node) => sensorStack(node, '.photo-metric')),
+          mobileStack: mobileGroups.map((node) => sensorStack(node, '.photo-mobile-reading')),
+        };
+      });
+    }, width);
+    for (const row of measured) {
+      assert.deepEqual(row.groupLabels.map((label) => label.name), ['1', '2'],
+        `${width}/${row.id}: both named source groups are visible`);
+      assert.ok(row.groupLabels.every((label) => Math.abs(label.size - row.exteriorFont) < .2),
+        `${width}/${row.id}: source labels match the Outdoor group font`);
+      if (width <= 1000) assert.ok(row.groupLabels.every((label) =>
+        Math.abs(label.size - row.heading * .9) < .2),
+        `${width}/${row.id}: mobile source heading remains 10% smaller than room name`);
+      assert.deepEqual(row.desktopStack, [{ count: 3, stacked: true }, { count: 2, stacked: true }],
+        `${width}/${row.id}: all desktop metrics follow one another vertically`);
+      assert.deepEqual(row.mobileStack, [{ count: 3, stacked: true }, { count: 2, stacked: true }],
+        `${width}/${row.id}: all phone metrics follow one another vertically`);
+    }
+    assert.deepEqual(errors, [], `${width}: group layout emits no runtime errors`);
+    assert.deepEqual(external, [], `${width}: group layout performs no remote requests`);
+    await page.close();
+  }
+  console.log('PASS uniform photo badges: Schrank, battery and indoor groups stack and scale like Outdoor');
+}
+
 async function checkBadgePositionEditor(browser) {
   const page = await browser.newPage({ viewport: { width: 390, height: 950 }, hasTouch: true });
   const { card, editor, errors } = await ready(page);
@@ -1366,6 +1455,7 @@ try {
   await checkOutdoorMobileBadgeWidth(browser);
   await checkOutdoorNaturalWidth(browser);
   await checkBadgePositionEditor(browser);
+  await checkUnifiedBadgeGroups(browser);
   await checkContinuousBadgeDragging(browser);
   await checkPinnedPositionsAndAllRooms(browser);
   await checkTwoHouseSides(browser);

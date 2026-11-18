@@ -137,8 +137,9 @@ export function resolveMobileReadings(room: RoomConfig, hass?: HomeAssistant): {
   });
 }
 
-/** Keep phone outdoor readings grouped by a matching source label; never invent relationships. */
-export function resolveMobileOutdoorGroups(room: RoomConfig, hass?: HomeAssistant): {
+/** Group phone readings by their actual sensor source in any room or device.
+ *  Only configured source labels are shared; never invent relationships. */
+export function resolveMobileReadingGroups(room: RoomConfig, hass?: HomeAssistant): {
   name: string; readings: ReturnType<typeof resolveMobileReadings>;
 }[] {
   const groups = new Map<string, { name: string; readings: ReturnType<typeof resolveMobileReadings> }>();
@@ -153,6 +154,9 @@ export function resolveMobileOutdoorGroups(room: RoomConfig, hass?: HomeAssistan
   }
   return [...groups.values()];
 }
+
+/** Keep the former export for existing integrations/tests. */
+export const resolveMobileOutdoorGroups = resolveMobileReadingGroups;
 
 /** Full, selected source readings, grouped only within the requested location. */
 export function resolveOverviewGroups(room: RoomConfig, hass?: HomeAssistant): OverviewGroup[] {

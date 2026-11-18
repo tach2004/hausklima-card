@@ -2,7 +2,7 @@ import { css, html, nothing } from 'lit';
 import { houseArtwork, frontHouseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS,
   FRONT_ROOM_ART_POSITIONS, MOBILE_ROOM_ART_POSITIONS, FRONT_MOBILE_ROOM_ART_POSITIONS } from './scene-photo';
 import type { HouseSide } from './front-view';
-import { formatSensorValue, resolveMobileReadings, resolveMobileOutdoorGroups, resolveOverviewGroups } from './metrics';
+import { formatSensorValue, resolveMobileReadings, resolveMobileReadingGroups, resolveOverviewGroups } from './metrics';
 import { metricIcon, roomIcon } from './icons';
 import { renderReadingGroups } from './reading-view';
 import type { BadgePositionSet, BuildingConfig, HomeAssistant, RoomConfig } from './types';
@@ -40,7 +40,12 @@ export function renderPhotoView(
   const renderBadge = (room: RoomConfig, category: string) => {
     const groups = resolveOverviewGroups(room, hass);
     const climate = resolveMobileReadings(room, hass);
-    const outdoorGroups = room.location === 'outdoor' ? resolveMobileOutdoorGroups(room, hass) : [];
+    // Named sensor groups obey exactly the same hierarchy on mobile in every
+    // room/device as they already do outside. Simple rooms without a source
+    // label keep their compact, ungrouped representation.
+    const showMobileGroups = room.location === 'outdoor' ||
+      climate.some((reading) => reading.sensor.overview_group?.trim() || reading.sourceLabel);
+    const mobileGroups = showMobileGroups ? resolveMobileReadingGroups(room, hass) : [];
     const mobileReading = ({ type, sensor, sourceLabel }: (typeof climate)[number], showSource = true) => html`
       <span class="photo-mobile-reading" data-metric=${type} data-reading-entity=${sensor.entity}>
         <span class="mobile-reading-icon ${type}" aria-hidden="true">${metricIcon(type)}</span>
@@ -55,9 +60,9 @@ export function renderPhotoView(
       @click=${() => onSelect(room)}>
       ${showNames ? html`<span class="photo-room-name">${roomIcon(room)}<span>${room.name}</span></span>` : nothing}
       ${renderReadingGroups(room, hass, true)}
-      ${climate.length ? html`<span class="photo-mobile-climate">
+      ${climate.length ? html`<span class="photo-mobile-climate ${showMobileGroups ? 'has-mobile-groups' : ''}">
         ${showNames ? html`<span class="photo-mobile-name">${roomIcon(room)}<span>${room.name}</span></span>` : nothing}
-        ${room.location === 'outdoor' ? outdoorGroups.map((group) => html`
+        ${showMobileGroups ? mobileGroups.map((group) => html`
           <span class="photo-mobile-source-group" data-mobile-source-group=${group.name}>
             <span class="photo-mobile-source-heading" title=${group.name}>${group.name}</span>
             ${group.readings.map((reading) => mobileReading(reading, false))}
@@ -178,15 +183,17 @@ export const photoStyles = css`
   .photo-device .photo-metric small { font-size: calc(var(--hk-badge-font-desktop, 12px) * .833); }
   .photo-device .photo-room-name { font-size: calc(var(--hk-badge-font-desktop, 12px) * .917); }
   .photo-outdoor { width: 100%; }
-  /* Source headings are 90% of the outdoor room name on each device.
-     The desktop/mobile font sliders still scale them proportionally. */
-  .photo-outdoor .source-group-name {
+  /* Every image badge uses the same source-heading scale as Outdoor.
+     Keep all group names 10% below the desktop title scale, regardless of
+     room, garage device or house side; respect the configurable font size. */
+  .photo-badge .source-group-name {
     font-size: calc(var(--hk-badge-font-desktop, 12px) * .9);
     font-weight: 750; line-height: 1.25;
   }
-  /* Outdoor readings are one per line on desktop too. This avoids an overly
-     wide max-content flex row and matches the vertically grouped phone badge. */
-  .photo-outdoor .group-rows .named-group .group-readings {
+  /* One SENSOR reading per row in EVERY image badge, including multi-source
+     groups such as cabinet "1"/"2". Override the general list/tile layout
+     without changing the room tiles or the detailed sensor view. */
+  .photo-badge .group-rows .named-group .group-readings {
     flex-direction: column; flex-wrap: nowrap; gap: 4px;
   }
   .photo-outdoor-choice { display: grid; gap: 4px; background: var(--hk-chip, rgba(22, 26, 30, .72)); color: #fff; border-radius: 9px 9px 0 0; padding: 7px 9px; font-size: 10px; }
@@ -231,9 +238,9 @@ export const photoStyles = css`
       width: 100%; min-height: 28px; font-size: 10px;
       background: #263039; color: #fff; border-color: #ffffff60;
     }
-    /* Outdoor phone badges: one source heading, then temperature, humidity and
-       optional measurements on their own lines. Other badges stay unchanged. */
-    .photo-outdoor-group .photo-mobile-climate { gap: 4px; }
+    /* The SAME source-heading and per-reading layout in every named mobile
+       badge. Compact badges without source headings keep their old spacing. */
+    .photo-mobile-climate.has-mobile-groups { gap: 4px; }
     .photo-mobile-source-group { display: flex; flex-direction: column; gap: 2px; min-width: 0; max-width: 100%; }
     .photo-mobile-source-group + .photo-mobile-source-group { border-top: 1px solid #ffffff55; padding-top: 5px; }
     .photo-mobile-source-heading {
@@ -241,8 +248,10 @@ export const photoStyles = css`
       color: #fff; font-size: calc(var(--hk-badge-font-mobile, 9px) * .81);
       font-weight: 750; line-height: 1.2;
     }
-    .photo-outdoor-group .photo-mobile-reading { width: 100%; flex-wrap: nowrap; }
-    .photo-outdoor-group .photo-mobile-reading :is(strong, small) { flex: 0 0 auto; white-space: nowrap; }
+    .photo-badge .photo-mobile-source-group .photo-mobile-reading { width: 100%; flex-wrap: nowrap; }
+    .photo-badge .photo-mobile-source-group .photo-mobile-reading :is(strong, small) {
+      flex: 0 0 auto; white-space: nowrap;
+    }
     .photo-mobile-climate { display: flex; flex-direction: column; gap: 0; min-width: 0; max-width: 100%; }
     .photo-mobile-name {
       display: flex; gap: 2px; align-items: center; color: #fff; font-size: calc(var(--hk-badge-font-mobile, 9px) * .9); font-weight: 750;
