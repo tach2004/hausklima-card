@@ -1,6 +1,6 @@
 import { css, html, nothing } from 'lit';
 import { houseArtwork, frontHouseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS,
-  FRONT_ROOM_ART_POSITIONS } from './scene-photo';
+  FRONT_ROOM_ART_POSITIONS, MOBILE_ROOM_ART_POSITIONS, FRONT_MOBILE_ROOM_ART_POSITIONS } from './scene-photo';
 import type { HouseSide } from './front-view';
 import { formatSensorValue, resolveMobileReadings, resolveMobileOutdoorGroups, resolveOverviewGroups } from './metrics';
 import { metricIcon, roomIcon } from './icons';
@@ -13,6 +13,8 @@ export interface PhotoViewOptions {
   side?: HouseSide;
   onToggleSide?: () => void;
   turning?: boolean;
+  editorDevice?: 'desktop' | 'mobile';
+  onBadgeEvent?: (room: RoomConfig, kind: 'down' | 'move' | 'up' | 'cancel' | 'key', event: PointerEvent | KeyboardEvent) => void;
 }
 
 /** Coordinates refer only to the approved, unchanged illustration. */
@@ -64,8 +66,25 @@ export function renderPhotoView(
     </button>`;
   };
   const positionAttrs = (room: RoomConfig) => options.badgePositions?.[room.id];
+  const mobileFallback = front ? FRONT_MOBILE_ROOM_ART_POSITIONS : MOBILE_ROOM_ART_POSITIONS;
+  const coordinateLabel = (room: RoomConfig, fallback: { x: number; y: number }) => {
+    if (!options.editorDevice || selectedRoomId !== room.id) return nothing;
+    const point = positionAttrs(room)?.[options.editorDevice] ??
+      (options.editorDevice === 'mobile' ? mobileFallback[room.id] : undefined) ?? fallback;
+    return html`<span class="photo-edit-coordinate" data-position-readout>${`X: ${point.x.toFixed(1)} % · Y: ${point.y.toFixed(1)} %`}</span>`;
+  };
+  const editEvents = (room: RoomConfig) => ({
+    down: (event: PointerEvent) => options.onBadgeEvent?.(room, 'down', event),
+    move: (event: PointerEvent) => options.onBadgeEvent?.(room, 'move', event),
+    up: (event: PointerEvent) => options.onBadgeEvent?.(room, 'up', event),
+    cancel: (event: PointerEvent) => options.onBadgeEvent?.(room, 'cancel', event),
+    key: (event: KeyboardEvent) => options.onBadgeEvent?.(room, 'key', event),
+  });
   const placement = (room: RoomConfig, position: { x: number; y: number; anchorX?: number; anchorY?: number }, category: string) => html`
-    <div class="photo-placement" data-overlay-id=${room.id}
+    <div class="photo-placement ${options.editorDevice && selectedRoomId === room.id ? 'is-edit-selected' : ''}" data-overlay-id=${room.id}
+      @pointerdown=${editEvents(room).down} @pointermove=${editEvents(room).move}
+      @pointerup=${editEvents(room).up} @pointercancel=${editEvents(room).cancel}
+      @keydown=${editEvents(room).key}
       data-anchor-x=${position.anchorX ?? position.x} data-anchor-y=${position.anchorY ?? position.y}
       data-preferred-x=${position.x} data-preferred-y=${position.y}
       data-manual-desktop-x=${positionAttrs(room)?.desktop?.x ?? nothing}
@@ -74,9 +93,10 @@ export function renderPhotoView(
       data-manual-mobile-y=${positionAttrs(room)?.mobile?.y ?? nothing}
       style=${`left:${position.x}%;top:${position.y}%;`}>
       ${renderBadge(room, category)}
+      ${coordinateLabel(room, position)}
     </div>`;
   return html`<div class="photo-overview"><div class="photo-stage" data-scene-side=${front ? 'front' : 'rear'}>
-    <img class="photo-image" src=${houseArtwork}
+    <img class="photo-image" id=${options.editorDevice ? 'position-photo' : nothing} src=${houseArtwork}
       alt=${front
         ? 'Vorderansicht mit Erd- und Dachgeschoss, Büro, Bad, Eingang, Balkon und Garage rechts.'
         : 'Gestaltete Hausansicht mit Dachgeschoss, Erdgeschoss und Keller sowie Garage mit Schaltschrank und zwei Batterien.'} />
@@ -96,7 +116,10 @@ export function renderPhotoView(
         style=${`left:${point.anchorX}%;top:${point.anchorY}%;`}
         aria-label=${`${room.name}: Messwerte und Sensorquellen öffnen`} @click=${() => onSelect(room)}><span></span></button>`;
     })}
-    ${outdoor ? html`<div class="photo-placement photo-outdoor-group" data-overlay-id=${outdoor.id}
+    ${outdoor ? html`<div class="photo-placement photo-outdoor-group ${options.editorDevice && selectedRoomId === outdoor.id ? 'is-edit-selected' : ''}" data-overlay-id=${outdoor.id}
+      @pointerdown=${editEvents(outdoor).down} @pointermove=${editEvents(outdoor).move}
+      @pointerup=${editEvents(outdoor).up} @pointercancel=${editEvents(outdoor).cancel}
+      @keydown=${editEvents(outdoor).key}
       data-anchor-x="86" data-anchor-y="20" data-preferred-x="86" data-preferred-y="20"
       data-manual-desktop-x=${positionAttrs(outdoor)?.desktop?.x ?? nothing}
       data-manual-desktop-y=${positionAttrs(outdoor)?.desktop?.y ?? nothing}
@@ -109,6 +132,7 @@ export function renderPhotoView(
           ${outdoors.map((room) => html`<option value=${room.id} .selected=${room.id === outdoor.id}>${room.name}</option>`)}
         </select></label>` : nothing}
       ${renderBadge(outdoor, 'photo-outdoor')}
+      ${coordinateLabel(outdoor, { x: 86, y: 20 })}
     </div>` : nothing}
     <p class="photo-dock-note" hidden>Verbundene Messwertfelder: Die Linien zeigen den zugehörigen Raum oder das Gerät.</p>
   </div></div>`;
@@ -154,10 +178,10 @@ export const photoStyles = css`
   .photo-device .photo-metric small { font-size: calc(var(--hk-badge-font-desktop, 12px) * .833); }
   .photo-device .photo-room-name { font-size: calc(var(--hk-badge-font-desktop, 12px) * .917); }
   .photo-outdoor { width: 100%; }
-  /* Outdoor source headings use exactly the room-name size. Both scale with
-     the user's desktop font control; measurement values stay unchanged. */
+  /* Source headings are 90% of the outdoor room name on each device.
+     The desktop/mobile font sliders still scale them proportionally. */
   .photo-outdoor .source-group-name {
-    font-size: var(--hk-badge-font-desktop, 12px);
+    font-size: calc(var(--hk-badge-font-desktop, 12px) * .9);
     font-weight: 750; line-height: 1.25;
   }
   /* Outdoor readings are one per line on desktop too. This avoids an overly
@@ -214,7 +238,7 @@ export const photoStyles = css`
     .photo-mobile-source-group + .photo-mobile-source-group { border-top: 1px solid #ffffff55; padding-top: 5px; }
     .photo-mobile-source-heading {
       display: block; max-width: 100%; overflow-wrap: anywhere;
-      color: #fff; font-size: calc(var(--hk-badge-font-mobile, 9px) * .9);
+      color: #fff; font-size: calc(var(--hk-badge-font-mobile, 9px) * .81);
       font-weight: 750; line-height: 1.2;
     }
     .photo-outdoor-group .photo-mobile-reading { width: 100%; flex-wrap: nowrap; }

@@ -43,29 +43,23 @@ export const editorStyles = css`
   .position-settings { margin-top: 16px; border: 1px solid var(--divider-color, #dce4e5);
     border-radius: 12px; padding: 10px 12px 14px; }
   .position-settings .field { margin: 12px 0; }
-  /* The position preview uses the exact same image and percent origin as the card. */
-  .position-preview { position: relative; width: 100%; overflow: hidden; border-radius: 12px;
-    background: transparent; }
-  .position-preview img { display: block; width: 100%; height: auto; aspect-ratio: 1300 / 732;
-    object-fit: contain; pointer-events: none; user-select: none; }
-  .position-preview .position-front-house-layer { position: absolute; top: 0; left: -18%;
-    width: 91%; height: 100%; object-fit: fill;
-    clip-path: polygon(29% 34%, 31% 15%, 91% 15%, 96.7% 34%, 95.5% 35%, 95.5% 88%, 29% 88%); }
-  .position-marker { position: absolute; transform: translate(-50%, -50%); display: flex;
-    flex-direction: column; align-items: flex-start; gap: 2px;
-    width: max-content; max-width: 46%; min-height: 28px; border-radius: 7px;
-    border: 2px solid #d3eeff; background: rgba(22, 26, 30, .80); color: #fff;
-    padding: 4px 5px; font-size: 10px; line-height: 1.2; font-weight: 500; text-align: left;
-    cursor: grab; touch-action: none; user-select: none; z-index: 4; box-shadow: 0 2px 9px #0008; }
-  .position-marker:active { cursor: grabbing; }
-  .marker-heading, .marker-reading { display: flex; align-items: center; gap: 3px; min-width: 0; width: 100%; }
-  .marker-heading { font-size: inherit; font-weight: 750; overflow-wrap: anywhere; }
-  .marker-heading > span { overflow-wrap: anywhere; min-width: 0; }
-  .position-marker svg { width: 11px; height: 11px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-  .position-marker .metric-icon.temperature { color: #ffc095; }
-  .position-marker .metric-icon.relative_humidity { color: #8dd6ee; }
-  .position-marker .metric-icon.absolute_humidity { color: #9bdad0; }
-  .marker-reading small { font-size: .85em; }
+  /* Editor renders the real card at logical desktop/phone width; transform
+     scales its presentation into the available editor column, not its layout. */
+  .position-live-viewport { position: relative; width: 100%; min-height: 1px; overflow: hidden;
+    border-radius: 12px; background: var(--card-background-color, #edf1f0); margin-top: 10px; }
+  .position-live-canvas { position: absolute; top: 0; left: 0; transform-origin: top left;
+    container: hausklima / inline-size; }
+  .position-live-canvas .photo-stage { box-shadow: none; }
+  .position-live-canvas .photo-placement .photo-badge { cursor: grab; touch-action: none; }
+  .position-live-canvas .photo-placement .photo-badge:active { cursor: grabbing; }
+  .position-live-canvas .photo-placement.is-edit-selected { z-index: 9; }
+  .position-live-canvas .photo-placement.is-edit-selected .photo-badge {
+    outline: 2px solid #d3eeff; outline-offset: 2px; }
+  .position-live-canvas .photo-edit-coordinate { display: block; position: absolute;
+    left: 50%; top: 100%; transform: translateX(-50%); z-index: 15;
+    width: max-content; max-width: 190px; white-space: nowrap;
+    font-size: 11px; font-weight: 650; background: #18262bea; color: #fff;
+    border-radius: 5px; padding: 3px 5px; pointer-events: none; }
   .position-coordinates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
   .position-coordinates .field { margin: 0; }
   .position-actions { align-items: center; justify-content: space-between; padding-top: 10px; }

@@ -44,13 +44,15 @@ function drawLeaders(
  *  No collision avoidance, auto-docking, edge clamping or auto-repositioning.
  *  The editing preview and rendered image share the same coordinate origin.
  */
-export function layoutPhotoOverlays(stage: HTMLElement): void {
+export function layoutPhotoOverlays(stage: HTMLElement, previewScale = 1): void {
   const image = stage.querySelector<HTMLImageElement>('.photo-image');
   if (!image) return;
   // Use fractional rendered dimensions, not rounded clientWidth/clientHeight:
   // the editor and live image then share identical percent coordinates.
   const bounds = image.getBoundingClientRect();
-  const width = bounds.width, imageHeight = bounds.height;
+  // The live editor visually scales a logical 1280/390px card. Calculate in
+  // unscaled CSS pixels; the card itself always calls this with scale = 1.
+  const width = bounds.width / previewScale, imageHeight = bounds.height / previewScale;
   if (!width || !imageHeight) return;
   const mobile = (stage.closest('ha-card')?.clientWidth ?? stage.clientWidth) <= 1000;
   stage.style.height = '';

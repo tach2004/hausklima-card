@@ -3,7 +3,7 @@ import { live } from 'lit/directives/live.js';
 import { keyed } from 'lit/directives/keyed.js';
 import { getDefaultConfig, normalizeConfig, resolveBuilding } from './config';
 import { applyFrontEdit, frontEditorConfig, isFrontRoom, isSharedLocation,
-  resolveSideBuilding } from './front-view';
+  resolveSideBuilding, resolveSideBadgePositions } from './front-view';
 import type { HouseSide } from './front-view';
 import {
   addRoom, addSensor, deleteRoom, editRoom, editSensor, removeSensor,
@@ -13,10 +13,13 @@ import { METRIC_LABELS } from './metrics';
 import { METRIC_TYPES } from './types';
 import type { HausKlimaCardConfig, HomeAssistant, MetricType, RoomConfig, SensorConfig } from './types';
 import { editorStyles } from './editor-styles';
-import { houseArtwork, frontHouseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS, MOBILE_ROOM_ART_POSITIONS,
+import { renderPhotoView, photoStyles } from './photo-view';
+import { layoutPhotoOverlays } from './overlay-layout';
+import { iconStyles } from './icons';
+import { readingStyles } from './reading-view';
+import { ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS, MOBILE_ROOM_ART_POSITIONS,
   FRONT_ROOM_ART_POSITIONS, FRONT_MOBILE_ROOM_ART_POSITIONS } from './scene-photo';
-import { roomIcon, metricIcon } from './icons';
-import { formatSensorValue, isMobileOverviewEnabled, resolveMeasurements, resolveMobileReadings } from './metrics';
+import { isMobileOverviewEnabled } from './metrics';
 
 interface NativeCardConstructor {
   getConfigElement?: () => HTMLElement | Promise<HTMLElement>;
@@ -45,6 +48,7 @@ export class HausKlimaCardEditor extends LitElement {
     _selectorRevision: { state: true },
     _positionDevice: { state: true },
     _editorSide: { state: true },
+    _previewOutdoorId: { state: true },
   };
 
   declare hass?: HomeAssistant;
@@ -61,8 +65,13 @@ export class HausKlimaCardEditor extends LitElement {
   private _selectorRevision = 0;
   private _positionDevice: 'desktop' | 'mobile' = 'desktop';
   private _editorSide: HouseSide = 'rear';
-  private _dragPointer: number | null = null;
-  private _dragCoordinates?: { x: number; y: number };
+  private _previewOutdoorId?: string;
+  private _drag?: { pointerId: number; roomId: string; device: 'desktop' | 'mobile';
+    startX: number; startY: number; offsetX: number; offsetY: number; moved: boolean;
+    position: { x: number; y: number } };
+  private _previewViewport?: HTMLElement;
+  private _previewResize?: ResizeObserver;
+  private _previewFrame?: number;
 
   setConfig(config: unknown): void {
     this._config = normalizeConfig(config);
@@ -99,6 +108,16 @@ export class HausKlimaCardEditor extends LitElement {
   }
 
   protected updated(): void {
+    const viewport = this.shadowRoot?.querySelector<HTMLElement>('.position-live-viewport');
+    if (viewport !== this._previewViewport) {
+      this._previewResize?.disconnect();
+      this._previewViewport = viewport ?? undefined;
+      if (viewport && typeof ResizeObserver !== 'undefined') {
+        this._previewResize = new ResizeObserver(() => this.queuePreviewLayout());
+        this._previewResize.observe(viewport);
+      }
+    }
+    this.queuePreviewLayout();
     // Native select.value must follow option insertion when adding/removing rooms.
     const roomSelect = this.shadowRoot?.querySelector<HTMLSelectElement>('#room-select');
     if (roomSelect && roomSelect.value !== this._roomId) roomSelect.value = this._roomId;
@@ -106,6 +125,40 @@ export class HausKlimaCardEditor extends LitElement {
     if (metricSelect && metricSelect.value !== this._metric) metricSelect.value = this._metric;
     const levelSelect = this.shadowRoot?.querySelector<HTMLSelectElement>('#new-room-level');
     if (levelSelect && [...levelSelect.options].some((option) => option.value === this._newRoomLevel)) levelSelect.value = this._newRoomLevel;
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._previewResize?.disconnect();
+    this._previewViewport = undefined;
+    if (this._previewFrame !== undefined) cancelAnimationFrame(this._previewFrame);
+  }
+
+  private queuePreviewLayout(): void {
+    if (this._previewFrame !== undefined) cancelAnimationFrame(this._previewFrame);
+    this._previewFrame = requestAnimationFrame(() => {
+      this._previewFrame = undefined;
+      this.layoutPreview();
+    });
+  }
+
+  /** Apply the logical viewport width immediately after Lit has updated its DOM.
+   * A mode change must not rely on a ResizeObserver: the outer width is unchanged.
+   */
+  private layoutPreview(): void {
+    const viewport = this.shadowRoot?.querySelector<HTMLElement>('.position-live-viewport');
+    const canvas = viewport?.querySelector<HTMLElement>('.position-live-canvas');
+    const stage = canvas?.querySelector<HTMLElement>('.photo-stage');
+    const image = stage?.querySelector<HTMLImageElement>('.photo-image');
+    if (!viewport || !canvas || !stage || !image || !viewport.clientWidth) return;
+    const designWidth = this._positionDevice === 'mobile' ? 390 : 1280;
+    const scale = Math.min(1, viewport.clientWidth / designWidth);
+    canvas.style.width = `${designWidth}px`;
+    canvas.style.transform = `scale(${scale})`;
+    canvas.style.left = `${Math.max(0, (viewport.clientWidth - designWidth * scale) / 2)}px`;
+    const height = `${image.offsetHeight * scale}px`;
+    if (viewport.style.height !== height) viewport.style.height = height;
+    layoutPhotoOverlays(stage, scale);
   }
 
   private activeBuilding() {
@@ -118,6 +171,8 @@ export class HausKlimaCardEditor extends LitElement {
     this._roomId = rooms[0]?.id ?? '';
     this._confirmDelete = false;
     this._error = '';
+    this._previewOutdoorId = undefined;
+    this._drag = undefined;
   }
 
   private commit(next: HausKlimaCardConfig): void {
@@ -156,6 +211,8 @@ export class HausKlimaCardEditor extends LitElement {
     this._roomId = (event.target as HTMLSelectElement).value;
     this._confirmDelete = false;
     this._error = '';
+    const room = this.activeBuilding().rooms.find((candidate) => candidate.id === this._roomId);
+    if (room?.location === 'outdoor') this._previewOutdoorId = room.id;
   }
 
   private changeMetric(event: Event): void {
@@ -185,41 +242,85 @@ export class HausKlimaCardEditor extends LitElement {
     return positions?.[room.id]?.[this._positionDevice] ?? this.scenePosition(room);
   }
 
-  private positionPointerDown(event: PointerEvent): void {
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    event.preventDefault();
-    this._dragPointer = event.pointerId;
-    this._dragCoordinates = undefined;
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  private liveBadgeEvent(room: RoomConfig, kind: 'down' | 'move' | 'up' | 'cancel' | 'key',
+    event: PointerEvent | KeyboardEvent): void {
+    if (kind === 'key') {
+      this.positionKeyDown(event as KeyboardEvent, room);
+      return;
+    }
+    const pointer = event as PointerEvent;
+    const placement = pointer.currentTarget as HTMLElement;
+    if (kind === 'down') {
+      if ((pointer.pointerType === 'mouse' && pointer.button !== 0)
+        || (pointer.target as HTMLElement).closest('select, .photo-outdoor-choice')) return;
+      const image = this.shadowRoot?.querySelector<HTMLImageElement>('#position-photo');
+      const position = this.savedPosition(room);
+      if (!image || !position) return;
+      const box = image.getBoundingClientRect();
+      if (!box.width || !box.height) return;
+      pointer.preventDefault();
+      this._drag = {
+        pointerId: pointer.pointerId, roomId: room.id, device: this._positionDevice,
+        startX: pointer.clientX, startY: pointer.clientY,
+        offsetX: pointer.clientX - (box.left + position.x / 100 * box.width),
+        offsetY: pointer.clientY - (box.top + position.y / 100 * box.height),
+        moved: false, position: { ...position },
+      };
+      placement.setPointerCapture(pointer.pointerId);
+      return;
+    }
+    const drag = this._drag;
+    if (!drag || drag.pointerId !== pointer.pointerId || drag.roomId !== room.id) return;
+    if (kind === 'cancel') {
+      this._drag = undefined;
+      this.queuePreviewLayout();
+      return;
+    }
+    if (kind === 'move' || kind === 'up') {
+      const image = this.shadowRoot?.querySelector<HTMLImageElement>('#position-photo');
+      const box = image?.getBoundingClientRect();
+      if (box?.width && box.height && (drag.moved ||
+        Math.hypot(pointer.clientX - drag.startX, pointer.clientY - drag.startY) >= 3)) {
+        drag.moved = true;
+        pointer.preventDefault();
+        const x = Math.max(0, Math.min(100, (pointer.clientX - drag.offsetX - box.left) / box.width * 100));
+        const y = Math.max(0, Math.min(100, (pointer.clientY - drag.offsetY - box.top) / box.height * 100));
+        drag.position = { x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 };
+        placement.style.left = `${x}%`;
+        placement.style.top = `${y}%`;
+        // Lit owns these text nodes. Never replace an element's textContent:
+        // replacing children invalidates Lit's text parts on the next rerender.
+        const updateText = (element: HTMLElement | null | undefined, value: string) => {
+          const node = [...(element?.childNodes ?? [])].find((item) => item.nodeType === Node.TEXT_NODE);
+          if (node) (node as Text).data = value;
+        };
+        updateText(placement.querySelector<HTMLElement>('[data-position-readout]'),
+          `X: ${x.toFixed(1)} % · Y: ${y.toFixed(1)} %`);
+        updateText(this.shadowRoot?.querySelector<HTMLElement>('#position-live-readout'),
+          `${room.name}: X ${x.toFixed(1)} % / Y ${y.toFixed(1)} %`);
+      }
+    }
+    if (kind === 'up') {
+      this._drag = undefined;
+      if (placement.hasPointerCapture(pointer.pointerId)) placement.releasePointerCapture(pointer.pointerId);
+      this._roomId = room.id;
+      if (room.location === 'outdoor') this._previewOutdoorId = room.id;
+      if (drag.moved) {
+        // One validated config-changed event per completed drag, not per pixel.
+        this.apply(() => saveBadgePosition(this._config, room.id, drag.device, drag.position));
+      }
+    }
   }
 
-  private positionPointerMove(event: PointerEvent): void {
-    if (this._dragPointer !== event.pointerId) return;
-    const image = this.shadowRoot?.querySelector<HTMLImageElement>('#position-photo');
-    const marker = event.currentTarget as HTMLElement;
-    if (!image) return;
-    const bounds = image.getBoundingClientRect();
-    if (!bounds.width || !bounds.height) return;
-    // Same 0–100% center coordinates as the live image, including at edges.
-    const x = Math.max(0, Math.min(100, (event.clientX - bounds.left) / bounds.width * 100));
-    const y = Math.max(0, Math.min(100, (event.clientY - bounds.top) / bounds.height * 100));
-    this._dragCoordinates = { x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 };
-    marker.style.left = `${x}%`;
-    marker.style.top = `${y}%`;
-  }
-
-  private positionPointerUp(event: PointerEvent, room: RoomConfig): void {
-    if (this._dragPointer !== event.pointerId) return;
-    this.positionPointerMove(event);
-    this._dragPointer = null;
-    const marker = event.currentTarget as HTMLElement;
-    if (marker.hasPointerCapture(event.pointerId)) marker.releasePointerCapture(event.pointerId);
-    const position = this._dragCoordinates;
-    this._dragCoordinates = undefined;
-    if (position) this.apply(() => saveBadgePosition(this._config, room.id, this._positionDevice, position));
+  private selectPreviewRoom(room: RoomConfig): void {
+    if (this._drag) return;
+    this._roomId = room.id;
+    if (room.location === 'outdoor') this._previewOutdoorId = room.id;
+    this._error = '';
   }
 
   private positionKeyDown(event: KeyboardEvent, room: RoomConfig): void {
+    if (!(event.target as HTMLElement).closest('.photo-badge')) return;
     const vectors: Record<string, [number, number]> = {
       ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
     };
@@ -250,63 +351,64 @@ export class HausKlimaCardEditor extends LitElement {
 
   private renderPositionEditor(room: RoomConfig | undefined) {
     if (!room) return nothing;
+    const building = this.activeBuilding();
     const position = this.savedPosition(room);
     const positions = this._editorSide === 'front' && !isSharedLocation(room)
       ? this._config.front_badge_positions : this._config.badge_positions;
     const stored = positions?.[room.id]?.[this._positionDevice];
-    const measurements = this._positionDevice === 'desktop'
-      ? resolveMeasurements(room, this.hass, 'overview').map((m) => ({ type: m.type, sensor: m.primary }))
-      : resolveMobileReadings(room, this.hass);
-    return html`<details class="position-settings">
+    return html`<details class="position-settings" @toggle=${() => this.queuePreviewLayout()}>
       <summary>Messwertkästchen im Bild verschieben</summary>
-      <p class="hint">Raum oben auswählen, dann das schwarze Kästchen mit Maus oder Finger ziehen.
-        Desktop und Handy werden unabhängig gespeichert. X-/Y-Werte können direkt eingegeben werden. Überlappende Kästchen werden nicht automatisch verschoben. Alternativ Pfeiltasten verwenden (Umschalt: 5 %).</p>
-      <label class="field" for="position-device"><span>Position für</span>
+      <p class="hint">Alle sichtbaren Kästchen im echten Hausbild können mit Maus oder Finger verschoben werden.
+        Ein Klick wählt den jeweiligen Messort aus; dessen X-/Y-Werte stehen darunter.
+        Desktop und Handy werden getrennt gespeichert; Garage und Außenmessorte behalten
+        auf Vorder- und Rückansicht die gleichen Positionen.
+        Mit Pfeiltasten verschiebst du um 1 % (Umschalt: 5 %).
+        Im normalen Dashboard ist Verschieben deaktiviert.</p>
+      <label class="field" for="position-device"><span>Vorschau für</span>
         <select id="position-device" .value=${this._positionDevice}
-          @change=${(event: Event) => { this._positionDevice = (event.target as HTMLSelectElement).value as 'desktop' | 'mobile'; }}>
-          <option value="desktop">Desktop</option><option value="mobile">Handy</option>
+          @change=${(event: Event) => {
+            this._drag = undefined;
+            this._positionDevice = (event.target as HTMLSelectElement).value as 'desktop' | 'mobile';
+            // The actual geometry changes, even though the editor column does not.
+            void this.updateComplete.then(() => this.layoutPreview());
+          }}>
+          <option value="desktop">Desktop (1280 px)</option><option value="mobile">Handy (390 px)</option>
         </select>
       </label>
-      ${position ? html`<div class="position-preview" aria-label="Vorschau der Kästchenposition">
-        <img id="position-photo" src=${houseArtwork} alt="Architekturillustration zur Kästchenpositionierung" />
-        ${this._editorSide === 'front' ? html`<img class="position-front-house-layer" src=${frontHouseArtwork} alt="" aria-hidden="true" />` : nothing}
-        <button type="button" id="position-marker" class="position-marker"
-          style=${`left:${position.x}%;top:${position.y}%;`}
-          aria-label=${`${room.name}: Kästchen verschieben`}
-          @pointerdown=${this.positionPointerDown}
-          @pointermove=${this.positionPointerMove}
-          @pointerup=${(event: PointerEvent) => this.positionPointerUp(event, room)}
-          @pointercancel=${(event: PointerEvent) => { if (event.pointerId === this._dragPointer) { this._dragPointer = null; this._dragCoordinates = undefined; } }}
-          @keydown=${(event: KeyboardEvent) => this.positionKeyDown(event, room)}>
-          <span class="marker-heading">${roomIcon(room)}<span>${room.name}</span></span>
-          ${measurements.length ? measurements.map((metric) => html`<span class="marker-reading">
-            ${metricIcon(metric.type)}
-            ${'sourceLabel' in metric && metric.sourceLabel ? html`<span>${metric.sourceLabel}</span>` : nothing}
-            <strong>${formatSensorValue(metric.sensor, this.hass)}</strong>
-            <small>${metric.sensor.unit}</small>
-          </span>`) : nothing}
-        </button>
+      <div class="position-live-viewport" aria-label="Live-Vorschau mit allen verschiebbaren Kästchen">
+        <div class="position-live-canvas" data-preview-device=${this._positionDevice}
+          style=${`--hk-chip: rgba(22, 26, 30, ${this._config.chip_opacity ?? .72}); --hk-badge-font-desktop: ${this._config.badge_font_desktop ?? 12}px; --hk-badge-font-mobile: ${this._config.badge_font_mobile ?? 9}px;`}>
+          ${renderPhotoView(building, this.hass, this._config.show_room_names ?? true,
+            (candidate) => this.selectPreviewRoom(candidate), room.id,
+            { side: this._editorSide, editorDevice: this._positionDevice,
+              outdoorId: room.location === 'outdoor' ? room.id : this._previewOutdoorId,
+              onOutdoorChange: (id) => { this._previewOutdoorId = id; this._roomId = id; },
+              badgePositions: resolveSideBadgePositions(this._config, resolveBuilding(this._config), this._editorSide),
+              onBadgeEvent: (candidate, kind, event) => this.liveBadgeEvent(candidate, kind, event) })}
+        </div>
       </div>
-      <div class="position-coordinates" role="group" aria-label="Kästchenposition in Prozent">
-        <label class="field" for="position-x">Horizontal (X) in %
-          <input id="position-x" type="number" min="0" max="100" step="0.1"
-            .value=${position.x.toFixed(1)}
-            @change=${(event: Event) => this.updatePositionCoordinate(event, room, 'x')} />
-        </label>
-        <label class="field" for="position-y">Vertikal (Y) in %
-          <input id="position-y" type="number" min="0" max="100" step="0.1"
-            .value=${position.y.toFixed(1)}
-            @change=${(event: Event) => this.updatePositionCoordinate(event, room, 'y')} />
-        </label>
-      </div>
-      <div class="button-row position-actions">
-        <span class="hint">Aktuelle Position: ${position.x.toFixed(1)} % / ${position.y.toFixed(1)} %</span>
-        <button type="button" id="position-reset" ?disabled=${!stored}
-          @click=${() => this.apply(() => resetBadgePosition(this._config, room.id, this._positionDevice))}>
-          Standardposition wiederherstellen
-        </button>
-      </div>` : html`<p class="hint">Dieser zusätzliche Raum hat noch keinen bestätigten Platz im Hausbild.
-        Er bleibt über die Raumübersicht erreichbar.</p>`}
+      ${position ? html`
+        <p id="position-live-readout" class="hint" role="status">${`${room.name}: X ${position.x.toFixed(1)} % / Y ${position.y.toFixed(1)} %`}</p>
+        <div class="position-coordinates" role="group" aria-label="Kästchenposition in Prozent">
+          <label class="field" for="position-x">Horizontal (X) in %
+            <input id="position-x" type="number" min="0" max="100" step="0.1"
+              .value=${position.x.toFixed(1)}
+              @change=${(event: Event) => this.updatePositionCoordinate(event, room, 'x')} />
+          </label>
+          <label class="field" for="position-y">Vertikal (Y) in %
+            <input id="position-y" type="number" min="0" max="100" step="0.1"
+              .value=${position.y.toFixed(1)}
+              @change=${(event: Event) => this.updatePositionCoordinate(event, room, 'y')} />
+          </label>
+        </div>
+        <div class="button-row position-actions">
+          <span class="hint">Aktuelle Position: ${position.x.toFixed(1)} % / ${position.y.toFixed(1)} %</span>
+          <button type="button" id="position-reset" ?disabled=${!stored}
+            @click=${() => this.apply(() => resetBadgePosition(this._config, room.id, this._positionDevice))}>
+            Standardposition wiederherstellen
+          </button>
+        </div>` : html`<p class="hint">Dieser zusätzliche Raum hat noch keinen bestätigten Platz im Hausbild.
+          Er bleibt über die Raumübersicht erreichbar.</p>`}
     </details>`;
   }
 
@@ -595,7 +697,7 @@ export class HausKlimaCardEditor extends LitElement {
     `;
   }
 
-  static styles = editorStyles;
+  static styles = [iconStyles, readingStyles, photoStyles, editorStyles];
 }
 
 if (!customElements.get('hausklima-card-editor')) customElements.define('hausklima-card-editor', HausKlimaCardEditor);

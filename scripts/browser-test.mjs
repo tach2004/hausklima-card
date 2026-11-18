@@ -1042,10 +1042,10 @@ async function checkTwoHouseSides(browser) {
         mobile: parseFloat(getComputedStyle(mobile).fontSize),
         mobileName: parseFloat(getComputedStyle(mobileName).fontSize) };
     });
-    assert.ok(Math.abs(outdoorFonts.desktop - outdoorFonts.desktopName) < .2,
-      `${width}: desktop source headings match the room title, not the larger readings`);
-    if (width <= 1000) assert.ok(Math.abs(outdoorFonts.mobile - outdoorFonts.mobileName) < .2,
-      `${width}: mobile source headings match the room title`);
+    assert.ok(Math.abs(outdoorFonts.desktop - outdoorFonts.desktopName * .9) < .2,
+      `${width}: desktop source headings are 90% of the room title`);
+    if (width <= 1000) assert.ok(Math.abs(outdoorFonts.mobile - outdoorFonts.mobileName * .9) < .2,
+      `${width}: phone source headings are 90% of the room title`);
     await assertLayout(page, card, `front-side/${width}`);
 
     // The same native editor includes every original room setting for each side.
@@ -1116,8 +1116,13 @@ async function checkBadgePositionEditor(browser) {
   await editor.locator('#room-select').selectOption('laundry');
   await editor.locator('.position-settings > summary').click();
   await editor.locator('#position-device').selectOption('mobile');
-  const marker = editor.locator('#position-marker');
+  const marker = editor.locator('.position-live-canvas .photo-placement[data-overlay-id="laundry"] .photo-badge');
   const image = editor.locator('#position-photo');
+  assert.ok(await editor.locator('.position-live-canvas .photo-placement').count() >= 8,
+    'live editor shows all actual badges rather than only one marker');
+  assert.equal(await editor.locator('.position-live-canvas').getAttribute('data-preview-device'), 'mobile');
+  assert.equal(await editor.locator('.position-live-canvas').evaluate((node) => node.offsetWidth), 390,
+    'live mobile preview renders at actual phone breakpoint');
   const before = await image.boundingBox();
   const from = await marker.boundingBox();
   assert.ok(before && from, 'the editor shows an interactive picture and a badge');
@@ -1223,7 +1228,12 @@ async function checkBadgePositionEditor(browser) {
     'typed mobile percentages persist exactly');
   const selectedMobile = structuredClone(config.badge_positions.laundry.mobile);
   await editor.locator('#position-device').selectOption('desktop');
-  const desktop = editor.locator('#position-marker');
+  await page.waitForFunction(() => window.hausklimaPreview.editor?.shadowRoot
+    ?.querySelector('.position-live-canvas')?.offsetWidth === 1280, null, { timeout: 5000 });
+  const desktop = editor.locator('.position-live-canvas .photo-placement[data-overlay-id="laundry"] .photo-badge');
+  assert.equal(await editor.locator('.position-live-canvas').getAttribute('data-preview-device'), 'desktop');
+  assert.equal(await editor.locator('.position-live-canvas').evaluate((node) => node.offsetWidth), 1280,
+    'desktop preview uses desktop layout even in narrow HA editor');
   await desktop.press('ArrowRight');
   config = await page.evaluate(() => window.hausklimaPreview.getConfig());
   assert.equal(config.badge_positions.laundry.desktop.x, 57, 'keyboard nudges desktop separately');
