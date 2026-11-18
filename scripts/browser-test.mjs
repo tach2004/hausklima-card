@@ -528,6 +528,10 @@ async function checkEditor(browser) {
     nodes.map((node) => node.getAttribute('data-metric'))),
     ['temperature', 'relative_humidity', 'pressure_relative', 'pressure_absolute'],
     'both pressure types can be enabled on the phone independently');
+  assert.deepEqual(await outdoorBadge.locator('.photo-mobile-qualifier:visible').allTextContents(),
+    ['rel.', 'abs.'], 'phone distinguishes relative and absolute pressure just like desktop');
+  assert.equal(await outdoorBadge.locator('.photo-mobile-reading[data-metric="relative_humidity"] .photo-mobile-qualifier').count(), 0,
+    'humidity is never mislabeled as pressure');
   await editor.locator('#metric-select').selectOption('pressure_absolute');
   await editor.locator('#mobile-metric-visible').uncheck();
   assert.equal(await outdoorBadge.locator('.photo-mobile-reading[data-metric="pressure_absolute"]:visible').count(), 0,
@@ -1008,11 +1012,14 @@ async function checkTwoHouseSides(browser) {
       const front = stage.querySelector('.photo-front-house-layer');
       return {
         left: getComputedStyle(front).left,
+        top: getComputedStyle(front).top,
         width: front.getBoundingClientRect().width,
         clip: getComputedStyle(front).clipPath,
       };
     });
-    assert.match(facadeAlignment.clip, /polygon/);
+    assert.match(facadeAlignment.clip, /polygon\(33\.3% 15\.1%, 89% 15\.1%/,
+      'roof crop follows its actual ridge instead of retaining a rectangular sky wedge');
+    assert.ok(parseFloat(facadeAlignment.top) < 0, 'front roof covers the rear roof ridge');
     assert.ok(facadeAlignment.width > 0, 'front facade layer has a rendered width');
     const switchGeometry = await card.locator('.house-side-wrapper').evaluate((frame) => {
       const img = frame.querySelector('.photo-image').getBoundingClientRect();
@@ -1027,18 +1034,18 @@ async function checkTwoHouseSides(browser) {
     assert.equal(switchGeometry.inside, true, `${width}: side switch stays inside the actual image`);
     const outdoorFonts = await card.locator('.photo-outdoor').evaluate((badge) => {
       const desktop = badge.querySelector('.source-group-name');
-      const metric = badge.querySelector('.photo-metric');
+      const desktopName = badge.querySelector('.photo-room-name');
       const mobile = badge.querySelector('.photo-mobile-source-heading');
-      const mobileReading = badge.querySelector('.photo-mobile-reading');
+      const mobileName = badge.querySelector('.photo-mobile-name');
       return { desktop: parseFloat(getComputedStyle(desktop).fontSize),
-        metric: parseFloat(getComputedStyle(metric).fontSize),
+        desktopName: parseFloat(getComputedStyle(desktopName).fontSize),
         mobile: parseFloat(getComputedStyle(mobile).fontSize),
-        mobileReading: parseFloat(getComputedStyle(mobileReading).fontSize) };
+        mobileName: parseFloat(getComputedStyle(mobileName).fontSize) };
     });
-    assert.ok(outdoorFonts.desktop >= outdoorFonts.metric && outdoorFonts.desktop < outdoorFonts.metric * 1.2,
-      `${width}: outdoor desktop source headings are as readable as readings`);
-    assert.ok(Math.abs(outdoorFonts.mobile - outdoorFonts.mobileReading) < .2,
-      `${width}: phone outdoor group names match reading type size`);
+    assert.ok(Math.abs(outdoorFonts.desktop - outdoorFonts.desktopName) < .2,
+      `${width}: desktop source headings match the room title, not the larger readings`);
+    if (width <= 1000) assert.ok(Math.abs(outdoorFonts.mobile - outdoorFonts.mobileName) < .2,
+      `${width}: mobile source headings match the room title`);
     await assertLayout(page, card, `front-side/${width}`);
 
     // The same native editor includes every original room setting for each side.

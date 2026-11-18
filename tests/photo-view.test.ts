@@ -247,6 +247,7 @@ describe('approved-image climate overlays', () => {
       pressure_relative: { sensors: [{ entity: 'sensor.test_pressure_rel', overview_group: 'Ecowitt' }] },
       pressure_absolute: { sensors: [{ entity: 'sensor.test_pressure_abs', overview_group: 'Ecowitt' }] },
     };
+    room.mobile_overview = { pressure_relative: true, pressure_absolute: true };
     building.rooms.push(room);
     const hass: HomeAssistant = { states: {
       'sensor.test_homematic': { state: '3.39999', attributes: { unit_of_measurement: '°C' } },
@@ -265,6 +266,8 @@ describe('approved-image climate overlays', () => {
     expect(panel.querySelectorAll('.metric-qualifier')).toHaveLength(2);
     expect(panel.querySelector('[data-metric="pressure_relative"]')?.textContent).toContain('rel.');
     expect(panel.querySelector('[data-metric="pressure_absolute"]')?.textContent).toContain('abs.');
+    expect([...panel.querySelectorAll('.photo-mobile-qualifier')].map((node) => node.textContent)).toEqual(['rel.', 'abs.']);
+    expect(panel.querySelector('.photo-mobile-reading[data-metric="relative_humidity"] .photo-mobile-qualifier')).toBeNull();
     expect(panel.textContent).not.toContain('9,9');
     expect(card.shadowRoot?.querySelector('.outdoor-block, .garage-block, .location-column')).toBeNull();
     // All outdoor source groups are in the photo; complete sensor values open on click.
