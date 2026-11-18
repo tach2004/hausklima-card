@@ -102,8 +102,8 @@ export function addRoom(config: HausKlimaCardConfig, input: NewRoom): HausKlimaC
       ? building.levels.find((entry) => entry.id === input.level_id)
       : building.levels.find((entry) => entry.id === 'ground_floor' && entry.building_id === 'house')
         ?? building.levels.find((entry) => entry.building_id === 'house');
-    if (!level || level.building_id !== 'house') {
-      throw new Error('Für weitere Räume eine vorhandene Hausebene auswählen. Die Garage ist bereits ein eigener Messort.');
+    if (!level || (input.location === 'outdoor' && level.building_id !== 'house')) {
+      throw new Error('Bitte eine vorhandene Gebäudeebene auswählen.');
     }
     const prefix = input.location === 'outdoor' ? 'outdoor' : 'room';
     let sequence = 1;
@@ -116,9 +116,20 @@ export function addRoom(config: HausKlimaCardConfig, input: NewRoom): HausKlimaC
 }
 
 export function deleteRoom(config: HausKlimaCardConfig, id: string): HausKlimaCardConfig {
-  return changeBuilding(config, (building) => {
+  const next = changeBuilding(config, (building) => {
     requireRoom(building, id);
     building.rooms = building.rooms.filter((room) => room.id !== id);
+  });
+  // Generated IDs may be reused after deletion: never give the next room
+  // another room's stale desktop/mobile position.
+  const badge_positions = structuredClone(next.badge_positions ?? {});
+  const front_badge_positions = structuredClone(next.front_badge_positions ?? {});
+  delete badge_positions[id];
+  delete front_badge_positions[id];
+  return normalizeConfig({
+    ...next,
+    badge_positions: Object.keys(badge_positions).length ? badge_positions : undefined,
+    front_badge_positions: Object.keys(front_badge_positions).length ? front_badge_positions : undefined,
   });
 }
 

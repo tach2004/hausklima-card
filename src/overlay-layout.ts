@@ -68,8 +68,10 @@ export function layoutPhotoOverlays(
     element.classList.remove('is-docked');
     const id = element.dataset.overlayId ?? '';
     const garageEquipment = id === 'garage_cabinet' || id === 'garage_battery_pylontech' || id === 'garage_battery_litime';
-    const badge = element.querySelector<HTMLElement>('.photo-badge.mobile-climate')
-      ?? (mobile && garageEquipment ? element.querySelector<HTMLElement>('.photo-badge') : null);
+    // Every configured location must retain its badge even when no phone
+    // reading is enabled yet. This allows new rooms to be positioned first
+    // and populated with sensors later.
+    const badge = element.querySelector<HTMLElement>('.photo-badge');
     if (mobile && !badge) {
       element.style.width = '0px';
       element.style.maxWidth = '0px';

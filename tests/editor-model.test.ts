@@ -152,6 +152,32 @@ describe('immutable graphical editor changes', () => {
   });
 });
 
+describe('dynamic user-defined rooms without ID-based photo placement', () => {
+  it('does not recreate deleted defaults and allows additional garage rooms', () => {
+    let config = deleteRoom(getDefaultConfig(), 'workshop');
+    config = deleteRoom(config, 'laundry');
+    config = addRoom(config, { name: 'Unterverteilung', location: 'indoor', level_id: 'ground_floor' });
+    config = addRoom(config, { name: 'Garage zusätzlicher Raum', location: 'indoor', level_id: 'garage' });
+    const building = resolveBuilding(config);
+    expect(building.rooms.some((room) => room.id === 'workshop' || room.id === 'laundry')).toBe(false);
+    expect(building.rooms.find((room) => room.name === 'Unterverteilung'))
+      .toMatchObject({ level_id: 'ground_floor', visible: false, width_m: null });
+    expect(building.rooms.find((room) => room.name === 'Garage zusätzlicher Raum'))
+      .toMatchObject({ level_id: 'garage', visible: false, width_m: null });
+  });
+
+  it('cleans up old coordinates when a generated room is deleted then its ID reused', () => {
+    const first = addRoom(getDefaultConfig(), { name: 'Messort A', location: 'indoor' });
+    const id = resolveBuilding(first).rooms.at(-1)!.id;
+    const positioned = saveBadgePosition(first, id, 'mobile', { x: 13.5, y: 60.2 });
+    const deleted = deleteRoom(positioned, id);
+    const second = addRoom(deleted, { name: 'Messort B', location: 'indoor' });
+    expect(resolveBuilding(second).rooms.at(-1)?.id).toBe(id);
+    expect(second.badge_positions?.[id]).toBeUndefined();
+    expect(second.front_badge_positions?.[id]).toBeUndefined();
+  });
+});
+
 describe('additional rooms and outdoor locations', () => {
   it('adds locations with unique stable IDs, no inferred dimensions and all existing defaults unchanged', () => {
     const original = getDefaultConfig();

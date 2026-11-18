@@ -277,7 +277,9 @@ describe('Lovelace card integration', () => {
     const building = getDefaultBuilding();
     building.rooms.push({ id: 'additional_room', name: 'Weiterer Raum', level_id: 'ground_floor', visible: false, width_m: null });
     const card = await createCard({ ...getDefaultConfig(), building });
-    expect(card.shadowRoot?.querySelector('.photo-stage [data-room-id="additional_room"]')).toBeNull();
+    // The user-added room is now in the actual fixed illustration too;
+    // the separate room overview and its complete details remain available.
+    expect(card.shadowRoot?.querySelector('.photo-stage [data-room-id="additional_room"]')).not.toBeNull();
     const button = find<HTMLButtonElement>(card, '.house-room-list [data-select-room="additional_room"]');
     expect(button.textContent).toContain('Weiterer Raum');
     button.click();
