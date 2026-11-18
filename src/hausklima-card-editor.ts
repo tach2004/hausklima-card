@@ -14,7 +14,7 @@ import { METRIC_TYPES } from './types';
 import type { HausKlimaCardConfig, HomeAssistant, MetricType, RoomConfig, SensorConfig } from './types';
 import { editorStyles } from './editor-styles';
 import { houseArtwork, frontHouseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS, MOBILE_ROOM_ART_POSITIONS,
-  FRONT_ROOM_ART_POSITIONS, FRONT_GARAGE_ART_POSITIONS, FRONT_MOBILE_ROOM_ART_POSITIONS } from './scene-photo';
+  FRONT_ROOM_ART_POSITIONS, FRONT_MOBILE_ROOM_ART_POSITIONS } from './scene-photo';
 import { roomIcon, metricIcon } from './icons';
 import { formatSensorValue, isMobileOverviewEnabled, resolveMeasurements, resolveMobileReadings } from './metrics';
 
@@ -165,10 +165,14 @@ export class HausKlimaCardEditor extends LitElement {
 
   /** Relative coordinates remain stable in Panel, Sections and resized editors. */
   private scenePosition(room: RoomConfig): { x: number; y: number } | undefined {
+    if (isSharedLocation(room)) {
+      return (this._positionDevice === 'mobile' ? MOBILE_ROOM_ART_POSITIONS[room.id] : undefined)
+        ?? GARAGE_ART_POSITIONS[room.id]
+        ?? (room.location === 'outdoor' ? { x: 86, y: 20 } : undefined);
+    }
     if (this._editorSide === 'front') {
       return (this._positionDevice === 'mobile' ? FRONT_MOBILE_ROOM_ART_POSITIONS[room.id] : undefined)
-        ?? FRONT_ROOM_ART_POSITIONS[room.id] ?? FRONT_GARAGE_ART_POSITIONS[room.id]
-        ?? (room.location === 'outdoor' ? { x: 12, y: 20 } : undefined);
+        ?? FRONT_ROOM_ART_POSITIONS[room.id];
     }
     return (this._positionDevice === 'mobile' ? MOBILE_ROOM_ART_POSITIONS[room.id] : undefined)
       ?? ROOM_ART_POSITIONS[room.id] ?? GARAGE_ART_POSITIONS[room.id]
@@ -176,7 +180,8 @@ export class HausKlimaCardEditor extends LitElement {
   }
 
   private savedPosition(room: RoomConfig): { x: number; y: number } | undefined {
-    const positions = this._editorSide === 'front' ? this._config.front_badge_positions : this._config.badge_positions;
+    const positions = this._editorSide === 'front' && !isSharedLocation(room)
+      ? this._config.front_badge_positions : this._config.badge_positions;
     return positions?.[room.id]?.[this._positionDevice] ?? this.scenePosition(room);
   }
 
@@ -246,7 +251,8 @@ export class HausKlimaCardEditor extends LitElement {
   private renderPositionEditor(room: RoomConfig | undefined) {
     if (!room) return nothing;
     const position = this.savedPosition(room);
-    const positions = this._editorSide === 'front' ? this._config.front_badge_positions : this._config.badge_positions;
+    const positions = this._editorSide === 'front' && !isSharedLocation(room)
+      ? this._config.front_badge_positions : this._config.badge_positions;
     const stored = positions?.[room.id]?.[this._positionDevice];
     const measurements = this._positionDevice === 'desktop'
       ? resolveMeasurements(room, this.hass, 'overview').map((m) => ({ type: m.type, sensor: m.primary }))
@@ -262,7 +268,8 @@ export class HausKlimaCardEditor extends LitElement {
         </select>
       </label>
       ${position ? html`<div class="position-preview" aria-label="Vorschau der Kästchenposition">
-        <img id="position-photo" src=${this._editorSide === 'front' ? frontHouseArtwork : houseArtwork} alt="Unveränderte Architekturillustration zur Kästchenpositionierung" />
+        <img id="position-photo" src=${houseArtwork} alt="Architekturillustration zur Kästchenpositionierung" />
+        ${this._editorSide === 'front' ? html`<img class="position-front-house-layer" src=${frontHouseArtwork} alt="" aria-hidden="true" />` : nothing}
         <button type="button" id="position-marker" class="position-marker"
           style=${`left:${position.x}%;top:${position.y}%;`}
           aria-label=${`${room.name}: Kästchen verschieben`}
@@ -488,7 +495,7 @@ export class HausKlimaCardEditor extends LitElement {
           </label>
           <p class="hint">Räume und Sensoren werden pro Hausseite getrennt gespeichert.
             Garage, Batterien, Schaltschrank und Außenmessorte verwenden dieselben Sensorquellen;
-            die Positionen ihrer Kästchen bleiben unabhängig.</p>
+            auch ihre Desktop- und Handy-Kästchenpositionen sind auf beiden Hausseiten identisch.</p>
           <div class="section-heading"><span class="step">1</span><h2>Raum oder Messort</h2></div>
           <label class="field" for="room-select"><span>Raum auswählen</span>
             <select id="room-select" .value=${live(this._roomId)} @change=${this.changeRoom}>
@@ -506,7 +513,7 @@ export class HausKlimaCardEditor extends LitElement {
                   @click=${() => { this._confirmDelete = true; }}>Raum entfernen</button>`}
             </div>
             <p class="hint">${this._editorSide === 'front' && isSharedLocation(room)
-              ? 'Gemeinsame Messstelle: Sensorzuordnungen gelten auf beiden Seiten; Kästchenposition nur für diese Ansicht.'
+              ? 'Gemeinsame Messstelle: Sensoren und Kästchenpositionen gelten auf beiden Hausseiten.'
               : room.location === 'outdoor' ? 'Außenmessort · eigener Bereich außerhalb des Hauses.' : `${room.level_id === 'garage' ? 'Garage · eigenständiger Klimamessort' : `${building.levels.find((level) => level.id === room.level_id)?.name ?? 'Weiterer Raum'} · ${room.visible ? 'im Gebäudeschnitt vorgesehen' : 'in der separaten Raumübersicht'}`}.`}</p>
             ${this._confirmDelete ? html`
               <div class="confirmation" role="alert">

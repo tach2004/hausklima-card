@@ -21,8 +21,17 @@ Die vorhandenen Kellerräume bleiben ausschließlich Teil der Rückansicht.
 Garage, Schaltschrank, Pylontech, LiTime und Außenmessorte werden aus
 `building.rooms` auf **beiden Seiten gemeinsam** verwendet – dieselben
 Sensor-Entitäten müssen daher nur einmal konfiguriert werden.
-Die Positionen der gemeinsamen Kästchen sind auf Vorder- und Rückseite
-dennoch separat (`front_badge_positions` beziehungsweise `badge_positions`).
+Garage, Batterien, Schaltschrank und Außenmessorte verwenden außerdem **dieselben
+Desktop- und Handy-Kästchenpositionen auf beiden Hausseiten** (`badge_positions`).
+Gesonderte `front_badge_positions` gelten nur für die neun Vorderseitenräume.
+Vorherige gesonderte Vorderseiten-Positionen gemeinsamer Messorte werden
+nicht mehr angewendet; die Rückseiten-Positionen bleiben die Referenz.
+
+Die Vorderansicht verwendet die genehmigte Hausfront und den bestehenden
+Garagenbereich rechts aus der ursprünglichen Rückseiten-Illustration
+als zwei lokal zusammengesetzte Bildschichten. Der Umschaltbutton bleibt auf
+Desktop und Handy innerhalb des Bildrahmens. Der Positionseditor zeigt die
+gleiche Zusammensetzung.
 
 Die Hausgrafiken werden lokal als WebP im ausgelieferten JavaScript eingebettet.
 Externe Bild- oder Entitätsdienste sind nicht erforderlich. Die bisherige
@@ -40,8 +49,7 @@ nicht unbedingt alle weiteren Branches.
 Der GitHub-Default-Branch **muss nicht verändert werden**.
 Eine Branch-Installation ersetzt allerdings die derzeit installierte
 `hausklima-card.js` im Home Assistant; sie ist **keine parallele zweite Karte**.
-Die Dashboardkonfiguration vorher sichern. Zur Rückkehr die stabile Release-Version
-(zur Entwicklungsbasis: `v0.1.14`) über dieselbe Aktion installieren und den
+Die Dashboardkonfiguration vorher sichern. Zur Rückkehr die zuvor verwendete stabile Release-Version über dieselbe Aktion installieren und den
 Browsercache der Karte neu laden. Für unabhängige Paralleltests ist eine
 separate HA-Testinstanz der sicherere Weg.
 

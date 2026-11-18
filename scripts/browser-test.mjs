@@ -974,7 +974,10 @@ async function checkTwoHouseSides(browser) {
     await page.waitForFunction(() => window.hausklimaPreview.card.shadowRoot.querySelector('.photo-stage')?.dataset.sceneSide === 'front');
     await page.waitForTimeout(270);
     const frontImage = await card.locator('.photo-image').getAttribute('src');
-    assert.notEqual(frontImage, rearImage, 'front artwork is different but rear artwork remains unchanged');
+    assert.equal(frontImage, rearImage, 'the right-side garage remains the same image on both sides');
+    assert.equal(await card.locator('.photo-front-house-layer').count(), 1, 'front facade overlays the shared right-side garage');
+    const frontFacade = await card.locator('.photo-front-house-layer').getAttribute('src');
+    assert.notEqual(frontFacade, rearImage, 'the front house remains visually distinct from the rear house');
     assert.equal(await card.locator('[data-house-side-switch]').textContent().then((s) => s.includes('Rückansicht')), true);
     assert.equal(await card.locator('.photo-room[data-room-id^="front_"]').count(), 9,
       'nine front rooms, no cellar or rear-room duplicates');
@@ -985,12 +988,44 @@ async function checkTwoHouseSides(browser) {
         const box = node.getBoundingClientRect();
         return { id: node.getAttribute('data-overlay-id'), x: (box.left + box.width / 2 - bounds.left) / bounds.width * 100 };
       }));
-    assert.ok(frontBuildings.some((item) => item.id === 'garage' && item.x < 35),
-      'garage appears on the left side on front');
-    assert.ok(frontBuildings.some((item) => item.id === 'demo_outdoor' && item.x < 35),
-      'existing outside source appears left and is shared');
+    assert.ok(frontBuildings.some((item) => item.id === 'garage' && item.x > 70),
+      'garage stays in the right-side area on the front');
+    assert.ok(frontBuildings.some((item) => item.id === 'demo_outdoor' && item.x > 70),
+      'outdoor group stays in the right-side area on the front');
     assert.equal(await card.locator('.photo-placement[data-overlay-id="garage_battery_pylontech"]').count(), 1);
     assert.equal(await card.locator('.photo-placement[data-overlay-id="garage_cabinet"]').count(), 1);
+    const facadeAlignment = await card.locator('.photo-stage').evaluate((stage) => {
+      const front = stage.querySelector('.photo-front-house-layer');
+      return {
+        left: getComputedStyle(front).left,
+        width: front.getBoundingClientRect().width,
+        clip: getComputedStyle(front).clipPath,
+      };
+    });
+    assert.match(facadeAlignment.clip, /polygon/);
+    assert.ok(facadeAlignment.width > 0, 'front facade layer has a rendered width');
+    const switchGeometry = await card.locator('.house-side-wrapper').evaluate((frame) => {
+      const img = frame.querySelector('.photo-image').getBoundingClientRect();
+      const button = frame.querySelector('[data-house-side-switch]').getBoundingClientRect();
+      return { inside: button.left >= img.left + 5 && button.top >= img.top + 5 &&
+        button.right <= img.right - 5 && button.bottom <= img.bottom - 5,
+        width: img.width };
+    });
+    assert.equal(switchGeometry.inside, true, `${width}: side switch stays inside the actual image`);
+    const outdoorFonts = await card.locator('.photo-outdoor').evaluate((badge) => {
+      const desktop = badge.querySelector('.source-group-name');
+      const metric = badge.querySelector('.photo-metric');
+      const mobile = badge.querySelector('.photo-mobile-source-heading');
+      const mobileReading = badge.querySelector('.photo-mobile-reading');
+      return { desktop: parseFloat(getComputedStyle(desktop).fontSize),
+        metric: parseFloat(getComputedStyle(metric).fontSize),
+        mobile: parseFloat(getComputedStyle(mobile).fontSize),
+        mobileReading: parseFloat(getComputedStyle(mobileReading).fontSize) };
+    });
+    assert.ok(Math.abs(outdoorFonts.desktop - outdoorFonts.metric) < .2,
+      `${width}: desktop outdoor group names match reading type size`);
+    assert.ok(Math.abs(outdoorFonts.mobile - outdoorFonts.mobileReading) < .2,
+      `${width}: phone outdoor group names match reading type size`);
     await assertLayout(page, card, `front-side/${width}`);
 
     // The same native editor includes every original room setting for each side.
@@ -1001,6 +1036,20 @@ async function checkTwoHouseSides(browser) {
       'front editor uses distinct room IDs');
     assert.ok(options.includes('garage') && options.includes('demo_outdoor'),
       'garage and outdoor sensor configurations appear once in both editors');
+    await editor.locator('#room-select').selectOption('garage');
+    await editor.locator('.position-settings > summary').click();
+    await editor.locator('#position-x').fill('82.4');
+    await editor.locator('#position-x').press('Tab');
+    let sharedPositions = await page.evaluate(() => window.hausklimaPreview.getConfig());
+    assert.equal(sharedPositions.badge_positions.garage.desktop.x, 82.4,
+      'editing shared garage on front updates canonical rear coordinates');
+    assert.equal(sharedPositions.front_badge_positions?.garage, undefined,
+      'shared garage never acquires front-only position');
+    await editor.locator('#editor-house-side').selectOption('rear');
+    await editor.locator('#room-select').selectOption('garage');
+    assert.equal(await editor.locator('#position-x').inputValue(), '82.4',
+      'back-side editor immediately shows the same shared garage position');
+    await editor.locator('#editor-house-side').selectOption('front');
     await editor.locator('#room-select').selectOption('front_office');
     await editor.locator('#metric-select').selectOption('temperature');
     await editor.locator('#new-sensor').evaluate((node) =>
@@ -1012,13 +1061,12 @@ async function checkTwoHouseSides(browser) {
       'sensor.demo_front_office_temperature', 'front editor persists its own source');
     assert.deepEqual(config.building.rooms.find((room) => room.id === 'bedroom'),
       original.building.rooms.find((room) => room.id === 'bedroom'), 'rear room settings are unchanged');
-    await editor.locator('.position-settings > summary').click();
     await editor.locator('#position-x').fill('34.2');
     await editor.locator('#position-x').press('Tab');
     config = await page.evaluate(() => window.hausklimaPreview.getConfig());
     assert.equal(config.front_badge_positions.front_office.desktop.x, 34.2);
-    assert.deepEqual(config.badge_positions, original.badge_positions,
-      'front position update does not affect any rear position');
+    assert.equal(config.badge_positions.garage.desktop.x, 82.4,
+      'front room position update never alters shared garage coordinates');
     await editor.locator('#editor-house-side').selectOption('rear');
     const rearOptions = await editor.locator('#room-select option').evaluateAll((nodes) => nodes.map((n) => n.value));
     assert.ok(rearOptions.includes('bedroom') && !rearOptions.includes('front_office'),
@@ -1027,11 +1075,12 @@ async function checkTwoHouseSides(browser) {
     await page.waitForFunction(() => window.hausklimaPreview.card.shadowRoot.querySelector('.photo-stage')?.dataset.sceneSide === 'rear');
     await page.waitForTimeout(270);
     assert.equal(await card.locator('.photo-image').getAttribute('src'), rearImage, 'original rear graphic restored');
+    assert.equal(await card.locator('.photo-front-house-layer').count(), 0, 'no front artwork is leaked into rear');
     assert.deepEqual(errors, [], `${width}: no runtime errors`);
     assert.deepEqual(external, [], `${width}: no external data requests`);
     await page.close();
   }
-  console.log('PASS house flip: rear default, clean front graphic, shared garage/outdoors, independent front sensors/editor/coordinates');
+  console.log('PASS house flip: garage stays right, shared positions, image-contained button, outdoor typography and independent room sensors');
 }
 
 async function checkBadgePositionEditor(browser) {

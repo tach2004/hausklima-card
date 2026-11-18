@@ -48,6 +48,9 @@ export const editorStyles = css`
     background: transparent; }
   .position-preview img { display: block; width: 100%; height: auto; aspect-ratio: 1300 / 732;
     object-fit: contain; pointer-events: none; user-select: none; }
+  .position-preview .position-front-house-layer { position: absolute; top: 0; left: -18%;
+    width: 91%; height: 100%; object-fit: fill;
+    clip-path: polygon(29% 34%, 31% 15%, 91% 15%, 96.7% 34%, 95.5% 35%, 95.5% 88%, 29% 88%); }
   .position-marker { position: absolute; transform: translate(-50%, -50%); display: flex;
     flex-direction: column; align-items: flex-start; gap: 2px;
     width: max-content; max-width: 46%; min-height: 28px; border-radius: 7px;
