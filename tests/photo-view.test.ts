@@ -281,6 +281,45 @@ describe('approved-image climate overlays', () => {
     expect(detail.querySelectorAll('.overview-sensor')).toHaveLength(5);
   });
 
+
+  it('uses the same named source groups in cabinet, battery and indoor badges on desktop and mobile', async () => {
+    const building = getDefaultBuilding();
+    const roomIds = ['garage_cabinet', 'garage_battery_pylontech', 'bedroom'];
+    const states: HomeAssistant['states'] = {};
+    for (const roomId of roomIds) {
+      const room = building.rooms.find((candidate) => candidate.id === roomId)!;
+      const sensor = (group: string, type: string) => {
+        const entity = `sensor.test_${roomId}_${group}_${type}`;
+        states[entity] = {
+          state: type === 'temperature' ? '13.9' : type === 'relative_humidity' ? '64.4' : '7.7',
+          attributes: { unit_of_measurement: type === 'temperature' ? '°C' :
+            type === 'relative_humidity' ? '%' : 'g/m³' },
+        };
+        return { entity, overview_group: group, show_in_overview: true, show_on_mobile: true };
+      };
+      room.measurements = {
+        temperature: { sensors: [sensor('1', 'temperature'), sensor('2', 'temperature')] },
+        relative_humidity: { sensors: [sensor('1', 'relative_humidity'), sensor('2', 'relative_humidity')] },
+        absolute_humidity: { sensors: [sensor('1', 'absolute_humidity')] },
+      };
+      room.mobile_overview = { absolute_humidity: true };
+    }
+    const card = await createCard(building, { states });
+    for (const roomId of roomIds) {
+      const badge = query<HTMLButtonElement>(card, `.photo-badge[data-room-id="${roomId}"]`);
+      expect([...badge.querySelectorAll('.source-group-name')].map((n) => n.textContent)).toEqual(['1', '2']);
+      expect([...badge.querySelectorAll('.photo-mobile-source-heading')].map((n) => n.textContent)).toEqual(['1', '2']);
+      expect([...badge.querySelectorAll('.named-group .group-readings')].map((n) =>
+        n.querySelectorAll('.photo-metric').length)).toEqual([3, 2]);
+      expect([...badge.querySelectorAll('.photo-mobile-source-group')].map((n) =>
+        n.querySelectorAll('.photo-mobile-reading').length)).toEqual([3, 2]);
+      expect(badge.querySelector('.photo-mobile-climate.has-mobile-groups')).not.toBeNull();
+    }
+    // A non-grouped room must not suddenly gain fabricated source headings.
+    const simpleRoom = query<HTMLButtonElement>(card, '.photo-badge[data-room-id="laundry"]');
+    expect(simpleRoom.querySelectorAll('.photo-mobile-source-heading')).toHaveLength(0);
+  });
+
   it('keeps a named single indoor temperature source vertical and introduces rows only for multiple selected sources', async () => {
     const building = getDefaultBuilding();
     const room = building.rooms.find((entry) => entry.id === 'bedroom')!;

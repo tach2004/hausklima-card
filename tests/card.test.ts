@@ -188,7 +188,12 @@ describe('Lovelace card integration', () => {
     card.setConfig({ ...getDefaultConfig(), building: mixed });
     await card.updateComplete;
     expect(phoneEntities()).toEqual(['sensor.test_homematic', 'sensor.test_vitodens']);
-    expect([...badge().querySelectorAll('.photo-mobile-source')].map((node) => node.textContent)).toEqual(['Homematic', 'Vitodens']);
+    // Group labels are now the same standalone headings as in Outdoor,
+    // not repeated inline with each reading. Mobile selection is unchanged.
+    expect([...badge().querySelectorAll('.photo-mobile-source-heading')].map((node) => node.textContent)).toEqual(['Homematic', 'Vitodens']);
+    expect(badge().querySelectorAll('.photo-mobile-source')).toHaveLength(0);
+    expect([...badge().querySelectorAll('.photo-mobile-source-group')].map((node) =>
+      node.querySelectorAll('.photo-mobile-reading').length)).toEqual([1, 1]);
     expect([...badge().querySelectorAll('.photo-metric')].map((node) => node.textContent?.trim())).toEqual(desktopBefore);
     expect((await openRoom(card, 'garage')).querySelectorAll('.sensor-row')).toHaveLength(4);
     const invalid = structuredClone(mixed);

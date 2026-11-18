@@ -75,10 +75,10 @@ export function layoutPhotoOverlays(
       element.style.maxWidth = '0px';
     } else {
       element.style.width = 'max-content';
-      const isOutdoor = element.classList.contains('photo-outdoor-group');
+      const hasNamedMobileGroups = !!element.querySelector('.photo-mobile-climate.has-mobile-groups');
       const isWideRoom = id === 'bedroom' || id === 'storage';
       const limit = mobile
-        ? isOutdoor ? Math.min(width - 8, 360)
+        ? hasNamedMobileGroups ? Math.min(width - 8, 360)
           : Math.min(isWideRoom ? 105 : 95, width * (isWideRoom ? .27 : .205))
         : Math.min(width - 8, element.querySelector('.has-named-groups') ? 360 : 220);
       element.style.maxWidth = `${Math.max(0, limit)}px`;
