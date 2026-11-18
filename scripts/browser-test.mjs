@@ -47,7 +47,27 @@ async function selectRoom(page, card, id, touch = false) {
   }
   const button = card.locator(`[data-select-room="${id}"]:visible`).first();
   await button.waitFor();
-  if (touch) await button.tap(); else await button.click();
+  if (touch) {
+    await button.tap();
+  } else {
+    // Additional user-placed badges may intentionally overlap fixed rooms.
+    // A covered photo badge is still reachable through its room-overview
+    // tile. Keep exercising actual picture clicks whenever unobstructed.
+    await button.scrollIntoViewIfNeeded();
+    const blocked = await button.evaluate((node) => {
+      const bounds = node.getBoundingClientRect();
+      if (!bounds.width || !bounds.height) return true;
+      const root = node.getRootNode();
+      const target = root.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2);
+      return target != null && !node.contains(target);
+    });
+    if (blocked) {
+      if (!await overviewTile.isVisible()) await card.locator('.overview-toggle').click();
+      await overviewTile.click();
+    } else {
+      await button.click();
+    }
+  }
   await card.locator(`.room-detail[data-room-id="${id}"]`).waitFor();
 }
 async function assertLayout(page, card, name) {
@@ -1280,6 +1300,96 @@ async function checkUnifiedBadgeGroups(browser) {
   console.log('PASS uniform photo badges: Schrank, battery and indoor groups stack and scale like Outdoor');
 }
 
+
+/** Regression: the user deleted the original rooms, added a new substation
+ * and expected its real badge in the image, plus independent front/rear
+ * additions and freely movable shared garage rooms. IDs are never an
+ * allow-list for photo rendering. */
+async function checkDynamicRoomPlacement(browser) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 940 }, hasTouch: true });
+  const { card, editor, errors, external } = await ready(page);
+  await page.evaluate(() => {
+    const config = window.hausklimaPreview.getConfig();
+    config.building.rooms = config.building.rooms.filter((room) =>
+      room.level_id === 'garage' || room.location === 'outdoor');
+    window.hausklimaPreview.setConfig(config);
+  });
+  assert.equal(await card.locator('.photo-placement[data-overlay-id="workshop"]').count(), 0,
+    'deleted original room must not reappear');
+  await page.locator('#editor-panel > summary').click();
+  await editor.locator('.new-room-settings > summary').click();
+  await editor.locator('#new-room-kind').selectOption('indoor');
+  await editor.locator('#new-room-side').selectOption('rear');
+  await editor.locator('#new-room-level').selectOption('ground_floor');
+  await editor.locator('#new-room-name').fill('Unterverteilung');
+  await editor.locator('#add-room').click();
+  let config = await page.evaluate(() => window.hausklimaPreview.getConfig());
+  const rearRoom = config.building.rooms.find((room) => room.name === 'Unterverteilung');
+  assert.ok(rearRoom && rearRoom.visible === false, 'the new room exists without fabricated geometry');
+  await card.locator(`.photo-placement[data-overlay-id="${rearRoom.id}"]`).waitFor();
+  assert.equal(await editor.locator('.position-live-canvas .photo-placement[data-overlay-id="' + rearRoom.id + '"]').count(), 1,
+    'the new room is immediately draggable in the live editor');
+  await page.evaluate((id) => {
+    const config = window.hausklimaPreview.getConfig();
+    const room = config.building.rooms.find((candidate) => candidate.id === id);
+    room.measurements = { temperature: { sensors: [{ entity: 'sensor.demo_bedroom_temperature' }] } };
+    window.hausklimaPreview.setConfig(config);
+  }, rearRoom.id);
+  assert.match(await card.locator(`.photo-room[data-room-id="${rearRoom.id}"]`).innerText(), /21,3/,
+    'sensors assigned to a new room appear inside the photo badge');
+
+  await editor.locator('.position-settings > summary').click();
+  await editor.locator('#position-x').fill('62.4');
+  await editor.locator('#position-x').press('Tab');
+  config = await page.evaluate(() => window.hausklimaPreview.getConfig());
+  assert.equal(config.badge_positions?.[rearRoom.id]?.desktop?.x, 62.4,
+    'the arbitrary rear room can be manually repositioned');
+
+  await editor.locator('#new-room-side').selectOption('front');
+  await editor.locator('#new-room-level').selectOption('attic');
+  await editor.locator('#new-room-name').fill('Vorderseite Messstelle');
+  await editor.locator('#add-room').click();
+  config = await page.evaluate(() => window.hausklimaPreview.getConfig());
+  const frontRoom = config.front_rooms.find((room) => room.name === 'Vorderseite Messstelle');
+  assert.ok(frontRoom, 'front addition is stored independently');
+  assert.equal(config.building.rooms.some((room) => room.id === frontRoom.id), false);
+  await card.locator('[data-house-side-switch]').click();
+  await page.waitForFunction(() =>
+    window.hausklimaPreview.card.shadowRoot.querySelector('.photo-stage')?.dataset.sceneSide === 'front');
+  await card.locator(`.photo-placement[data-overlay-id="${frontRoom.id}"]`).waitFor();
+  assert.equal(await card.locator(`.photo-placement[data-overlay-id="${rearRoom.id}"]`).count(), 0,
+    'rear-only substation is not duplicated on the front');
+  assert.equal(await editor.locator('.position-live-canvas .photo-placement[data-overlay-id="' + frontRoom.id + '"]').count(), 1,
+    'front room has its own draggable badge');
+
+  const garageOptions = await editor.locator('#new-room-level option').evaluateAll((options) =>
+    options.map((option) => option.value));
+  assert.ok(garageOptions.includes('garage'), 'Garage is available as building level');
+  await editor.locator('#new-room-level').selectOption('garage');
+  assert.equal(await editor.locator('#new-room-side').isDisabled(), true,
+    'garage additions are automatically shared between sides');
+  await editor.locator('#new-room-name').fill('Garage Zusatzmessort');
+  await editor.locator('#add-room').click();
+  config = await page.evaluate(() => window.hausklimaPreview.getConfig());
+  const garageRoom = config.building.rooms.find((room) => room.name === 'Garage Zusatzmessort');
+  assert.ok(garageRoom && garageRoom.level_id === 'garage');
+  await card.locator(`.photo-placement[data-overlay-id="${garageRoom.id}"]`).waitFor();
+  const garagePlacement = card.locator(`.photo-placement[data-overlay-id="${garageRoom.id}"]`);
+  assert.equal(await garagePlacement.locator('.photo-badge').count(), 1);
+  assert.equal(await card.locator(`.photo-object-target[data-select-room="${garageRoom.id}"]`).count(), 0,
+    'no fake physical garage anchor is drawn for an additional room');
+  await card.locator('[data-house-side-switch]').click();
+  await page.waitForFunction(() =>
+    window.hausklimaPreview.card.shadowRoot.querySelector('.photo-stage')?.dataset.sceneSide === 'rear');
+  await card.locator(`.photo-placement[data-overlay-id="${rearRoom.id}"]`).waitFor();
+  assert.equal(await card.locator(`.photo-placement[data-overlay-id="${garageRoom.id}"]`).count(), 1);
+  assert.equal(await card.locator(`.photo-placement[data-overlay-id="${frontRoom.id}"]`).count(), 0);
+  assert.deepEqual(errors, [], 'no runtime errors while adding arbitrary rooms on both sides');
+  assert.deepEqual(external, [], 'no extra network requests');
+  await page.close();
+  console.log('PASS dynamic photo rooms: removed defaults, sensor assignment, garage and both house sides');
+}
+
 async function checkBadgePositionEditor(browser) {
   const page = await browser.newPage({ viewport: { width: 390, height: 950 }, hasTouch: true });
   const { card, editor, errors } = await ready(page);
@@ -1454,6 +1564,7 @@ try {
   await checkPhoneSourceToggles(browser);
   await checkOutdoorMobileBadgeWidth(browser);
   await checkOutdoorNaturalWidth(browser);
+  await checkDynamicRoomPlacement(browser);
   await checkBadgePositionEditor(browser);
   await checkUnifiedBadgeGroups(browser);
   await checkContinuousBadgeDragging(browser);

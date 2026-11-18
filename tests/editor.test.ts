@@ -433,6 +433,40 @@ describe('Phase 2 native sensor and room editor', () => {
     expect(Object.keys(saved.building?.rooms[0]?.measurements ?? {})).toHaveLength(5);
   });
 
+  it('chooses a house side explicitly and exposes shared garage level when adding any room', async () => {
+    const editor = await createEditor();
+    const configs = capture(editor);
+    const levelSelect = editor.shadowRoot!.querySelector<HTMLSelectElement>('#new-room-level')!;
+    expect([...levelSelect.options].map((option) => option.value)).toContain('garage');
+    await change(editor, '#new-room-side', 'front');
+    await change(editor, '#new-room-level', 'attic');
+    const nameField = input(editor, 'new-room-name');
+    nameField.value = 'Anbau Messort';
+    nameField.dispatchEvent(new Event('input', { bubbles: true }));
+    await editor.updateComplete;
+    await click(editor, '#add-room');
+    const configuredFront = latest(configs);
+    const newFront = configuredFront.front_rooms?.find((room) => room.name === 'Anbau Messort');
+    expect(newFront).toMatchObject({ level_id: 'attic', visible: false, width_m: null });
+    expect(configuredFront.building?.rooms.some((room) => room.id === newFront?.id) ?? false).toBe(false);
+    expect(editor.shadowRoot!.querySelector<HTMLSelectElement>('#editor-house-side')?.value).toBe('front');
+    expect(editor.shadowRoot!.querySelector<HTMLSelectElement>('#room-select')?.value).toBe(newFront?.id);
+    expect(editor.shadowRoot!.querySelector('.position-live-canvas [data-overlay-id="' + newFront!.id + '"]')).not.toBeNull();
+
+    await change(editor, '#new-room-level', 'garage');
+    expect(editor.shadowRoot!.querySelector<HTMLSelectElement>('#new-room-side')?.disabled).toBe(true);
+    const garageName = input(editor, 'new-room-name');
+    garageName.value = 'Garage Technik';
+    garageName.dispatchEvent(new Event('input', { bubbles: true }));
+    await editor.updateComplete;
+    await click(editor, '#add-room');
+    const shared = latest(configs).building?.rooms.find((room) => room.name === 'Garage Technik');
+    expect(shared).toMatchObject({ level_id: 'garage', location: 'indoor', visible: false });
+    expect(latest(configs).front_rooms?.some((room) => room.id === shared!.id)).toBe(false);
+    expect(editor.shadowRoot!.querySelector<HTMLSelectElement>('#room-select')?.value).toBe(shared?.id);
+    expect(editor.shadowRoot!.querySelector('.position-live-canvas [data-overlay-id="' + shared!.id + '"]')).not.toBeNull();
+  });
+
   it('selects garage without duplication and safely adds and removes outside and extra rooms', async () => {
     const editor = await createEditor();
     const configs = capture(editor);

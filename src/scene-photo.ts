@@ -1,3 +1,40 @@
+import type { RoomConfig } from './types';
+
+export type PhotoHouseSide = 'front' | 'rear';
+export interface PhotoRoomCoordinates { x: number; y: number; anchorX?: number; anchorY?: number; }
+
+/** A fixed illustration must NEVER require a fixed list of room IDs.
+ * Original locations retain their proven defaults; every other configured
+ * room gets a deterministic, movable INITIAL coordinate based on its floor
+ * and order among new rooms, never its name, numeric ID or sensor mapping.
+ * Stored user coordinates always override this initial coordinate.
+ */
+export function photoRoomPosition(
+  room: RoomConfig, allRooms: RoomConfig[], side: PhotoHouseSide,
+  device: 'desktop' | 'mobile' = 'desktop',
+): PhotoRoomCoordinates {
+  const defaults = side === 'front' ? FRONT_ROOM_ART_POSITIONS : ROOM_ART_POSITIONS;
+  const mobileDefaults = side === 'front' ? FRONT_MOBILE_ROOM_ART_POSITIONS : MOBILE_ROOM_ART_POSITIONS;
+  // Preserve the approved independent phone starting positions for existing
+  // rooms. Newly added rooms are not subject to any ID whitelist.
+  const fixed = device === 'mobile' && mobileDefaults[room.id]
+    ? mobileDefaults[room.id]
+    : room.level_id === 'garage' ? GARAGE_ART_POSITIONS[room.id] : defaults[room.id];
+  if (fixed) return fixed;
+  const added = allRooms.filter((candidate) => candidate.level_id === room.level_id &&
+    candidate.location !== 'outdoor' && !(candidate.level_id === 'garage'
+      ? GARAGE_ART_POSITIONS[candidate.id] : defaults[candidate.id]));
+  const slot = Math.max(0, added.findIndex((candidate) => candidate.id === room.id));
+  const column = slot % 5, row = Math.floor(slot / 5) % 4;
+  const levelBase: Record<string, { x: number; y: number }> = side === 'front'
+    ? { attic: { x: 22, y: 37 }, ground_floor: { x: 22, y: 64 }, garage: { x: 75, y: 51 } }
+    : { attic: { x: 22, y: 33 }, ground_floor: { x: 22, y: 53 },
+        basement: { x: 22, y: 74 }, garage: { x: 75, y: 51 } };
+  const origin = levelBase[room.level_id] ?? { x: 50, y: 57 };
+  return { x: Math.min(96, origin.x + column * (room.level_id === 'garage' ? 4.5 : 8)),
+    y: Math.min(96, origin.y + row * 3) };
+}
+
 import artwork from './assets/hausklima-cutaway.webp';
 import frontArtwork from './assets/hausklima-front.webp';
 

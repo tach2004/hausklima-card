@@ -38,6 +38,54 @@ function outdoor(id: string, name: string, entity: string, extraEntity?: string)
 }
 
 describe('approved-image climate overlays', () => {
+  it('shows arbitrarily many new rooms after the original rooms were deleted', async () => {
+    const building = getDefaultBuilding();
+    // Simulate the reported user setup: original sensorless house rooms have
+    // been removed for good. No implicit default-room recreation is allowed.
+    building.rooms = building.rooms.filter((room) => room.level_id === 'garage');
+    const created: RoomConfig[] = Array.from({ length: 22 }, (_, i) => ({
+      id: `custom_location_${i + 40}`, name: i === 0 ? 'Unterverteilung' : `Neuer Messort ${i + 1}`,
+      level_id: i % 3 === 0 ? 'basement' : i % 3 === 1 ? 'attic' : 'ground_floor',
+      location: 'indoor', visible: false, width_m: null,
+      ...(i === 0 ? { measurements: {
+        temperature: { sensors: [{ entity: 'sensor.test_new_distributor' }] },
+      } } : {}),
+    }));
+    building.rooms.push(...created);
+    const card = await createCard(building, { states: {
+      'sensor.test_new_distributor': { state: '13.9', attributes: { unit_of_measurement: '°C' } },
+    } });
+    for (const room of created) {
+      const node = query<HTMLDivElement>(card, `.photo-placement[data-overlay-id="${room.id}"]`);
+      expect(node.querySelector('.photo-badge')?.textContent).toContain(room.name);
+      expect(Number(node.dataset.preferredX)).toBeGreaterThan(0);
+      expect(Number(node.dataset.preferredY)).toBeGreaterThan(0);
+    }
+    expect(query(card, '.photo-room[data-room-id="custom_location_40"]').textContent).toContain('13,9');
+    expect(card.shadowRoot!.querySelector('[data-overlay-id="workshop"]')).toBeNull();
+    expect(card.shadowRoot!.querySelector('[data-overlay-id="laundry"]')).toBeNull();
+    expect(card.shadowRoot!.querySelectorAll('.photo-room')).toHaveLength(22);
+  });
+
+  it('shows newly added garage rooms and keeps arbitrary saved desktop/mobile positions', async () => {
+    const building = getDefaultBuilding();
+    building.rooms.push({
+      id: 'arbitrary_garage_workbench', name: 'Werkbank', level_id: 'garage',
+      visible: false, width_m: null, location: 'indoor',
+      measurements: { temperature: { sensors: [{ entity: 'sensor.test_workbench' }] } },
+    });
+    const card = await createCard(building, { states: {
+      'sensor.test_workbench': { state: '11.2', attributes: { unit_of_measurement: '°C' } },
+    } }, { badge_positions: {
+      arbitrary_garage_workbench: { desktop: { x: 76.4, y: 69.2 }, mobile: { x: 84.1, y: 74.7 } },
+    } });
+    const node = query<HTMLDivElement>(card, '.photo-placement[data-overlay-id="arbitrary_garage_workbench"]');
+    expect(node.dataset.manualDesktopX).toBe('76.4');
+    expect(node.dataset.manualMobileX).toBe('84.1');
+    expect(node.querySelector('.photo-device')?.textContent).toContain('11,2');
+    expect(card.shadowRoot!.querySelectorAll('.photo-object-target[data-select-room="arbitrary_garage_workbench"]')).toHaveLength(0);
+  });
+
   it('keeps the approved WebP byte-identical', () => {
     const bytes = readFileSync('src/assets/hausklima-cutaway.webp');
     expect(createHash('sha256').update(bytes).digest('hex')).toBe('fc840fd3cdd7ec1ecbae75a475c14674eafa28e99d7c43888ce6ffef7cbbef98');

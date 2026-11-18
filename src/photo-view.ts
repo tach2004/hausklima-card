@@ -1,6 +1,6 @@
 import { css, html, nothing } from 'lit';
-import { houseArtwork, frontHouseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS,
-  FRONT_ROOM_ART_POSITIONS, MOBILE_ROOM_ART_POSITIONS, FRONT_MOBILE_ROOM_ART_POSITIONS } from './scene-photo';
+import { houseArtwork, frontHouseArtwork, GARAGE_ART_POSITIONS,
+  MOBILE_ROOM_ART_POSITIONS, FRONT_MOBILE_ROOM_ART_POSITIONS, photoRoomPosition } from './scene-photo';
 import type { HouseSide } from './front-view';
 import { formatSensorValue, resolveMobileReadings, resolveMobileReadingGroups, resolveOverviewGroups } from './metrics';
 import { metricIcon, roomIcon } from './icons';
@@ -27,10 +27,13 @@ export function renderPhotoView(
   options: PhotoViewOptions = {},
 ) {
   const front = options.side === 'front';
-  const roomPositions = front ? FRONT_ROOM_ART_POSITIONS : ROOM_ART_POSITIONS;
   const garagePositions = GARAGE_ART_POSITIONS;
-  const rooms = building.rooms.filter((room) => roomPositions[room.id] && room.visible && room.location !== 'outdoor');
-  const devices = building.rooms.filter((room) => garagePositions[room.id] && room.location !== 'outdoor');
+  // Never gate photo badges on a hard-coded room ID or a geometrical
+  // cross-section visibility flag. The photo is fixed; rooms and their
+  // sensor badges are independent of the building drawing.
+  const rooms = building.rooms.filter((room) => room.location !== 'outdoor' && room.level_id !== 'garage');
+  const devices = building.rooms.filter((room) => room.location !== 'outdoor' && room.level_id === 'garage');
+  const initialPosition = (room: RoomConfig) => photoRoomPosition(room, building.rooms, front ? 'front' : 'rear');
   const outdoors = building.rooms.filter((room) => room.location === 'outdoor' &&
     (resolveOverviewGroups(room, hass).length || resolveMobileReadings(room, hass).length));
   const outdoor = outdoors.find((room) => room.id === options.outdoorId) ?? outdoors[0];
@@ -112,10 +115,12 @@ export function renderPhotoView(
       <span aria-hidden="true">⟳</span> ${front ? 'Rückansicht' : 'Vorderansicht'}
     </button>` : nothing}
     <svg class="photo-leaders" aria-hidden="true"></svg>
-    ${rooms.map((room) => placement(room, roomPositions[room.id]!, 'photo-room'))}
-    ${devices.map((room) => placement(room, garagePositions[room.id]!, room.id === 'garage'
+    ${rooms.map((room) => placement(room, initialPosition(room), 'photo-room'))}
+    ${devices.map((room) => placement(room, initialPosition(room), room.id === 'garage'
       ? `photo-air ${resolveOverviewGroups(room, hass).length ? 'photo-garage' : ''}` : 'photo-device'))}
-    ${devices.map((room) => {
+    ${devices.filter((room) => Boolean(garagePositions[room.id])).map((room) => {
+      // Physical targets are only known for objects already illustrated.
+      // Additional garage rooms must not acquire invented object anchors.
       const point = garagePositions[room.id]!;
       return html`<button class="photo-object-target" type="button" data-select-room=${room.id} data-anchor-x=${point.anchorX} data-anchor-y=${point.anchorY}
         style=${`left:${point.anchorX}%;top:${point.anchorY}%;`}
@@ -217,15 +222,16 @@ export const photoStyles = css`
       border-radius: 8px; box-shadow: 0 2px 10px #0005;
       background: var(--hk-chip, rgba(22, 26, 30, .72));
     }
-    .photo-badge .sensor-groups, .photo-badge .photo-room-name, .photo-badge.mobile-no-climate { display: none; }
-    /* Three devices remain identifiable even before a temperature/RH sensor
-       is assigned: show a lightweight label, never an empty dark box. */
-    .photo-device .photo-badge.mobile-no-climate {
+    .photo-badge .sensor-groups, .photo-badge .photo-room-name { display: none; }
+    /* Any configured room remains discoverable before a phone sensor is
+       assigned. Do not hide new (or existing) rooms solely because their
+       phone readings are empty. These labels remain draggable in the editor. */
+    .photo-badge.mobile-no-climate {
       display: flex; min-height: 19px; padding: 2px; border: 0;
       background: transparent; box-shadow: none; backdrop-filter: none;
       -webkit-backdrop-filter: none;
     }
-    .photo-device .photo-badge.mobile-no-climate .photo-room-name {
+    .photo-badge.mobile-no-climate .photo-room-name {
       display: flex; align-items: center; gap: 2px;
       font-size: var(--hk-badge-font-mobile, 9px); color: #243137;
       text-shadow: 0 1px 2px #fff, 0 0 4px #fff;
