@@ -117,7 +117,10 @@ export class HausKlimaCardEditor extends LitElement {
         this._previewResize.observe(viewport);
       }
     }
-    this.queuePreviewLayout();
+    // Lit can restore the position attribute from the last persisted config.
+    // Reapply the in-flight location before paint, not one frame later.
+    if (this._drag?.moved) this.layoutPreview();
+    else this.queuePreviewLayout();
     // Native select.value must follow option insertion when adding/removing rooms.
     const roomSelect = this.shadowRoot?.querySelector<HTMLSelectElement>('#room-select');
     if (roomSelect && roomSelect.value !== this._roomId) roomSelect.value = this._roomId;
@@ -158,7 +161,8 @@ export class HausKlimaCardEditor extends LitElement {
     canvas.style.left = `${Math.max(0, (viewport.clientWidth - designWidth * scale) / 2)}px`;
     const height = `${image.offsetHeight * scale}px`;
     if (viewport.style.height !== height) viewport.style.height = height;
-    layoutPhotoOverlays(stage, scale);
+    layoutPhotoOverlays(stage, scale, this._drag?.moved
+      ? { roomId: this._drag.roomId, position: this._drag.position } : undefined);
   }
 
   private activeBuilding() {
@@ -257,13 +261,16 @@ export class HausKlimaCardEditor extends LitElement {
       const position = this.savedPosition(room);
       if (!image || !position) return;
       const box = image.getBoundingClientRect();
-      if (!box.width || !box.height) return;
+      const badge = placement.getBoundingClientRect();
+      if (!box.width || !box.height || !badge.width || !badge.height) return;
       pointer.preventDefault();
       this._drag = {
         pointerId: pointer.pointerId, roomId: room.id, device: this._positionDevice,
         startX: pointer.clientX, startY: pointer.clientY,
-        offsetX: pointer.clientX - (box.left + position.x / 100 * box.width),
-        offsetY: pointer.clientY - (box.top + position.y / 100 * box.height),
+        // Use the actual rendered badge centre, not a possibly different
+        // default coordinate when entering the first mouse/touch move.
+        offsetX: pointer.clientX - (badge.left + badge.width / 2),
+        offsetY: pointer.clientY - (badge.top + badge.height / 2),
         moved: false, position: { ...position },
       };
       placement.setPointerCapture(pointer.pointerId);
@@ -273,7 +280,7 @@ export class HausKlimaCardEditor extends LitElement {
     if (!drag || drag.pointerId !== pointer.pointerId || drag.roomId !== room.id) return;
     if (kind === 'cancel') {
       this._drag = undefined;
-      this.queuePreviewLayout();
+      this.layoutPreview();
       return;
     }
     if (kind === 'move' || kind === 'up') {
@@ -286,8 +293,9 @@ export class HausKlimaCardEditor extends LitElement {
         const x = Math.max(0, Math.min(100, (pointer.clientX - drag.offsetX - box.left) / box.width * 100));
         const y = Math.max(0, Math.min(100, (pointer.clientY - drag.offsetY - box.top) / box.height * 100));
         drag.position = { x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 };
-        placement.style.left = `${x}%`;
-        placement.style.top = `${y}%`;
+        // Use the same live coordinates in the normal layout engine. Writing
+        // percentage styles here would be overwritten by its pixel layout.
+        this.layoutPreview();
         // Lit owns these text nodes. Never replace an element's textContent:
         // replacing children invalidates Lit's text parts on the next rerender.
         const updateText = (element: HTMLElement | null | undefined, value: string) => {

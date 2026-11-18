@@ -1103,6 +1103,94 @@ async function checkTwoHouseSides(browser) {
   console.log('PASS house flip: garage stays right, shared positions, image-contained button, outdoor typography and independent room sensors');
 }
 
+
+/** Regression: a reflow or reactive Home Assistant update must not send a
+ * pointer-captured badge back to its persisted coordinates while dragging.
+ * This exercises both logical layouts and real Chromium touch input.
+ */
+async function checkContinuousBadgeDragging(browser) {
+  const variants = [
+    { device: 'desktop', input: 'mouse', width: 1440 },
+    { device: 'mobile', input: 'mouse', width: 390 },
+    { device: 'mobile', input: 'touch', width: 430 },
+  ];
+  for (const variant of variants) {
+    const page = await browser.newPage({ viewport: { width: variant.width, height: 1100 }, hasTouch: true });
+    const { editor, errors, external } = await ready(page);
+    await page.locator('#editor-panel > summary').click();
+    await editor.locator('#room-select').selectOption('laundry');
+    await editor.locator('.position-settings > summary').click();
+    if (variant.device === 'mobile') await editor.locator('#position-device').selectOption('mobile');
+    await page.waitForFunction((device) =>
+      window.hausklimaPreview.editor.shadowRoot.querySelector('.position-live-canvas')?.offsetWidth
+        === (device === 'mobile' ? 390 : 1280), variant.device);
+    const placement = editor.locator('.position-live-canvas .photo-placement[data-overlay-id="laundry"]');
+    const badge = placement.locator('.photo-badge');
+    await badge.scrollIntoViewIfNeeded();
+    const badgeBox = await badge.boundingBox();
+    const imageBox = await editor.locator('#position-photo').boundingBox();
+    assert.ok(badgeBox?.width && imageBox?.width, 'badge and photo have measurable dimensions');
+    const start = { x: badgeBox.x + badgeBox.width / 2, y: badgeBox.y + badgeBox.height / 2 };
+    const measure = () => placement.evaluate((element) => {
+      const p = element.getBoundingClientRect();
+      const image = element.closest('.photo-stage').querySelector('.photo-image').getBoundingClientRect();
+      return { x: (p.left + p.width / 2 - image.left) / image.width * 100,
+        y: (p.top + p.height / 2 - image.top) / image.height * 100 };
+    });
+    const original = await measure();
+    const configBefore = await page.evaluate(() => window.hausklimaPreview.getConfig());
+    const originalSaved = configBefore.badge_positions?.laundry?.[variant.device];
+    const cdp = variant.input === 'touch' ? await page.context().newCDPSession(page) : undefined;
+    const finger = (x, y) => [{ x, y, id: 1 }];
+    if (cdp) await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchStart', touchPoints: finger(start.x, start.y),
+    });
+    else { await page.mouse.move(start.x, start.y); await page.mouse.down(); }
+    for (let step = 1; step <= 4; step++) {
+      const x = start.x + imageBox.width * step * .03;
+      const y = start.y - imageBox.height * step * .025;
+      if (cdp) await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove', touchPoints: finger(x, y),
+      });
+      else await page.mouse.move(x, y, { steps: 2 });
+      // Let Lit and the normal layout routine run between individual moves,
+      // like HA sensor refresh / ResizeObserver while a pointer is captured.
+      await editor.evaluate(async (element) => {
+        element.requestUpdate();
+        await element.updateComplete;
+        element.layoutPreview();
+        await new Promise(requestAnimationFrame);
+      });
+      const after = await measure();
+      const expectedX = original.x + step * 3;
+      const expectedY = original.y - step * 2.5;
+      assert.ok(Math.abs(after.x - expectedX) < .65,
+        `${variant.device}/${variant.input} step ${step}: X must never jump back (${after.x} vs ${expectedX})`);
+      assert.ok(Math.abs(after.y - expectedY) < .65,
+        `${variant.device}/${variant.input} step ${step}: Y must never jump back (${after.y} vs ${expectedY})`);
+      const during = await page.evaluate(() => window.hausklimaPreview.getConfig());
+      assert.deepEqual(during.badge_positions?.laundry?.[variant.device], originalSaved,
+        'drag changes are not persisted before pointer release');
+    }
+    if (cdp) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await cdp.detach(); }
+    else await page.mouse.up();
+    const after = await page.evaluate(() => window.hausklimaPreview.getConfig());
+    const saved = after.badge_positions?.laundry?.[variant.device];
+    assert.ok(saved, 'release saves the active device position');
+    assert.ok(Math.abs(saved.x - (original.x + 12)) < .65 &&
+      Math.abs(saved.y - (original.y - 10)) < .65,
+    `${variant.device}/${variant.input}: saved position matches the last pointer move`);
+    const opposite = variant.device === 'mobile' ? 'desktop' : 'mobile';
+    assert.deepEqual(after.badge_positions?.laundry?.[opposite],
+      configBefore.badge_positions?.laundry?.[opposite],
+      'the other device position remains unchanged');
+    assert.deepEqual(errors, [], 'no Lit/DOM runtime errors during continuous drag');
+    assert.deepEqual(external, [], 'no external requests during continuous drag');
+    await page.close();
+  }
+  console.log('PASS continuous dragging: desktop mouse, mobile mouse and real touch, reflow without snapping');
+}
+
 async function checkBadgePositionEditor(browser) {
   const page = await browser.newPage({ viewport: { width: 390, height: 950 }, hasTouch: true });
   const { card, editor, errors } = await ready(page);
@@ -1278,6 +1366,7 @@ try {
   await checkOutdoorMobileBadgeWidth(browser);
   await checkOutdoorNaturalWidth(browser);
   await checkBadgePositionEditor(browser);
+  await checkContinuousBadgeDragging(browser);
   await checkPinnedPositionsAndAllRooms(browser);
   await checkTwoHouseSides(browser);
   await checkResponsive(browser, 'chromium');
