@@ -145,6 +145,8 @@ export const cardStyles = css`
   .house-side-wrapper.flip-in .photo-overview { animation: hk-turn-in .23s ease-out both; }
   @keyframes hk-turn-out { to { transform: perspective(1200px) rotateY(87deg); opacity: .6; } }
   @keyframes hk-turn-in { from { transform: perspective(1200px) rotateY(-87deg); opacity: .6; } to { transform: perspective(1200px) rotateY(0); opacity: 1; } }
+  /* Anchored inside .photo-stage itself, not relative to the outer wrapper.
+     On wide desktop panels the picture may be narrower than the card. */
   .house-side-button { position: absolute; top: 14px; left: 14px; z-index: 10;
     display: inline-flex; align-items: center; gap: 7px; border: 1px solid #ffffff77;
     border-radius: 25px; padding: 8px 12px; min-height: 36px; cursor: pointer;

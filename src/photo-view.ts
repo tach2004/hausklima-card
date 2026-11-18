@@ -11,6 +11,8 @@ export interface PhotoViewOptions {
   onOutdoorChange?: (id: string) => void;
   badgePositions?: Record<string, BadgePositionSet>;
   side?: HouseSide;
+  onToggleSide?: () => void;
+  turning?: boolean;
 }
 
 /** Coordinates refer only to the approved, unchanged illustration. */
@@ -41,6 +43,7 @@ export function renderPhotoView(
       <span class="photo-mobile-reading" data-metric=${type} data-reading-entity=${sensor.entity}>
         <span class="mobile-reading-icon ${type}" aria-hidden="true">${metricIcon(type)}</span>
         ${showSource && sourceLabel ? html`<span class="photo-mobile-source" title=${sourceLabel}>${sourceLabel}</span>` : nothing}
+        ${type === 'pressure_relative' || type === 'pressure_absolute' ? html`<span class="photo-mobile-qualifier">${type === 'pressure_relative' ? 'rel.' : 'abs.'}</span>` : nothing}
         <strong>${formatSensorValue(sensor, hass)}</strong>
         ${sensor.status === 'available' && sensor.unit ? html`<small>${sensor.unit}</small>` : nothing}
       </span>`;
@@ -78,6 +81,11 @@ export function renderPhotoView(
         ? 'Vorderansicht mit Erd- und Dachgeschoss, Büro, Bad, Eingang, Balkon und Garage rechts.'
         : 'Gestaltete Hausansicht mit Dachgeschoss, Erdgeschoss und Keller sowie Garage mit Schaltschrank und zwei Batterien.'} />
     ${front ? html`<img class="photo-front-house-layer" src=${frontHouseArtwork} alt="" aria-hidden="true" />` : nothing}
+    ${options.onToggleSide ? html`<button class="house-side-button" data-house-side-switch type="button"
+      aria-label=${front ? 'Zur Rückansicht drehen' : 'Zur Vorderansicht drehen'}
+      @click=${options.onToggleSide} ?disabled=${Boolean(options.turning)}>
+      <span aria-hidden="true">⟳</span> ${front ? 'Rückansicht' : 'Vorderansicht'}
+    </button>` : nothing}
     <svg class="photo-leaders" aria-hidden="true"></svg>
     ${rooms.map((room) => placement(room, roomPositions[room.id]!, 'photo-room'))}
     ${devices.map((room) => placement(room, garagePositions[room.id]!, room.id === 'garage'
@@ -110,11 +118,14 @@ export const photoStyles = css`
   .photo-overview { width: 100%; max-width: var(--hk-scene-max-width, 1400px); margin: 0 auto; min-width: 0; }
   .photo-stage { position: relative; width: 100%; isolation: isolate; border-radius: 17px; background: var(--hk-paper, #e6e6e0); box-shadow: 0 8px 30px #1b39401c; line-height: 1.2; }
   .photo-image { display: block; width: 100%; height: auto; aspect-ratio: 1300 / 732; object-fit: contain; border-radius: 17px; pointer-events: none; user-select: none; }
-  /* The front house is cropped from the approved front illustration and placed
-     over the original right-garage landscape. No third-party image or network.
-     The position preview uses exactly the same two layers and percentages. */
-  .photo-front-house-layer { position: absolute; top: 0; left: -18%; width: 91%; height: 100%;
-    object-fit: fill; clip-path: polygon(29% 34%, 31% 15%, 91% 15%, 96.7% 34%, 95.5% 35%, 95.5% 88%, 29% 88%);
+  /* Keep the original right-side garage/landscape while replacing ONLY the
+     left house silhouette. The earlier wide horizontal crop retained patches
+     of the other sky above the roof and let the underlying ridge show through.
+     Follow the actual sloping roof edges and lift the front layer just enough
+     to cover the old ridge, without changing the saved device coordinates.
+     The position editor renders the same photo view and inherits this mask. */
+  .photo-front-house-layer { position: absolute; top: -1.4%; left: -18%; width: 91%; height: 100%;
+    object-fit: fill; clip-path: polygon(33.3% 15.1%, 89% 15.1%, 97.1% 32.8%, 95.5% 35%, 95.5% 90%, 29% 90%, 29% 35%, 27% 32.8%);
     pointer-events: none; user-select: none; }
 
   .photo-placement { position: absolute; transform: translate(-50%, -50%); width: max-content; max-width: 220px; min-width: 0; z-index: 2; }
@@ -143,8 +154,12 @@ export const photoStyles = css`
   .photo-device .photo-metric small { font-size: calc(var(--hk-badge-font-desktop, 12px) * .833); }
   .photo-device .photo-room-name { font-size: calc(var(--hk-badge-font-desktop, 12px) * .917); }
   .photo-outdoor { width: 100%; }
-  /* Only the outdoor source headings change; the sensor readings retain their font. */
-  .photo-outdoor .source-group-name { font-size: calc(var(--hk-badge-font-desktop, 12px) * 1.0833); font-weight: 750; }
+  /* Outdoor source headings use exactly the room-name size. Both scale with
+     the user's desktop font control; measurement values stay unchanged. */
+  .photo-outdoor .source-group-name {
+    font-size: var(--hk-badge-font-desktop, 12px);
+    font-weight: 750; line-height: 1.25;
+  }
   /* Outdoor readings are one per line on desktop too. This avoids an overly
      wide max-content flex row and matches the vertically grouped phone badge. */
   .photo-outdoor .group-rows .named-group .group-readings {
@@ -199,7 +214,7 @@ export const photoStyles = css`
     .photo-mobile-source-group + .photo-mobile-source-group { border-top: 1px solid #ffffff55; padding-top: 5px; }
     .photo-mobile-source-heading {
       display: block; max-width: 100%; overflow-wrap: anywhere;
-      color: #fff; font-size: var(--hk-badge-font-mobile, 9px);
+      color: #fff; font-size: calc(var(--hk-badge-font-mobile, 9px) * .9);
       font-weight: 750; line-height: 1.2;
     }
     .photo-outdoor-group .photo-mobile-reading { width: 100%; flex-wrap: nowrap; }
@@ -219,6 +234,8 @@ export const photoStyles = css`
     }
     .photo-mobile-source { font-size: .9em; font-weight: 600; color: #e4eef4; max-width: 13ch;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+    /* rel./abs. identify pressure sources, just as in the desktop badge. */
+    .photo-mobile-qualifier { font-size: .9em; font-weight: 600; color: #e4eef4; white-space: nowrap; flex-shrink: 0; }
     .photo-mobile-reading strong { font-size: inherit; font-weight: 750; color: #fff; }
     .photo-mobile-reading small { font-size: .85em; font-weight: 500; color: #eef4f7; }
     .mobile-reading-icon { display: inline-flex; align-items: center; flex-shrink: 0; width: 1em; height: 1em; color: #ffc095; }

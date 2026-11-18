@@ -85,6 +85,31 @@ describe('front and rear house separation', () => {
     expect(getDefaultConfig().front_badge_positions).toBeUndefined();
   });
 
+  it('keeps all five right-side shared objects at identical coordinates on both sides', () => {
+    const config = normalizeConfig({ ...getDefaultConfig(), building: getDefaultBuilding(),
+      badge_positions: {
+        garage: { desktop: { x: 85, y: 56 }, mobile: { x: 86, y: 54 } },
+        garage_cabinet: { desktop: { x: 75.5, y: 89 } },
+        garage_battery_pylontech: { desktop: { x: 85, y: 89 } },
+        garage_battery_litime: { mobile: { x: 94.5, y: 89 } },
+      },
+      front_badge_positions: {
+        garage_cabinet: { desktop: { x: 16, y: 70 } },
+        garage: { mobile: { x: 18, y: 68 } },
+      },
+    });
+    const rear = resolveBuilding(config);
+    const front = resolveSideBuilding(config, rear, 'front');
+    const shared = rear.rooms.filter((room) => room.level_id === 'garage' || room.location === 'outdoor');
+    expect(front.rooms.filter((room) => room.level_id === 'garage' || room.location === 'outdoor')).toEqual(shared);
+    const rearPositions = resolveSideBadgePositions(config, rear, 'rear');
+    const frontPositions = resolveSideBadgePositions(config, rear, 'front');
+    for (const room of shared) expect(frontPositions?.[room.id]).toEqual(rearPositions?.[room.id]);
+    expect(frontPositions?.garage_cabinet?.desktop).toEqual({ x: 75.5, y: 89 });
+    expect(frontPositions?.garage?.mobile).toEqual({ x: 86, y: 54 });
+    expect(frontPositions?.front_office).toBeUndefined();
+  });
+
   it('rejects cross-side collisions in stored front identifiers and invalid levels', () => {
     expect(() => normalizeConfig({ ...getDefaultConfig(), front_rooms: [
       { id: 'bedroom', name: 'Unzulässig', level_id: 'attic', visible: true, width_m: 2 },
