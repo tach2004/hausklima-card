@@ -1,6 +1,6 @@
 import { css, html, nothing } from 'lit';
 import { houseArtwork, frontHouseArtwork, ROOM_ART_POSITIONS, GARAGE_ART_POSITIONS,
-  FRONT_ROOM_ART_POSITIONS, FRONT_GARAGE_ART_POSITIONS } from './scene-photo';
+  FRONT_ROOM_ART_POSITIONS } from './scene-photo';
 import type { HouseSide } from './front-view';
 import { formatSensorValue, resolveMobileReadings, resolveMobileOutdoorGroups, resolveOverviewGroups } from './metrics';
 import { metricIcon, roomIcon } from './icons';
@@ -24,7 +24,7 @@ export function renderPhotoView(
 ) {
   const front = options.side === 'front';
   const roomPositions = front ? FRONT_ROOM_ART_POSITIONS : ROOM_ART_POSITIONS;
-  const garagePositions = front ? FRONT_GARAGE_ART_POSITIONS : GARAGE_ART_POSITIONS;
+  const garagePositions = GARAGE_ART_POSITIONS;
   const rooms = building.rooms.filter((room) => roomPositions[room.id] && room.visible && room.location !== 'outdoor');
   const devices = building.rooms.filter((room) => garagePositions[room.id] && room.location !== 'outdoor');
   const outdoors = building.rooms.filter((room) => room.location === 'outdoor' &&
@@ -73,10 +73,11 @@ export function renderPhotoView(
       ${renderBadge(room, category)}
     </div>`;
   return html`<div class="photo-overview"><div class="photo-stage" data-scene-side=${front ? 'front' : 'rear'}>
-    <img class="photo-image" src=${front ? frontHouseArtwork : houseArtwork}
+    <img class="photo-image" src=${houseArtwork}
       alt=${front
-        ? 'Illustrative Vorderansicht mit Erd- und Dachgeschoss, Bad, Büro, Heizungsraum, Eingang, Balkon und Garage links.'
-        : 'Gestaltete Hausansicht mit Dachgeschoss, Erdgeschoss und Keller sowie freistehender Garage mit Schaltschrank links und zwei Batterien rechts. Die Einrichtung ist illustrativ.'} />
+        ? 'Vorderansicht mit Erd- und Dachgeschoss, Büro, Bad, Eingang, Balkon und Garage rechts.'
+        : 'Gestaltete Hausansicht mit Dachgeschoss, Erdgeschoss und Keller sowie Garage mit Schaltschrank und zwei Batterien.'} />
+    ${front ? html`<img class="photo-front-house-layer" src=${frontHouseArtwork} alt="" aria-hidden="true" />` : nothing}
     <svg class="photo-leaders" aria-hidden="true"></svg>
     ${rooms.map((room) => placement(room, roomPositions[room.id]!, 'photo-room'))}
     ${devices.map((room) => placement(room, garagePositions[room.id]!, room.id === 'garage'
@@ -88,12 +89,12 @@ export function renderPhotoView(
         aria-label=${`${room.name}: Messwerte und Sensorquellen öffnen`} @click=${() => onSelect(room)}><span></span></button>`;
     })}
     ${outdoor ? html`<div class="photo-placement photo-outdoor-group" data-overlay-id=${outdoor.id}
-      data-anchor-x=${front ? 12 : 86} data-anchor-y="20" data-preferred-x=${front ? 12 : 86} data-preferred-y="20"
+      data-anchor-x="86" data-anchor-y="20" data-preferred-x="86" data-preferred-y="20"
       data-manual-desktop-x=${positionAttrs(outdoor)?.desktop?.x ?? nothing}
       data-manual-desktop-y=${positionAttrs(outdoor)?.desktop?.y ?? nothing}
       data-manual-mobile-x=${positionAttrs(outdoor)?.mobile?.x ?? nothing}
       data-manual-mobile-y=${positionAttrs(outdoor)?.mobile?.y ?? nothing}
-      style=${`left:${front ? 12 : 86}%;top:20%;`}>
+      style="left:86%;top:20%;">
       ${outdoors.length > 1 ? html`<label class="photo-outdoor-choice"><span>Außenmessort im Bild</span>
         <select id="photo-outdoor-select" data-outdoor-selector .value=${outdoor.id} aria-label="Außenmessort im Bild"
           @change=${(event: Event) => options.onOutdoorChange?.((event.target as HTMLSelectElement).value)}>
@@ -109,6 +110,13 @@ export const photoStyles = css`
   .photo-overview { width: 100%; max-width: var(--hk-scene-max-width, 1400px); margin: 0 auto; min-width: 0; }
   .photo-stage { position: relative; width: 100%; isolation: isolate; border-radius: 17px; background: var(--hk-paper, #e6e6e0); box-shadow: 0 8px 30px #1b39401c; line-height: 1.2; }
   .photo-image { display: block; width: 100%; height: auto; aspect-ratio: 1300 / 732; object-fit: contain; border-radius: 17px; pointer-events: none; user-select: none; }
+  /* The front house is cropped from the approved front illustration and placed
+     over the original right-garage landscape. No third-party image or network.
+     The position preview uses exactly the same two layers and percentages. */
+  .photo-front-house-layer { position: absolute; top: 0; left: -18%; width: 91%; height: 100%;
+    object-fit: fill; clip-path: polygon(29% 34%, 31% 15%, 91% 15%, 96.7% 34%, 95.5% 35%, 95.5% 88%, 29% 88%);
+    pointer-events: none; user-select: none; }
+
   .photo-placement { position: absolute; transform: translate(-50%, -50%); width: max-content; max-width: 220px; min-width: 0; z-index: 2; }
   .photo-placement:has(.has-named-groups) { max-width: 360px; }
   .photo-badge { width: max-content; max-width: 100%; min-width: 0; min-height: 36px; border-radius: 9px; border: 1px solid #ffffff45;
@@ -135,6 +143,8 @@ export const photoStyles = css`
   .photo-device .photo-metric small { font-size: calc(var(--hk-badge-font-desktop, 12px) * .833); }
   .photo-device .photo-room-name { font-size: calc(var(--hk-badge-font-desktop, 12px) * .917); }
   .photo-outdoor { width: 100%; }
+  /* Only the outdoor source headings change; the sensor readings retain their font. */
+  .photo-outdoor .source-group-name { font-size: calc(var(--hk-badge-font-desktop, 12px) * 1.0833); font-weight: 750; }
   /* Outdoor readings are one per line on desktop too. This avoids an overly
      wide max-content flex row and matches the vertically grouped phone badge. */
   .photo-outdoor .group-rows .named-group .group-readings {
@@ -189,7 +199,7 @@ export const photoStyles = css`
     .photo-mobile-source-group + .photo-mobile-source-group { border-top: 1px solid #ffffff55; padding-top: 5px; }
     .photo-mobile-source-heading {
       display: block; max-width: 100%; overflow-wrap: anywhere;
-      color: #fff; font-size: calc(var(--hk-badge-font-mobile, 9px) * .95);
+      color: #fff; font-size: var(--hk-badge-font-mobile, 9px);
       font-weight: 750; line-height: 1.2;
     }
     .photo-outdoor-group .photo-mobile-reading { width: 100%; flex-wrap: nowrap; }

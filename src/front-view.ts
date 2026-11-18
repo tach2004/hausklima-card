@@ -24,6 +24,22 @@ export const isSharedLocation = (room: RoomConfig): boolean =>
   room.location === 'outdoor' || room.level_id === 'garage';
 export const isFrontRoom = (room: RoomConfig): boolean => room.id.startsWith('front_');
 
+/** Garage, batteries, cabinet and outdoor locations have canonical rear badge
+ * coordinates shared by both facade images. Legacy front-side values for those
+ * shared IDs are ignored rather than silently overriding existing positions.
+ */
+export function resolveSideBadgePositions(
+  config: HausKlimaCardConfig, rear: BuildingConfig, side: HouseSide,
+): HausKlimaCardConfig['badge_positions'] {
+  if (side === 'rear') return config.badge_positions;
+  const positions = { ...config.front_badge_positions };
+  for (const room of rear.rooms.filter(isSharedLocation)) {
+    if (config.badge_positions?.[room.id]) positions[room.id] = config.badge_positions[room.id]!;
+    else delete positions[room.id];
+  }
+  return positions;
+}
+
 /** Configured front rooms and original garage/outdoor objects are reused,
  * not copied into two separately editable sensor configurations.
  */
@@ -43,17 +59,26 @@ export function resolveSideBuilding(config: HausKlimaCardConfig, rear: BuildingC
  * mappings are written back once to the original building.
  */
 export function frontEditorConfig(config: HausKlimaCardConfig, rear: BuildingConfig): HausKlimaCardConfig {
-  return { ...config, building: resolveFrontBuilding(config, rear), badge_positions: config.front_badge_positions };
+  return { ...config, building: resolveFrontBuilding(config, rear), badge_positions: resolveSideBadgePositions(config, rear, 'front') };
 }
 export function applyFrontEdit(original: HausKlimaCardConfig, rear: BuildingConfig, edited: HausKlimaCardConfig): HausKlimaCardConfig {
   const updated = edited.building?.rooms ?? [];
   const shared = new Map(updated.filter(isSharedLocation).map((room) => [room.id, room]));
   const mergedRear: BuildingConfig = { ...rear, rooms: rear.rooms.map((room) => isSharedLocation(room)
     ? structuredClone(shared.get(room.id) ?? room) : room) };
+  const rearPositions = structuredClone(original.badge_positions ?? {});
+  const frontPositions = structuredClone(edited.badge_positions ?? {});
+  for (const room of rear.rooms.filter(isSharedLocation)) {
+    const position = edited.badge_positions?.[room.id];
+    if (position) rearPositions[room.id] = structuredClone(position);
+    else delete rearPositions[room.id];
+    delete frontPositions[room.id];
+  }
   return {
     ...original,
     building: mergedRear,
     front_rooms: updated.filter(isFrontRoom).map((room) => structuredClone(room)),
-    front_badge_positions: edited.badge_positions,
+    badge_positions: Object.keys(rearPositions).length ? rearPositions : undefined,
+    front_badge_positions: Object.keys(frontPositions).length ? frontPositions : undefined,
   };
 }

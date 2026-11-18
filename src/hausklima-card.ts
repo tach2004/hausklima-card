@@ -8,7 +8,7 @@ import { iconStyles, metricIcon, roomIcon } from './icons';
 import { readingStyles, renderReadingGroups } from './reading-view';
 import type { BuildingConfig, HausKlimaCardConfig, HomeAssistant, ResolvedMeasurement, RoomConfig } from './types';
 import { cardStyles } from './styles';
-import { isFrontRoom, resolveSideBuilding } from './front-view';
+import { isFrontRoom, resolveSideBuilding, resolveSideBadgePositions } from './front-view';
 import type { HouseSide } from './front-view';
 
 const formatDimension = (value: number) => value.toLocaleString('de-DE', { maximumFractionDigits: 2 });
@@ -191,13 +191,13 @@ export class HausKlimaCard extends LitElement {
             (room) => this.selectRoom(room), this._selected,
             { side: this._side, outdoorId: this._outdoorId,
               onOutdoorChange: (id) => { this._outdoorId = id; },
-              badgePositions: rear ? config.badge_positions : config.front_badge_positions })}
-        </div>
-        <button class="house-side-button" data-house-side-switch type="button"
+              badgePositions: resolveSideBadgePositions(config, resolveBuilding(config), this._side) })}
+          <button class="house-side-button" data-house-side-switch type="button"
           aria-label=${this._side === 'rear' ? 'Zur Vorderansicht drehen' : 'Zur Rückansicht drehen'}
           @click=${() => this.toggleHouseSide()} ?disabled=${Boolean(this._turningPhase)}>
           <span aria-hidden="true">⟳</span> ${this._side === 'rear' ? 'Vorderansicht' : 'Rückansicht'}
-        </button>
+          </button>
+        </div>
         ${selected ? this.renderDetails(selected, building) : nothing}
       </div>
       <div class="photo-lower">

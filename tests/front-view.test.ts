@@ -1,8 +1,8 @@
 import { describe, expect, it } from '../scripts/unit-test-compat';
 import { getDefaultConfig, normalizeConfig, resolveBuilding } from '../src/config';
 import { getDefaultBuilding } from '../src/defaults';
-import { applyFrontEdit, frontEditorConfig, getDefaultFrontRooms, resolveSideBuilding } from '../src/front-view';
-import { addSensor, saveBadgePosition } from '../src/editor-model';
+import { applyFrontEdit, frontEditorConfig, getDefaultFrontRooms, resolveSideBadgePositions, resolveSideBuilding } from '../src/front-view';
+import { addSensor, resetBadgePosition, saveBadgePosition } from '../src/editor-model';
 
 describe('front and rear house separation', () => {
   it('starts on nine independent front rooms, two floors and shared garage/outside only', () => {
@@ -48,14 +48,39 @@ describe('front and rear house separation', () => {
     expect(frontGarage).toEqual(rearGarage);
   });
 
-  it('keeps front/rear badge positions independent even for shared garage', () => {
-    const original = normalizeConfig({ ...getDefaultConfig(),
-      badge_positions: { garage: { mobile: { x: 87, y: 60 } } } });
+  it('shares garage, cabinet, batteries and outdoor positions while isolating front rooms', () => {
+    const building = getDefaultBuilding();
+    building.rooms.push({ id: 'outdoor_test', name: 'Außen', level_id: 'ground_floor',
+      location: 'outdoor', visible: false, width_m: null });
+    const shared = ['garage', 'garage_cabinet', 'garage_battery_pylontech',
+      'garage_battery_litime', 'outdoor_test'];
+    const original = normalizeConfig({ ...getDefaultConfig(), building,
+      badge_positions: Object.fromEntries(shared.map((id, index) =>
+        [id, { desktop: { x: 70 + index, y: 25 }, mobile: { x: 80 + index, y: 65 } }])),
+      front_badge_positions: {
+        garage: { desktop: { x: 12, y: 12 } },
+        front_office: { desktop: { x: 35, y: 45 } },
+      },
+    });
     const rear = resolveBuilding(original);
-    const edit = saveBadgePosition(frontEditorConfig(original, rear), 'garage', 'mobile', { x: 12.5, y: 67.4 });
-    const saved = normalizeConfig(applyFrontEdit(original, rear, edit));
-    expect(saved.front_badge_positions?.garage?.mobile).toEqual({ x: 12.5, y: 67.4 });
-    expect(saved.badge_positions?.garage?.mobile).toEqual({ x: 87, y: 60 });
+    const front = resolveSideBadgePositions(original, rear, 'front')!;
+    for (const id of shared) expect(front[id]).toEqual(original.badge_positions![id]);
+    expect(front.front_office?.desktop).toEqual({ x: 35, y: 45 });
+
+    const edited = saveBadgePosition(frontEditorConfig(original, rear), 'garage_cabinet',
+      'mobile', { x: 92.5, y: 82.1 });
+    const saved = normalizeConfig(applyFrontEdit(original, rear, edited));
+    expect(saved.badge_positions?.garage_cabinet?.mobile).toEqual({ x: 92.5, y: 82.1 });
+    expect(saved.front_badge_positions?.garage_cabinet).toBeUndefined();
+    expect(saved.front_badge_positions?.garage).toBeUndefined();
+    expect(saved.front_badge_positions?.front_office?.desktop).toEqual({ x: 35, y: 45 });
+    expect(resolveSideBadgePositions(saved, resolveBuilding(saved), 'front')?.garage_cabinet)
+      .toEqual(saved.badge_positions?.garage_cabinet);
+    const reset = resetBadgePosition(frontEditorConfig(saved, resolveBuilding(saved)),
+      'garage_cabinet', 'mobile');
+    const afterReset = applyFrontEdit(saved, resolveBuilding(saved), reset);
+    expect(afterReset.badge_positions?.garage_cabinet?.mobile).toBeUndefined();
+    expect(afterReset.badge_positions?.garage_cabinet?.desktop).toEqual({ x: 71, y: 25 });
     expect(getDefaultConfig().front_rooms).toBeUndefined();
     expect(getDefaultConfig().front_badge_positions).toBeUndefined();
   });
