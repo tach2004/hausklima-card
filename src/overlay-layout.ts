@@ -44,7 +44,10 @@ function drawLeaders(
  *  No collision avoidance, auto-docking, edge clamping or auto-repositioning.
  *  The editing preview and rendered image share the same coordinate origin.
  */
-export function layoutPhotoOverlays(stage: HTMLElement, previewScale = 1): void {
+export function layoutPhotoOverlays(
+  stage: HTMLElement, previewScale = 1,
+  activeDrag?: { roomId: string; position: { x: number; y: number } },
+): void {
   const image = stage.querySelector<HTMLImageElement>('.photo-image');
   if (!image) return;
   // Use fractional rendered dimensions, not rounded clientWidth/clientHeight:
@@ -85,10 +88,14 @@ export function layoutPhotoOverlays(stage: HTMLElement, previewScale = 1): void 
       : undefined;
     const manualX = element.dataset[mobile ? 'manualMobileX' : 'manualDesktopX'];
     const manualY = element.dataset[mobile ? 'manualMobileY' : 'manualDesktopY'];
-    const x = manualX === undefined || manualY === undefined
-      ? (fallback?.x ?? Number(element.dataset.preferredX)) : Number(manualX);
-    const y = manualX === undefined || manualY === undefined
-      ? (fallback?.y ?? Number(element.dataset.preferredY)) : Number(manualY);
+    // During editor drag the transient coordinates take priority over the
+    // persisted config on *every* reflow. Otherwise a ResizeObserver / Lit
+    // update pulls the badge back to its old position between pointer moves.
+    const live = activeDrag?.roomId === id ? activeDrag.position : undefined;
+    const x = live?.x ?? (manualX === undefined || manualY === undefined
+      ? (fallback?.x ?? Number(element.dataset.preferredX)) : Number(manualX));
+    const y = live?.y ?? (manualX === undefined || manualY === undefined
+      ? (fallback?.y ?? Number(element.dataset.preferredY)) : Number(manualY));
     element.style.left = `${width * x / 100}px`;
     element.style.top = `${imageHeight * y / 100}px`;
     if (garageEquipment) {
