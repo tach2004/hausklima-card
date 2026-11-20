@@ -176,8 +176,8 @@ describe('Lovelace editor', () => {
     outdoor.measurements = {};
     for (const type of METRIC_TYPES) outdoor.measurements[type] = {
       sensors: [
-        { entity: `sensor.${type}_hm`, overview_group: 'Homematic' },
-        { entity: `sensor.${type}_ec`, overview_group: 'Ecowitt', show_in_overview: true },
+        { entity: `sensor.${type}_hm`, overview_group: 'Quelle A' },
+        { entity: `sensor.${type}_ec`, overview_group: 'Quelle B', show_in_overview: true },
       ],
       primary: `sensor.${type}_ec`,
     };
@@ -337,32 +337,32 @@ describe('Phase 2 native sensor and room editor', () => {
   it('selects multiple overview sources, names shared groups and persists both pressure mappings', async () => {
     const editor = await createEditor();
     const configs = capture(editor);
-    await pick(editor, 'sensor.test_homematic_temperature');
-    await pick(editor, 'sensor.test_ecowitt_temperature');
-    expect(element<HTMLInputElement>(editor, '[data-action="sensor-overview"][data-entity="sensor.test_homematic_temperature"]').checked).toBe(true);
-    expect(element<HTMLInputElement>(editor, '[data-action="sensor-overview"][data-entity="sensor.test_ecowitt_temperature"]').checked).toBe(false);
-    await check(editor, '[data-action="sensor-overview"][data-entity="sensor.test_ecowitt_temperature"]', true);
-    await change(editor, '[data-action="sensor-group"][data-entity="sensor.test_homematic_temperature"]', 'Homematic');
-    await change(editor, '[data-action="sensor-group"][data-entity="sensor.test_ecowitt_temperature"]', 'Ecowitt');
+    await pick(editor, 'sensor.test_source_a_temperature');
+    await pick(editor, 'sensor.test_source_b_temperature');
+    expect(element<HTMLInputElement>(editor, '[data-action="sensor-overview"][data-entity="sensor.test_source_a_temperature"]').checked).toBe(true);
+    expect(element<HTMLInputElement>(editor, '[data-action="sensor-overview"][data-entity="sensor.test_source_b_temperature"]').checked).toBe(false);
+    await check(editor, '[data-action="sensor-overview"][data-entity="sensor.test_source_b_temperature"]', true);
+    await change(editor, '[data-action="sensor-group"][data-entity="sensor.test_source_a_temperature"]', 'Quelle A');
+    await change(editor, '[data-action="sensor-group"][data-entity="sensor.test_source_b_temperature"]', 'Quelle B');
     for (const type of ['pressure_relative', 'pressure_absolute']) {
       await change(editor, '#metric-select', type);
       await pick(editor, `sensor.test_${type}`);
-      await change(editor, `[data-action="sensor-group"][data-entity="sensor.test_${type}"]`, 'Ecowitt');
+      await change(editor, `[data-action="sensor-group"][data-entity="sensor.test_${type}"]`, 'Quelle B');
     }
     const saved = JSON.parse(JSON.stringify(latest(configs))) as HausKlimaCardConfig;
     const reloaded = await createEditor(saved);
     const afterReload = capture(reloaded);
     expect(reloaded.shadowRoot?.textContent).toContain('Standardquelle');
     expect(reloaded.shadowRoot?.textContent).toContain('Gruppe in der Übersicht');
-    expect(element<HTMLInputElement>(reloaded, '[data-action="sensor-overview"][data-entity="sensor.test_ecowitt_temperature"]').checked).toBe(true);
-    expect(element<HTMLInputElement>(reloaded, '[data-action="sensor-group"][data-entity="sensor.test_ecowitt_temperature"]').value).toBe('Ecowitt');
-    await check(reloaded, '[data-action="sensor-overview"][data-entity="sensor.test_homematic_temperature"]', false);
-    expect(latest(afterReload).building!.rooms[0]!.measurements!.temperature!.sensors[0]).toMatchObject({ show_in_overview: false, overview_group: 'Homematic' });
-    expect(latest(afterReload).building!.rooms[0]!.measurements!.temperature!.primary).toBe('sensor.test_homematic_temperature');
+    expect(element<HTMLInputElement>(reloaded, '[data-action="sensor-overview"][data-entity="sensor.test_source_b_temperature"]').checked).toBe(true);
+    expect(element<HTMLInputElement>(reloaded, '[data-action="sensor-group"][data-entity="sensor.test_source_b_temperature"]').value).toBe('Quelle B');
+    await check(reloaded, '[data-action="sensor-overview"][data-entity="sensor.test_source_a_temperature"]', false);
+    expect(latest(afterReload).building!.rooms[0]!.measurements!.temperature!.sensors[0]).toMatchObject({ show_in_overview: false, overview_group: 'Quelle A' });
+    expect(latest(afterReload).building!.rooms[0]!.measurements!.temperature!.primary).toBe('sensor.test_source_a_temperature');
     expect(saved.building!.rooms[0]!.measurements!.temperature!.sensors[0]!.show_in_overview).toBeUndefined();
     for (const type of ['pressure_relative', 'pressure_absolute'] as const) {
       await change(reloaded, '#metric-select', type);
-      expect(element<HTMLInputElement>(reloaded, `[data-action="sensor-group"][data-entity="sensor.test_${type}"]`).value).toBe('Ecowitt');
+      expect(element<HTMLInputElement>(reloaded, `[data-action="sensor-group"][data-entity="sensor.test_${type}"]`).value).toBe('Quelle B');
     }
   });
 
@@ -567,7 +567,7 @@ describe('Native HA selector loading', () => {
 describe('scene width visual setting', () => {
   it('updates width immediately on input and preserves v0.1.1 mappings, names, opacity and unknown fields on reload', async () => {
     const building = getDefaultBuilding();
-    building.rooms.find((room) => room.id === 'garage_battery_pylontech')!.name = 'Eigene Batterie';
+    building.rooms.find((room) => room.id === 'garage_battery_1')!.name = 'Eigene Batterie';
     building.rooms[0]!.measurements = { temperature: {
       sensors: [{ entity: 'sensor.test_first', name: 'Quelle' }, { entity: 'sensor.test_second' }],
       primary: 'sensor.test_second', visible: true, show_in_overview: false,
@@ -622,13 +622,13 @@ describe('text fields during live Home Assistant updates', () => {
     aliasField.value = 'Neuer Sensorname';
     aliasField.dispatchEvent(new Event('change', { bubbles: true }));
     await editor.updateComplete;
-    groupField.value = 'Ecowitt';
+    groupField.value = 'Quelle B';
     groupField.dispatchEvent(new Event('change', { bubbles: true }));
     await editor.updateComplete;
     const savedRoom = latest(updates).building!.rooms.find((entry) => entry.id === 'workshop')!;
     expect(savedRoom.name).toBe('Werkstatt Nord');
     expect(savedRoom.measurements!.temperature!.sensors[0]).toMatchObject({
-      name: 'Neuer Sensorname', overview_group: 'Ecowitt',
+      name: 'Neuer Sensorname', overview_group: 'Quelle B',
     });
 
     // Both optional fields are intentionally clearable (back to HA name / no group).

@@ -38,21 +38,21 @@ export const demoConfig = {
       room('storage', 'Abstellraum', 'attic', 3.6),
       room('garage', 'Garage', 'garage', 6),
       { ...room('garage_cabinet', 'Schaltschrank', 'garage', null), visible: false },
-      { ...room('garage_battery_pylontech', 'Pylontech', 'garage', null), visible: false },
-      { ...room('garage_battery_litime', 'LiTime', 'garage', null), visible: false },
+      { ...room('garage_battery_1', 'Batterie 1', 'garage', null), visible: false },
+      { ...room('garage_battery_2', 'Batterie 2', 'garage', null), visible: false },
       { id: 'demo_outdoor', name: 'Außen', location: 'outdoor', level_id: 'ground_floor', visible: false, width_m: null,
         measurements: {
           temperature: { sensors: [
-            { entity: 'sensor.demo_outdoor_homematic_temperature', name: 'Homematic', show_in_overview: true, overview_group: 'Homematic' },
-            { entity: 'sensor.demo_outdoor_ecowitt_temperature', name: 'Ecowitt', show_in_overview: true, overview_group: 'Ecowitt' },
-            { entity: 'sensor.demo_outdoor_vitodens_temperature', name: 'Vitodens', show_in_overview: true, overview_group: 'Vitodens' },
-          ], primary: 'sensor.demo_outdoor_ecowitt_temperature' },
+            { entity: 'sensor.demo_outdoor_source_a_temperature', name: 'Quelle A', show_in_overview: true, overview_group: 'Quelle A' },
+            { entity: 'sensor.demo_outdoor_source_b_temperature', name: 'Quelle B', show_in_overview: true, overview_group: 'Quelle B' },
+            { entity: 'sensor.demo_outdoor_source_c_temperature', name: 'Quelle C', show_in_overview: true, overview_group: 'Quelle C' },
+          ], primary: 'sensor.demo_outdoor_source_b_temperature' },
           relative_humidity: { sensors: [
-            { entity: 'sensor.demo_outdoor_homematic_humidity', name: 'Homematic', show_in_overview: true, overview_group: 'Homematic' },
-            { entity: 'sensor.demo_outdoor_ecowitt_humidity', name: 'Ecowitt', show_in_overview: true, overview_group: 'Ecowitt' },
-          ], primary: 'sensor.demo_outdoor_ecowitt_humidity' },
-          pressure_relative: { sensors: [{ entity: 'sensor.demo_outdoor_relative_pressure', name: 'Luftdruck relativ', overview_group: 'Ecowitt' }] },
-          pressure_absolute: { sensors: [{ entity: 'sensor.demo_outdoor_absolute_pressure', name: 'Luftdruck absolut', overview_group: 'Ecowitt' }] },
+            { entity: 'sensor.demo_outdoor_source_a_humidity', name: 'Quelle A', show_in_overview: true, overview_group: 'Quelle A' },
+            { entity: 'sensor.demo_outdoor_source_b_humidity', name: 'Quelle B', show_in_overview: true, overview_group: 'Quelle B' },
+          ], primary: 'sensor.demo_outdoor_source_b_humidity' },
+          pressure_relative: { sensors: [{ entity: 'sensor.demo_outdoor_relative_pressure', name: 'Luftdruck relativ', overview_group: 'Quelle B' }] },
+          pressure_absolute: { sensors: [{ entity: 'sensor.demo_outdoor_absolute_pressure', name: 'Luftdruck absolut', overview_group: 'Quelle B' }] },
         },
       },
       { id: 'demo_outdoor_north', name: 'Außen Nord', location: 'outdoor', level_id: 'ground_floor', visible: false, width_m: null,
@@ -73,7 +73,7 @@ bedroom.measurements.absolute_humidity = { sensors: [{ entity: 'sensor.demo_bedr
 
 const values = {
   workshop: [19.8, 50], basement_hall: [20.9, 51], laundry: [16.8000011444092, 52], living_room: [21.8, 47],
-  ground_hall: [21.4, 49], kitchen: [21.2, 48], bedroom: [21.3, 48], storage: [20.8, 49], garage: [18.9, 55], garage_cabinet: [25.4321, 42], garage_battery_pylontech: [23.8, 45], garage_battery_litime: [24.1, 46], outdoor_north: [2.8, 90.5], study: [22.1, 46],
+  ground_hall: [21.4, 49], kitchen: [21.2, 48], bedroom: [21.3, 48], storage: [20.8, 49], garage: [18.9, 55], garage_cabinet: [25.4321, 42], garage_battery_1: [23.8, 45], garage_battery_2: [24.1, 46], outdoor_north: [2.8, 90.5], study: [22.1, 46],
 };
 export const demoStates = {};
 for (const [id, [temp, rh]] of Object.entries(values)) {
@@ -81,9 +81,9 @@ for (const [id, [temp, rh]] of Object.entries(values)) {
   demoStates[`sensor.demo_${id}_humidity`] = { state: String(rh), attributes: { friendly_name: `${id} Feuchte`, unit_of_measurement: '%', device_class: 'humidity' } };
 }
 for (const [id, value, unit] of [
-  ['outdoor_homematic_temperature', '3.4', '°C'], ['outdoor_ecowitt_temperature', '3.6', '°C'],
-  ['outdoor_homematic_humidity', '86', '%'], ['outdoor_ecowitt_humidity', '85', '%'],
-  ['outdoor_vitodens_temperature', '3.8', '°C'],
+  ['outdoor_source_a_temperature', '3.4', '°C'], ['outdoor_source_b_temperature', '3.6', '°C'],
+  ['outdoor_source_a_humidity', '86', '%'], ['outdoor_source_b_humidity', '85', '%'],
+  ['outdoor_source_c_temperature', '3.8', '°C'],
   ['outdoor_relative_pressure', '1013.27', 'hPa'], ['outdoor_absolute_pressure', '998.72', 'hPa'],
   ['bedroom_co2', '745', 'ppm'], ['bedroom_voc', '218', 'VOC-Index'], ['bedroom_absolute_humidity', '8.9', 'g/m³'],
   ['additional_temperature', '20.7', '°C'],

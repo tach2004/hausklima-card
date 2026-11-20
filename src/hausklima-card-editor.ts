@@ -522,7 +522,7 @@ export class HausKlimaCardEditor extends LitElement {
         <label class="field"><span>Gruppe in der Übersicht <small>(optional)</small></span>
           <input type="text" data-action="sensor-group" data-entity=${sensor.entity}
             aria-label=${`Sensorgruppe für Sensor ${index + 1}`} .value=${sensor.overview_group ?? ''}
-            placeholder="z. B. Homematic, Ecowitt, Vitodens"
+            placeholder="z. B. Quelle A oder Wetterstation"
             @change=${(event: Event) => this.apply(() => editSensor(this._config, room.id, this._metric, sensor.entity, { overview_group: (event.target as HTMLInputElement).value }))} />
         </label>
         <div class="sensor-actions">
@@ -670,7 +670,7 @@ export class HausKlimaCardEditor extends LitElement {
                 Diesen Messwert im Handy-Kästchen anzeigen</label>
             </div>
             <p class="hint">Handy: Diese Messart insgesamt ein-/ausblenden. Zusätzlich kannst du bei jedem Sensor darunter einen eigenen Handy-Haken setzen. Beim Aktivieren einer Quelle wird die Messart fürs Handy automatisch aktiviert. Desktop und Details bleiben unabhängig.</p>
-            <p class="hint">Mit „Haupt – in Übersicht“ können mehrere Quellen sichtbar sein. Gleiche Gruppennamen bündeln Werte unter einem gemeinsamen Namen, z. B. Temperatur und Feuchte von „Homematic“. Ohne Gruppe bleiben einzelne Hauptwerte schmal untereinander; mehrere Quellen derselben Messart erhalten ihren Anzeigenamen. „Standardquelle“ bestimmt die Hauptanzeige nur, solange der jeweilige Haupt-Haken nicht ausdrücklich gesetzt oder entfernt wurde. Alle Quellen bleiben in den Details erreichbar.</p>
+            <p class="hint">Mit „Haupt – in Übersicht“ können mehrere Quellen sichtbar sein. Gib zusammengehörigen Werten denselben Gruppennamen, etwa „Quelle A“. Ohne Gruppe bleiben einzelne Hauptwerte schmal untereinander. Mehrere Quellen derselben Messart erhalten ihren Anzeigenamen. „Standardquelle“ bestimmt die Hauptanzeige nur, solange der jeweilige Haupt-Haken nicht ausdrücklich gesetzt oder entfernt wurde. Alle Quellen bleiben in den Details erreichbar.</p>
             <div class="sensor-list">${measurement?.sensors.map((sensor, index) => this.renderSensor(room, sensor, index, measurement.primary))}</div>
             ${!measurement?.sensors.length ? html`<p class="empty-hint">Noch kein Sensor für diese Messart zugeordnet.</p>` : nothing}
             ${this._selectorAvailable ? html`

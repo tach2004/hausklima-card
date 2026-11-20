@@ -53,7 +53,7 @@ describe('building model', () => {
 describe('garage equipment migration', () => {
   it('includes garage air, both batteries, and cabinet without dummy sensor readings', () => {
     const building = resolveBuilding(getDefaultConfig());
-    const ids = ['garage', 'garage_battery_pylontech', 'garage_battery_litime', 'garage_cabinet'];
+    const ids = ['garage', 'garage_battery_1', 'garage_battery_2', 'garage_cabinet'];
     for (const id of ids) {
       const room = building.rooms.find((item) => item.id === id);
       expect(room).toBeDefined();
@@ -66,7 +66,7 @@ describe('garage equipment migration', () => {
   it('migrates saved phase 2 configs without losing room/sensor mappings and only once', () => {
     const legacy = getDefaultBuilding();
     legacy.rooms = legacy.rooms.filter((room) =>
-      !['garage_battery_pylontech', 'garage_battery_litime', 'garage_cabinet'].includes(room.id));
+      !['garage_battery_1', 'garage_battery_2', 'garage_cabinet'].includes(room.id));
     delete legacy.garage_components_initialized;
     legacy.rooms.find((room) => room.id === 'garage')!.measurements = {
       temperature: { sensors: [{ entity: 'sensor.test_garage_temperature' }] },
@@ -79,9 +79,9 @@ describe('garage equipment migration', () => {
     expect(second.rooms.filter((room) => room.level_id === 'garage')).toHaveLength(4);
 
     // After migration, an intentionally removed component stays removed.
-    second.rooms = second.rooms.filter((room) => room.id !== 'garage_battery_litime');
+    second.rooms = second.rooms.filter((room) => room.id !== 'garage_battery_2');
     expect(resolveBuilding({ ...getDefaultConfig(), building: second }).rooms.some((room) =>
-      room.id === 'garage_battery_litime')).toBe(false);
+      room.id === 'garage_battery_2')).toBe(false);
   });
 });
 
@@ -390,27 +390,27 @@ describe('selected overview sources and groups', () => {
   it('groups independently selected sources across metrics and keeps other sources in details', () => {
     const room = configuredRoom();
     room.measurements = {
-      temperature: { primary: 'sensor.test_homematic_t', sensors: [
-        { entity: 'sensor.test_homematic_t', overview_group: 'Homematic' },
-        { entity: 'sensor.test_ecowitt_t', show_in_overview: true, overview_group: 'Ecowitt' },
-        { entity: 'sensor.test_vitodens_t', show_in_overview: true, overview_group: 'Vitodens' },
+      temperature: { primary: 'sensor.test_source_a_t', sensors: [
+        { entity: 'sensor.test_source_a_t', overview_group: 'Quelle A' },
+        { entity: 'sensor.test_source_b_t', show_in_overview: true, overview_group: 'Quelle B' },
+        { entity: 'sensor.test_source_c_t', show_in_overview: true, overview_group: 'Quelle C' },
         { entity: 'sensor.test_hidden_t', show_in_overview: false },
       ] },
       relative_humidity: { sensors: [
-        { entity: 'sensor.test_homematic_h', overview_group: 'Homematic' },
-        { entity: 'sensor.test_ecowitt_h', show_in_overview: true, overview_group: 'Ecowitt' },
+        { entity: 'sensor.test_source_a_h', overview_group: 'Quelle A' },
+        { entity: 'sensor.test_source_b_h', show_in_overview: true, overview_group: 'Quelle B' },
       ] },
-      pressure_relative: { sensors: [{ entity: 'sensor.test_pressure', overview_group: 'Ecowitt' }] },
+      pressure_relative: { sensors: [{ entity: 'sensor.test_pressure', overview_group: 'Quelle B' }] },
     };
     const reloaded = JSON.parse(JSON.stringify(room)) as RoomConfig;
     const groups = resolveOverviewGroups(reloaded);
-    expect(groups.map((group) => group.name)).toEqual(['Homematic', 'Ecowitt', 'Vitodens']);
+    expect(groups.map((group) => group.name)).toEqual(['Quelle A', 'Quelle B', 'Quelle C']);
     expect(groups.map((group) => group.readings.map((reading) => reading.type))).toEqual([
       ['temperature', 'relative_humidity'], ['temperature', 'relative_humidity', 'pressure_relative'], ['temperature'],
     ]);
     expect(groups.flatMap((group) => group.readings).map((reading) => reading.sensor.entity)).not.toContain('sensor.test_hidden_t');
     expect(resolveMeasurements(reloaded, undefined, 'details')[0]!.sensors).toHaveLength(4);
-    expect(resolveMeasurements(reloaded, undefined, 'details')[0]!.primary.entity).toBe('sensor.test_homematic_t');
+    expect(resolveMeasurements(reloaded, undefined, 'details')[0]!.primary.entity).toBe('sensor.test_source_a_t');
     expect(groups[1]!.readings[0]!.sensor.status).toBe('missing');
   });
 
@@ -449,9 +449,9 @@ describe('selected overview sources and groups', () => {
     sensor.show_in_overview = true;
     Object.assign(sensor, { overview_group: '   ' });
     expect(() => normalizeConfig({ ...getDefaultConfig(), building })).toThrow(/overview_group/);
-    sensor.overview_group = 'Homematic';
+    sensor.overview_group = 'Quelle A';
     Object.assign(sensor, { future: { retained: true } });
     expect(normalizeConfig({ ...getDefaultConfig(), building }).building!.rooms[0]!.measurements!.temperature!.sensors[0])
-      .toMatchObject({ overview_group: 'Homematic', show_in_overview: true, future: { retained: true } });
+      .toMatchObject({ overview_group: 'Quelle A', show_in_overview: true, future: { retained: true } });
   });
 });

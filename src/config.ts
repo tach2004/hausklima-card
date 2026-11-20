@@ -1,4 +1,5 @@
 import { getDefaultBuilding } from './defaults';
+import { garageLocationKey, isGarageEquipment } from './garage-locations';
 import { METRIC_TYPES } from './types';
 import type { BuildingConfig, HausKlimaCardConfig } from './types';
 
@@ -216,12 +217,20 @@ export function normalizeConfig(input: unknown): HausKlimaCardConfig {
  */
 export function resolveBuilding(config: HausKlimaCardConfig): BuildingConfig {
   const building = config.building ? structuredClone(config.building) : getDefaultBuilding();
+  const positions = config.badge_positions;
+  if (!config.building && positions) {
+    // Position-only edits can be saved before the building is customized.
+    // In that case reuse the older keys so the saved coordinates still apply.
+    for (const id of Object.keys(positions)) {
+      const key = garageLocationKey(id);
+      if (key === id || Object.hasOwn(positions, key)) continue;
+      const room = building.rooms.find((candidate) => candidate.id === key);
+      if (room) room.id = id;
+    }
+  }
   if (!building.garage_components_initialized) {
-    const extraRooms = getDefaultBuilding().rooms.filter((room) =>
-      room.id === 'garage_battery_pylontech' ||
-      room.id === 'garage_battery_litime' ||
-      room.id === 'garage_cabinet');
-    const installed = new Set(building.rooms.map((room) => room.id));
+    const extraRooms = getDefaultBuilding().rooms.filter((room) => isGarageEquipment(room.id));
+    const installed = new Set(building.rooms.map((room) => garageLocationKey(room.id)));
     for (const room of extraRooms) {
       if (!installed.has(room.id)) building.rooms.push(room);
     }

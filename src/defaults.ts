@@ -37,8 +37,8 @@ const DEFAULT_BUILDING: BuildingConfig = {
     { id: 'bedroom', name: 'Schlafzimmer', level_id: 'attic', layer_id: 'main', visible: true, width_m: 7.6 },
     { id: 'storage', name: 'Abstellraum', level_id: 'attic', layer_id: 'main', visible: true, width_m: 3.6 },
     { id: 'garage', name: 'Garage', level_id: 'garage', layer_id: 'main', visible: true, width_m: 6 },
-    { id: 'garage_battery_pylontech', name: 'Pylontech', level_id: 'garage', layer_id: 'main', visible: false, width_m: null },
-    { id: 'garage_battery_litime', name: 'LiTime', level_id: 'garage', layer_id: 'main', visible: false, width_m: null },
+    { id: 'garage_battery_1', name: 'Batterie 1', level_id: 'garage', layer_id: 'main', visible: false, width_m: null },
+    { id: 'garage_battery_2', name: 'Batterie 2', level_id: 'garage', layer_id: 'main', visible: false, width_m: null },
     { id: 'garage_cabinet', name: 'Schaltschrank', level_id: 'garage', layer_id: 'main', visible: false, width_m: null },
   ],
   notes: [

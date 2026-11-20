@@ -162,23 +162,23 @@ describe('Lovelace card integration', () => {
     const outdoor = building.rooms.find((r) => r.id === 'garage')!;
     outdoor.measurements = {
       temperature: { sensors: [
-        { entity: 'sensor.test_homematic', name: 'HM Außentemperatur', overview_group: 'Homematic' },
-        { entity: 'sensor.test_ecowitt', name: 'Ecowitt Außentemperatur', overview_group: 'Ecowitt', show_in_overview: true },
-        { entity: 'sensor.test_vitodens', name: 'Kessel Außentemperatur', overview_group: 'Vitodens', show_in_overview: false },
-      ], primary: 'sensor.test_ecowitt' },
+        { entity: 'sensor.test_source_a', name: 'Außenfühler A', overview_group: 'Quelle A' },
+        { entity: 'sensor.test_source_b', name: 'Quelle B Außentemperatur', overview_group: 'Quelle B', show_in_overview: true },
+        { entity: 'sensor.test_source_c', name: 'Kessel Außentemperatur', overview_group: 'Quelle C', show_in_overview: false },
+      ], primary: 'sensor.test_source_b' },
       relative_humidity: { sensors: [{ entity: 'sensor.test_rh' }] },
     };
     const hass = { states: {
-      'sensor.test_homematic': { state: '3.4', attributes: { unit_of_measurement: '°C' } },
-      'sensor.test_ecowitt': { state: '3.6', attributes: { unit_of_measurement: '°C' } },
-      'sensor.test_vitodens': { state: '3.8', attributes: { unit_of_measurement: '°C' } },
+      'sensor.test_source_a': { state: '3.4', attributes: { unit_of_measurement: '°C' } },
+      'sensor.test_source_b': { state: '3.6', attributes: { unit_of_measurement: '°C' } },
+      'sensor.test_source_c': { state: '3.8', attributes: { unit_of_measurement: '°C' } },
       'sensor.test_rh': { state: '83', attributes: { unit_of_measurement: '%' } },
     } };
     const card = await createCard({ ...getDefaultConfig(), building }, hass);
     const badge = () => find(card, '.photo-air[data-room-id="garage"]');
     const phoneEntities = () => [...badge().querySelectorAll('.photo-mobile-reading')].map((node) => node.getAttribute('data-reading-entity'));
     const desktopBefore = [...badge().querySelectorAll('.photo-metric')].map((node) => node.textContent?.trim());
-    expect(phoneEntities()).toEqual(['sensor.test_ecowitt', 'sensor.test_rh']); // back-compat
+    expect(phoneEntities()).toEqual(['sensor.test_source_b', 'sensor.test_rh']); // back-compat
     const mixed = structuredClone(building);
     const room = mixed.rooms.find((r) => r.id === 'garage')!;
     room.measurements!.temperature!.sensors[0]!.show_on_mobile = true;
@@ -187,10 +187,10 @@ describe('Lovelace card integration', () => {
     room.measurements!.relative_humidity!.sensors[0]!.show_on_mobile = false;
     card.setConfig({ ...getDefaultConfig(), building: mixed });
     await card.updateComplete;
-    expect(phoneEntities()).toEqual(['sensor.test_homematic', 'sensor.test_vitodens']);
+    expect(phoneEntities()).toEqual(['sensor.test_source_a', 'sensor.test_source_c']);
     // Group labels are now the same standalone headings as in Outdoor,
     // not repeated inline with each reading. Mobile selection is unchanged.
-    expect([...badge().querySelectorAll('.photo-mobile-source-heading')].map((node) => node.textContent)).toEqual(['Homematic', 'Vitodens']);
+    expect([...badge().querySelectorAll('.photo-mobile-source-heading')].map((node) => node.textContent)).toEqual(['Quelle A', 'Quelle C']);
     expect(badge().querySelectorAll('.photo-mobile-source')).toHaveLength(0);
     expect([...badge().querySelectorAll('.photo-mobile-source-group')].map((node) =>
       node.querySelectorAll('.photo-mobile-reading').length)).toEqual([1, 1]);
@@ -204,14 +204,14 @@ describe('Lovelace card integration', () => {
   it('binds desktop and phone overlay position overrides without affecting sensors', async () => {
     const config = { ...getDefaultConfig(), badge_positions: {
       laundry: { desktop: { x: 20, y: 80 }, mobile: { x: 60, y: 65 } },
-      garage_battery_pylontech: { mobile: { x: 85, y: 77 } },
+      garage_battery_1: { mobile: { x: 85, y: 77 } },
     } };
     const card = await createCard(config);
     const laundry = find(card, '.photo-placement[data-overlay-id="laundry"]');
     expect(laundry.getAttribute('data-manual-desktop-x')).toBe('20');
     expect(laundry.getAttribute('data-manual-mobile-x')).toBe('60');
     expect(laundry.getAttribute('data-manual-mobile-y')).toBe('65');
-    expect(find(card, '.photo-placement[data-overlay-id="garage_battery_pylontech"]').getAttribute('data-manual-mobile-x')).toBe('85');
+    expect(find(card, '.photo-placement[data-overlay-id="garage_battery_1"]').getAttribute('data-manual-mobile-x')).toBe('85');
     const reset = { ...getDefaultConfig(), badge_positions: {} };
     card.setConfig(reset);
     await card.updateComplete;
@@ -265,7 +265,7 @@ describe('Lovelace card integration', () => {
 
   it('keeps each battery and cabinet separately configurable and selectable', async () => {
     const card = await createCard();
-    for (const id of ['garage', 'garage_battery_pylontech', 'garage_battery_litime', 'garage_cabinet']) {
+    for (const id of ['garage', 'garage_battery_1', 'garage_battery_2', 'garage_cabinet']) {
       const button = find<HTMLButtonElement>(card, `.photo-badge[data-select-room="${id}"]`);
       button.click();
       await card.updateComplete;
@@ -377,8 +377,8 @@ describe('Lovelace card integration', () => {
       co2: { sensors: [{ entity: 'sensor.test_garage_co2' }] },
       voc: { sensors: [{ entity: 'sensor.test_garage_voc' }] },
     };
-    const pylontech = building.rooms.find((room) => room.id === 'garage_battery_pylontech')!;
-    pylontech.measurements = { temperature: { sensors: [{ entity: 'sensor.test_battery_temp' }] } };
+    const battery1 = building.rooms.find((room) => room.id === 'garage_battery_1')!;
+    battery1.measurements = { temperature: { sensors: [{ entity: 'sensor.test_battery_temp' }] } };
     const states = {
       'sensor.test_garage_temp': { state: '17.4', attributes: { unit_of_measurement: '°C' } },
       'sensor.test_garage_rh': { state: '51', attributes: { unit_of_measurement: '%' } },
@@ -393,8 +393,8 @@ describe('Lovelace card integration', () => {
     expect(garageOverlay.textContent).toContain('7,6');
     expect(garageOverlay.textContent).toContain('640');
     expect(garageOverlay.textContent).toContain('123');
-    expect(find(card, '.photo-device[data-select-room="garage_battery_pylontech"]').textContent).toContain('19,2');
-    expect(find(card, '.photo-device[data-select-room="garage_battery_litime"]').classList.contains('name-only')).toBe(true);
+    expect(find(card, '.photo-device[data-select-room="garage_battery_1"]').textContent).toContain('19,2');
+    expect(find(card, '.photo-device[data-select-room="garage_battery_2"]').classList.contains('name-only')).toBe(true);
     expect(find<HTMLElement>(card, 'ha-card').style.getPropertyValue('--hk-chip')).toContain('0.5');
   });
 
