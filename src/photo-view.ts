@@ -1,5 +1,5 @@
 import { css, html, nothing } from 'lit';
-import { houseArtwork, frontHouseArtwork, GARAGE_ART_POSITIONS,
+import { houseArtwork, frontHouseArtwork, garageArtPosition,
   MOBILE_ROOM_ART_POSITIONS, FRONT_MOBILE_ROOM_ART_POSITIONS, photoRoomPosition } from './scene-photo';
 import type { HouseSide } from './front-view';
 import { formatSensorValue, resolveMobileReadings, resolveMobileReadingGroups, resolveOverviewGroups } from './metrics';
@@ -27,7 +27,6 @@ export function renderPhotoView(
   options: PhotoViewOptions = {},
 ) {
   const front = options.side === 'front';
-  const garagePositions = GARAGE_ART_POSITIONS;
   // Never gate photo badges on a hard-coded room ID or a geometrical
   // cross-section visibility flag. The photo is fixed; rooms and their
   // sensor badges are independent of the building drawing.
@@ -118,10 +117,11 @@ export function renderPhotoView(
     ${rooms.map((room) => placement(room, initialPosition(room), 'photo-room'))}
     ${devices.map((room) => placement(room, initialPosition(room), room.id === 'garage'
       ? `photo-air ${resolveOverviewGroups(room, hass).length ? 'photo-garage' : ''}` : 'photo-device'))}
-    ${devices.filter((room) => Boolean(garagePositions[room.id])).map((room) => {
+    ${devices.map((room) => {
       // Physical targets are only known for objects already illustrated.
       // Additional garage rooms must not acquire invented object anchors.
-      const point = garagePositions[room.id]!;
+      const point = garageArtPosition(room.id);
+      if (!point) return nothing;
       return html`<button class="photo-object-target" type="button" data-select-room=${room.id} data-anchor-x=${point.anchorX} data-anchor-y=${point.anchorY}
         style=${`left:${point.anchorX}%;top:${point.anchorY}%;`}
         aria-label=${`${room.name}: Messwerte und Sensorquellen öffnen`} @click=${() => onSelect(room)}><span></span></button>`;

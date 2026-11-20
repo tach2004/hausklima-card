@@ -2,14 +2,14 @@ import assert from 'node:assert/strict';
 import { mkdir, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { chromium, devices, webkit } from '@playwright/test';
+import { chromium, webkit } from '@playwright/test';
 import { startPreview } from './dev.mjs';
 import { demoConfig, demoStates } from '../dev/fixtures.js';
 
 // DEMO-WERTE: only the development harness receives these synthetic HA states.
 const server = await startPreview(0);
 const url = `http://127.0.0.1:${server.address().port}`;
-const screenshotDirectory = process.env.UPDATE_SCREENSHOTS === '1' ? 'docs/screenshots/adaptive-groups' : 'work/screenshots/adaptive-groups';
+const screenshotDirectory = 'work/screenshots';
 const launched = [];
 const webkitDisabled = process.env.SKIP_WEBKIT === '1';
 const artworkHash = 'fc840fd3cdd7ec1ecbae75a475c14674eafa28e99d7c43888ce6ffef7cbbef98';
@@ -107,12 +107,12 @@ async function assertLayout(page, card, name) {
 async function checkResponsive(browser, engine) {
   const matrix = [
     ...[360, 390, 430, 1280, 1440, 1920].map((width) => ({ name: `width-${width}`, viewport: { width, height: width < 768 ? 900 : 1100 }, hasTouch: width < 768 })),
-    { name: 'iphone-17-portrait', ...devices['iPhone 17'], deviceScaleFactor: 1 },
-    { name: 'iphone-17-landscape', ...devices['iPhone 17 landscape'], deviceScaleFactor: 1 },
+    { name: 'mobile-portrait', viewport: { width: 402, height: 681 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true },
+    { name: 'mobile-landscape', viewport: { width: 756, height: 352 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true },
   ];
   for (const dimensions of matrix) {
     for (const theme of ['light', 'dark']) {
-      const { name, defaultBrowserType: _browserType, ...device } = dimensions;
+      const { name, ...device } = dimensions;
       const page = await browser.newPage(device);
       const result = await ready(page, `/?demo=1&theme=${theme}`);
       const { card } = result;
@@ -135,7 +135,7 @@ async function checkResponsive(browser, engine) {
         assert.equal(await leaderPaths.count(), 3, `${name}: cabinet and two batteries have one responsive leader line each`);
         assert.deepEqual((await leaderPaths.evaluateAll((nodes) =>
           nodes.map((node) => node.getAttribute('data-leader-room')).sort())),
-          ['garage_battery_litime', 'garage_battery_pylontech', 'garage_cabinet'],
+          ['garage_battery_1', 'garage_battery_2', 'garage_cabinet'],
           `${name}: each leader line belongs to the correct device`);
         assert.equal(await card.locator('.photo-leaders').evaluate((svg) => getComputedStyle(svg).display), 'block',
           `${name}: phone lines must be visibly drawn`);
@@ -185,7 +185,7 @@ async function checkResponsive(browser, engine) {
         assert.equal(await card.locator('.photo-lower .location-column, .outdoor-block, .garage-block').count(), 0,
           `${name}: no redundant outdoor or garage cards on desktop`);
         assert.equal(await card.locator('.photo-room.with-metrics[data-room-id="bedroom"] .photo-metric').count(), 5, `${name}: five room metrics in overlay`);
-        for (const id of ['garage', 'garage_cabinet', 'garage_battery_pylontech', 'garage_battery_litime']) {
+        for (const id of ['garage', 'garage_cabinet', 'garage_battery_1', 'garage_battery_2']) {
           assert.equal(await card.locator(`.photo-device[data-room-id="${id}"], .photo-garage[data-room-id="${id}"]`).count(), 1, `${name}: own device overlay ${id}`);
         }
       }
@@ -201,8 +201,8 @@ async function checkResponsive(browser, engine) {
         await card.getByRole('button', { name: 'Raumdetails schließen' }).click();
       }
       if (engine === 'chromium' && name === 'width-1440') await page.screenshot({ path: `${screenshotDirectory}/panel-${theme}.png`, fullPage: true });
-      if (engine === 'chromium' && name === 'iphone-17-portrait') await page.screenshot({ path: `${screenshotDirectory}/iphone-portrait-${theme}.png`, fullPage: true });
-      if (engine === 'chromium' && name === 'iphone-17-landscape') await page.screenshot({ path: `${screenshotDirectory}/iphone-landscape-${theme}.png`, fullPage: true });
+      if (engine === 'chromium' && name === 'mobile-portrait') await page.screenshot({ path: `${screenshotDirectory}/mobile-portrait-${theme}.png`, fullPage: true });
+      if (engine === 'chromium' && name === 'mobile-landscape') await page.screenshot({ path: `${screenshotDirectory}/mobile-landscape-${theme}.png`, fullPage: true });
       assert.deepEqual(result.errors, [], `${engine}/${name}/${theme}: browser errors`);
       assert.deepEqual(result.external, [], `${engine}/${name}/${theme}: external runtime requests`);
       console.log(`PASS ${engine} ${name} ${dimensions.viewport.width}×${dimensions.viewport.height} ${theme}: complete values, all rooms/devices/sources, no collisions, unchanged artwork`);
@@ -216,20 +216,20 @@ async function checkStates(browser) {
   await selectRoom(page, card, 'demo_outdoor');
   const outdoor = card.locator('.room-detail');
   assert.equal(await outdoor.locator('.sensor-row').count(), 7);
-  const primary = outdoor.locator('.sensor-row[data-entity="sensor.demo_outdoor_ecowitt_temperature"]');
+  const primary = outdoor.locator('.sensor-row[data-entity="sensor.demo_outdoor_source_b_temperature"]');
   assert.match(await primary.innerText(), /Standardquelle.*Hauptanzeige/);
   assert.match(await primary.innerText(), /3[,.]6/);
   const states = structuredClone(demoStates);
-  states['sensor.demo_outdoor_ecowitt_temperature'].state = 'unavailable';
-  states['sensor.demo_outdoor_homematic_temperature'].state = 'unknown';
-  delete states['sensor.demo_outdoor_homematic_humidity'];
+  states['sensor.demo_outdoor_source_b_temperature'].state = 'unavailable';
+  states['sensor.demo_outdoor_source_a_temperature'].state = 'unknown';
+  delete states['sensor.demo_outdoor_source_a_humidity'];
   await page.evaluate((next) => window.hausklimaPreview.setStates(next), states);
   await page.waitForFunction(() => document.querySelector('hausklima-card').shadowRoot.querySelector('.room-detail')?.textContent.includes('Nicht verfügbar'));
   assert.match(await outdoor.innerText(), /Unbekannt/);
   assert.match(await outdoor.innerText(), /Entität fehlt/);
   assert.match(await card.locator('.photo-outdoor[data-room-id="demo_outdoor"]').innerText(), /Nicht verfügbar/, 'unavailable primary remains explicit on the image');
   assert.equal(await outdoor.locator('.sensor-row').count(), 7);
-  states['sensor.demo_outdoor_ecowitt_temperature'].state = '5.7';
+  states['sensor.demo_outdoor_source_b_temperature'].state = '5.7';
   await page.evaluate((next) => window.hausklimaPreview.setStates(next), states);
   await page.waitForFunction(() => /5[,.]7/.test(document.querySelector('hausklima-card').shadowRoot.querySelector('.room-detail')?.textContent ?? ''));
   await page.evaluate(() => {
@@ -237,7 +237,7 @@ async function checkStates(browser) {
     window.hausklimaPreview.card.addEventListener('hass-more-info', (event) => { window.testEntityEvent = event.detail.entityId; });
   });
   await primary.click();
-  assert.equal(await page.evaluate(() => window.testEntityEvent), 'sensor.demo_outdoor_ecowitt_temperature');
+  assert.equal(await page.evaluate(() => window.testEntityEvent), 'sensor.demo_outdoor_source_b_temperature');
   assert.deepEqual(errors, []);
   await page.close();
   // Default production-style config stays an honest empty state without demo values.
@@ -250,7 +250,7 @@ async function checkStates(browser) {
   assert.deepEqual(
     (await initial.card.locator('.photo-leaders path[data-leader-room]').evaluateAll((paths) =>
       paths.map((path) => path.getAttribute('data-leader-room')).sort())),
-    ['garage_battery_litime', 'garage_battery_pylontech', 'garage_cabinet'],
+    ['garage_battery_1', 'garage_battery_2', 'garage_cabinet'],
     'even unconfigured garage devices retain their three label connectors without empty black panels',
   );
   const emptyBackground = await initial.card.locator('.photo-room.name-only').first().evaluate((element) => getComputedStyle(element).backgroundColor);
@@ -314,7 +314,7 @@ async function checkOverlayBehavior(browser) {
   assert.equal(await bedroom.locator('[data-metric="voc"] strong').innerText(), '218');
   assert.match(await bedroom.innerText(), /VOC-Index/);
   assert.equal(await card.locator('.photo-room[data-room-id="laundry"] .photo-metric strong').first().innerText(), '16,8');
-  for (const id of ['garage', 'garage_cabinet', 'garage_battery_pylontech', 'garage_battery_litime']) {
+  for (const id of ['garage', 'garage_cabinet', 'garage_battery_1', 'garage_battery_2']) {
     const panel = card.locator(`.photo-device.with-metrics[data-room-id="${id}"], .photo-garage.with-metrics[data-room-id="${id}"]`);
     assert.equal(await panel.count(), 1, `dedicated visible values for ${id}`);
     const target = card.locator(`.photo-object-target[data-select-room="${id}"]`);
@@ -417,28 +417,28 @@ async function checkSourceGroups(browser) {
     const { card, editor, errors, external } = await ready(page);
     const outdoor = card.locator('.photo-outdoor[data-room-id="demo_outdoor"]').first();
     const groups = outdoor.locator('[data-overview-group]');
-    assert.deepEqual(await groups.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-overview-group'))), ['Homematic', 'Ecowitt', 'Vitodens']);
+    assert.deepEqual(await groups.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-overview-group'))), ['Quelle A', 'Quelle B', 'Quelle C']);
     const metricSelector = '.photo-metric';
-    const homematic = outdoor.locator('[data-overview-group="Homematic"]');
-    const ecowitt = outdoor.locator('[data-overview-group="Ecowitt"]');
-    assert.equal(await homematic.locator(metricSelector).count(), 2, 'temperature and humidity share their named source');
-    assert.match(await homematic.textContent(), /3,4/);
-    assert.match(await homematic.textContent(), /86,0/);
-    assert.equal(await ecowitt.locator(metricSelector).count(), 4, 'relative and absolute air pressure join Ecowitt only');
-    assert.equal(await ecowitt.locator('[data-metric="pressure_relative"] strong').textContent(), '1013');
-    assert.equal(await ecowitt.locator('[data-metric="pressure_absolute"] strong').textContent(), '999');
-    assert.match(await ecowitt.textContent(), /hPa/);
+    const sourceA = outdoor.locator('[data-overview-group="Quelle A"]');
+    const sourceB = outdoor.locator('[data-overview-group="Quelle B"]');
+    assert.equal(await sourceA.locator(metricSelector).count(), 2, 'temperature and humidity share their named source');
+    assert.match(await sourceA.textContent(), /3,4/);
+    assert.match(await sourceA.textContent(), /86,0/);
+    assert.equal(await sourceB.locator(metricSelector).count(), 4, 'relative and absolute air pressure join Quelle B only');
+    assert.equal(await sourceB.locator('[data-metric="pressure_relative"] strong').textContent(), '1013');
+    assert.equal(await sourceB.locator('[data-metric="pressure_absolute"] strong').textContent(), '999');
+    assert.match(await sourceB.textContent(), /hPa/);
     assert.equal(await outdoor.locator(`${metricSelector} svg`).count(), 7, 'each visible reading uses a genuine SVG icon');
 
     await page.locator('#editor-panel > summary').click();
     await editor.locator('#room-select').selectOption('demo_outdoor');
     await editor.locator('#metric-select').selectOption('temperature');
-    const entity = 'sensor.demo_outdoor_homematic_temperature';
+    const entity = 'sensor.demo_outdoor_source_a_temperature';
     const main = editor.locator(`[data-action="sensor-overview"][data-entity="${entity}"]`);
     assert.equal(await main.isChecked(), true);
     await main.uncheck();
     await page.waitForFunction(() => window.hausklimaPreview.getConfig().building.rooms.find((room) => room.id === 'demo_outdoor').measurements.temperature.sensors[0].show_in_overview === false);
-    assert.equal(await homematic.locator('[data-metric="temperature"]').count(), 0, 'unchecked source disappears from overview');
+    assert.equal(await sourceA.locator('[data-metric="temperature"]').count(), 0, 'unchecked source disappears from overview');
     await selectRoom(page, card, 'demo_outdoor', width < 768);
     assert.equal(await card.locator('.room-detail .sensor-row').count(), 7, 'unchecked sources remain in full details');
     await card.getByRole('button', { name: 'Raumdetails schließen' }).click();
@@ -447,7 +447,7 @@ async function checkSourceGroups(browser) {
     await group.fill('Garten West'); await group.press('Tab');
     assert.equal(await outdoor.locator('[data-overview-group="Garten West"] [data-metric="temperature"]').count(), 1, 'custom group labels are displayed');
     await editor.locator('#metric-select').selectOption('relative_humidity');
-    const humidityGroup = editor.locator('[data-action="sensor-group"][data-entity="sensor.demo_outdoor_homematic_humidity"]');
+    const humidityGroup = editor.locator('[data-action="sensor-group"][data-entity="sensor.demo_outdoor_source_a_humidity"]');
     await humidityGroup.fill('Garten West'); await humidityGroup.press('Tab');
     assert.equal(await outdoor.locator(`[data-overview-group="Garten West"] ${metricSelector}`).count(), 2, 'matching free labels join metrics');
     await page.reload(); await page.waitForFunction(() => window.previewReady === true);
@@ -571,7 +571,7 @@ async function checkEditor(browser) {
   await assertLayout(page, card, 'mobile-metric-all-types-enabled/default-font');
   if (process.env.UPDATE_SCREENSHOTS === '1') {
     await page.locator('#editor-panel > summary').click();
-    await page.screenshot({ path: `${screenshotDirectory}/iphone-optional-metrics.png`, fullPage: true });
+    await page.screenshot({ path: `${screenshotDirectory}/mobile-optional-metrics.png`, fullPage: true });
     await page.locator('#editor-panel > summary').click();
   }
   await page.evaluate(() => {
@@ -745,9 +745,9 @@ async function checkOutdoorMobileBadgeWidth(browser) {
       `${width}: outdoor location selector fits the same panel width`);
     assert.equal(geometry.rows.length, 6, `${width}: three temperatures, two humidity sources and one pressure stay visible`);
     assert.deepEqual(geometry.groups.map((group) => [group.name, ...group.metrics]), [
-      ['Homematic', 'temperature', 'relative_humidity'],
-      ['Ecowitt', 'temperature', 'relative_humidity', 'pressure_relative'],
-      ['Vitodens', 'temperature'],
+      ['Quelle A', 'temperature', 'relative_humidity'],
+      ['Quelle B', 'temperature', 'relative_humidity', 'pressure_relative'],
+      ['Quelle C', 'temperature'],
     ], `${width}: group by source with temperature and humidity on separate lines`);
     for (const group of geometry.groups) {
       assert.ok(group.headingBottom <= group.firstReadingTop + 1, `${width}: heading above readings`);
@@ -796,13 +796,13 @@ async function checkOutdoorNaturalWidth(browser) {
       await settle();
     };
     // First compare a compact version with the same sources and values.
-    await applyNames({ Homematic: 'HM', Ecowitt: 'Eco', Vitodens: 'VD' });
+    await applyNames({ 'Quelle A': 'A', 'Quelle B': 'B', 'Quelle C': 'C' });
     const short = await card.locator('.photo-outdoor-group').evaluate((node) => ({
       width: node.getBoundingClientRect().width,
       docked: node.classList.contains('is-docked'),
     }));
-    await applyNames({ HM: 'Homematic Außentemperaturfühler',
-      Eco: 'Ecowitt WS90 Wetterstation', VD: 'Vitodens Außensensor' });
+    await applyNames({ A: 'Außenfühler am Gartentor',
+      B: 'Wetterstation auf der Garage', C: 'Außenfühler an der Hauswand' });
     const long = await card.locator('.photo-outdoor-group').evaluate((node) => {
       const box = node.getBoundingClientRect();
       const image = node.closest('.photo-stage').getBoundingClientRect();
@@ -832,7 +832,7 @@ async function checkOutdoorNaturalWidth(browser) {
       `${viewportWidth}: named outdoor badge respects available horizontal width`);
     if (viewportWidth <= 1000) {
       assert.deepEqual(long.headings.map((h) => h.text),
-        ['Homematic Außentemperaturfühler', 'Ecowitt WS90 Wetterstation', 'Vitodens Außensensor'],
+        ['Außenfühler am Gartentor', 'Wetterstation auf der Garage', 'Außenfühler an der Hauswand'],
         `${viewportWidth}: all mobile source names remain present`);
       assert.ok(long.headings.every((h) => !h.clipped), `${viewportWidth}: no source title is cut off`);
     }
@@ -864,35 +864,35 @@ async function checkPhoneSourceToggles(browser) {
   const names = () => badge.locator('.photo-mobile-reading[data-metric="temperature"]:visible');
   const selectedEntities = () => names().evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-reading-entity')));
   const before = await badge.locator('.photo-metric').allTextContents();
-  assert.deepEqual(await selectedEntities(), ['sensor.demo_outdoor_ecowitt_temperature'],
+  assert.deepEqual(await selectedEntities(), ['sensor.demo_outdoor_source_b_temperature'],
     'existing phone config still shows primary source only');
-  const homematic = editor.locator('[data-action="sensor-mobile"][data-entity="sensor.demo_outdoor_homematic_temperature"]');
-  const vitodens = editor.locator('[data-action="sensor-mobile"][data-entity="sensor.demo_outdoor_vitodens_temperature"]');
-  const ecowitt = editor.locator('[data-action="sensor-mobile"][data-entity="sensor.demo_outdoor_ecowitt_temperature"]');
-  assert.equal(await homematic.isChecked(), false, 'extra sources start hidden');
-  assert.equal(await ecowitt.isChecked(), true, 'primary starts visible');
-  await homematic.check();
-  await vitodens.check();
+  const sourceA = editor.locator('[data-action="sensor-mobile"][data-entity="sensor.demo_outdoor_source_a_temperature"]');
+  const sourceC = editor.locator('[data-action="sensor-mobile"][data-entity="sensor.demo_outdoor_source_c_temperature"]');
+  const sourceB = editor.locator('[data-action="sensor-mobile"][data-entity="sensor.demo_outdoor_source_b_temperature"]');
+  assert.equal(await sourceA.isChecked(), false, 'extra sources start hidden');
+  assert.equal(await sourceB.isChecked(), true, 'primary starts visible');
+  await sourceA.check();
+  await sourceC.check();
   assert.deepEqual(await selectedEntities(), [
-    'sensor.demo_outdoor_homematic_temperature',
-    'sensor.demo_outdoor_ecowitt_temperature',
-    'sensor.demo_outdoor_vitodens_temperature',
+    'sensor.demo_outdoor_source_a_temperature',
+    'sensor.demo_outdoor_source_b_temperature',
+    'sensor.demo_outdoor_source_c_temperature',
   ]);
-  assert.deepEqual(await badge.locator('.photo-mobile-source-heading').allTextContents(), ['Homematic', 'Ecowitt', 'Vitodens'],
+  assert.deepEqual(await badge.locator('.photo-mobile-source-heading').allTextContents(), ['Quelle A', 'Quelle B', 'Quelle C'],
     'multiple sources show their own group name on the phone');
   assert.deepEqual(await badge.locator('.photo-metric').allTextContents(), before, 'desktop sources are independent');
-  await ecowitt.uncheck();
+  await sourceB.uncheck();
   assert.deepEqual(await selectedEntities(), [
-    'sensor.demo_outdoor_homematic_temperature', 'sensor.demo_outdoor_vitodens_temperature',
+    'sensor.demo_outdoor_source_a_temperature', 'sensor.demo_outdoor_source_c_temperature',
   ], 'primary can also be individually removed from the phone');
   assert.equal((await page.evaluate(() => window.hausklimaPreview.getConfig()))
     .building.rooms.find((r) => r.id === 'demo_outdoor').measurements.temperature.sensors[1].show_on_mobile, false);
   await editor.locator('#metric-select').selectOption('relative_humidity');
-  const rh = editor.locator('[data-action="sensor-mobile"][data-entity="sensor.demo_outdoor_homematic_humidity"]');
+  const rh = editor.locator('[data-action="sensor-mobile"][data-entity="sensor.demo_outdoor_source_a_humidity"]');
   await rh.check();
   assert.deepEqual(await badge.locator('.photo-mobile-reading[data-metric="relative_humidity"]:visible').evaluateAll(
     (nodes) => nodes.map((n) => n.getAttribute('data-reading-entity'))),
-    ['sensor.demo_outdoor_homematic_humidity', 'sensor.demo_outdoor_ecowitt_humidity'],
+    ['sensor.demo_outdoor_source_a_humidity', 'sensor.demo_outdoor_source_b_humidity'],
     'humidity sources can also be enabled independently');
   await editor.locator('#metric-select').selectOption('pressure_relative');
   await editor.locator('[data-action="sensor-mobile"][data-entity="sensor.demo_outdoor_relative_pressure"]').check();
@@ -906,7 +906,7 @@ async function checkPhoneSourceToggles(browser) {
   await assertLayout(page, card, 'phone selected sources and layout');
   if (process.env.UPDATE_SCREENSHOTS === '1') {
     await page.locator('#editor-panel > summary').click();
-    await page.screenshot({ path: `${screenshotDirectory}/iphone-multiple-sources.png`, fullPage: true });
+    await page.screenshot({ path: `${screenshotDirectory}/mobile-multiple-sources.png`, fullPage: true });
     await page.locator('#editor-panel > summary').click();
   }
   // Source checkbox states must survive editing and page reload.
@@ -919,7 +919,7 @@ async function checkPhoneSourceToggles(browser) {
   assert.equal(await card.locator('.room-detail .sensor-row').count(), 7, 'phone source choices never remove details');
   assert.deepEqual(errors, []);
   await page.close();
-  console.log('PASS phone source selection: Homematic, Ecowitt, Vitodens, RH, pressure, desktop isolation, persistence');
+  console.log('PASS phone source selection: Quelle A, Quelle B, Quelle C, RH, pressure, desktop isolation, persistence');
 }
 
 
@@ -932,7 +932,7 @@ async function checkPinnedPositionsAndAllRooms(browser) {
       config.badge_positions = { ...config.badge_positions,
         laundry: { desktop: { x: 54.2, y: 72.6 }, mobile: { x: 50, y: 60 } },
         workshop: { desktop: { x: 54.2, y: 72.6 }, mobile: { x: 50, y: 60 } },
-        garage_battery_litime: { desktop: { x: 94.5, y: 89 }, mobile: { x: 94.5, y: 89 } } };
+        garage_battery_2: { desktop: { x: 94.5, y: 89 }, mobile: { x: 94.5, y: 89 } } };
       window.hausklimaPreview.setConfig(config);
     });
     await page.evaluate(async () => {
@@ -950,7 +950,7 @@ async function checkPinnedPositionsAndAllRooms(browser) {
           docked: node.classList.contains('is-docked') };
       };
       return { imageHeight: image.height, stageHeight: stage.getBoundingClientRect().height,
-        laundry: get('laundry'), workshop: get('workshop'), battery: get('garage_battery_litime') };
+        laundry: get('laundry'), workshop: get('workshop'), battery: get('garage_battery_2') };
     });
     const expected = width < 768 ? { x: 50, y: 60 } : { x: 54.2, y: 72.6 };
     for (const id of ['laundry', 'workshop']) {
@@ -967,8 +967,8 @@ async function checkPinnedPositionsAndAllRooms(browser) {
       const tiles = card.locator('.house-room-list .room-tile');
       assert.equal(await tiles.count(), demoConfig.building.rooms.length,
         'all rooms, garage and outdoor locations use the same overview tiles');
-      for (const id of ['garage', 'garage_cabinet', 'garage_battery_pylontech',
-        'garage_battery_litime', 'demo_outdoor', 'demo_outdoor_north']) {
+      for (const id of ['garage', 'garage_cabinet', 'garage_battery_1',
+        'garage_battery_2', 'demo_outdoor', 'demo_outdoor_north']) {
         const tile = card.locator(`.house-room-list .room-tile[data-select-room="${id}"]`);
         assert.equal(await tile.count(), 1, `${id} has a normal room card below the image`);
         await tile.click();
@@ -1016,11 +1016,11 @@ async function checkTwoHouseSides(browser) {
       'garage stays in the right-side area on the front');
     assert.ok(frontBuildings.some((item) => item.id === 'demo_outdoor' && item.x > 70),
       'outdoor group stays in the right-side area on the front');
-    assert.equal(await card.locator('.photo-placement[data-overlay-id="garage_battery_pylontech"]').count(), 1);
+    assert.equal(await card.locator('.photo-placement[data-overlay-id="garage_battery_1"]').count(), 1);
     assert.equal(await card.locator('.photo-placement[data-overlay-id="garage_cabinet"]').count(), 1);
     const sharedDeviceCoordinates = await card.locator('.photo-placement, .photo-outdoor-group').evaluateAll((nodes) =>
-      nodes.filter((node) => ['garage', 'garage_cabinet', 'garage_battery_pylontech',
-        'garage_battery_litime', 'demo_outdoor'].includes(node.dataset.overlayId))
+      nodes.filter((node) => ['garage', 'garage_cabinet', 'garage_battery_1',
+        'garage_battery_2', 'demo_outdoor'].includes(node.dataset.overlayId))
         .map((node) => ({ id: node.dataset.overlayId,
           desktopX: node.dataset.manualDesktopX, mobileX: node.dataset.manualMobileX,
           preferredX: node.dataset.preferredX, preferredY: node.dataset.preferredY }))
@@ -1222,7 +1222,7 @@ async function checkUnifiedBadgeGroups(browser) {
     await page.evaluate(() => {
       const config = window.hausklimaPreview.getConfig();
       const hass = structuredClone(window.hausklimaPreview.card.hass.states);
-      const ids = ['garage_cabinet', 'garage_battery_pylontech', 'bedroom'];
+      const ids = ['garage_cabinet', 'garage_battery_1', 'bedroom'];
       for (const id of ids) {
         const room = config.building.rooms.find((candidate) => candidate.id === id);
         room.name = id === 'garage_cabinet' ? 'Schrank' : room.name;
@@ -1256,7 +1256,7 @@ async function checkUnifiedBadgeGroups(browser) {
       const outdoors = box('demo_outdoor');
       const outdoorDesktop = parseFloat(getComputedStyle(outdoors.querySelector('.source-group-name')).fontSize);
       const outdoorMobile = parseFloat(getComputedStyle(outdoors.querySelector('.photo-mobile-source-heading')).fontSize);
-      const labels = ['garage_cabinet', 'garage_battery_pylontech', 'bedroom'];
+      const labels = ['garage_cabinet', 'garage_battery_1', 'bedroom'];
       return labels.map((id) => {
         const badge = box(id);
         const desktopGroups = [...badge.querySelectorAll('.named-group')];
@@ -1443,10 +1443,10 @@ async function checkBadgePositionEditor(browser) {
     await editor.locator('.position-settings').screenshot({ path: `${screenshotDirectory}/badge-position-editor-mobile.png` });
   }
   // A manually positioned garage badge keeps its exact point; the connector follows.
-  const deviceId = 'garage_battery_pylontech';
+  const deviceId = 'garage_battery_1';
   const leader = card.locator(`.photo-leaders path[data-leader-room="${deviceId}"]`);
   const originalLeader = await leader.getAttribute('d');
-  assert.ok(originalLeader, 'Pylontech leader exists before movement');
+  assert.ok(originalLeader, 'Batterie 1 leader exists before movement');
   await page.evaluate((id) => {
     const next = window.hausklimaPreview.getConfig();
     next.badge_positions = { ...next.badge_positions, [id]: { mobile: { x: 88, y: 79 } } };
@@ -1459,7 +1459,7 @@ async function checkBadgePositionEditor(browser) {
     return line?.getAttribute('d') && line.getAttribute('d') !== previous;
   }, { id: deviceId, previous: originalLeader });
   const movedLeader = await leader.getAttribute('d');
-  assert.notEqual(movedLeader, originalLeader, 'Pylontech line follows user-saved phone badge position');
+  assert.notEqual(movedLeader, originalLeader, 'Batterie 1 line follows user-saved phone badge position');
   assert.equal(await card.locator(`.photo-placement[data-overlay-id="${deviceId}"]`).getAttribute('data-manual-mobile-x'), '88');
   // Moving only the desktop badge must NOT alter the phone connector.
   await page.evaluate((id) => {

@@ -1,4 +1,5 @@
 import { MOBILE_ROOM_ART_POSITIONS, FRONT_MOBILE_ROOM_ART_POSITIONS } from './scene-photo';
+import { isGarageEquipment } from './garage-locations';
 interface Rectangle { x: number; y: number; width: number; height: number; }
 /** Draw device-anchor to badge-edge connectors after every responsive reflow.
  *  No static coordinates: manually moved badges are measured in their new location.
@@ -67,7 +68,7 @@ export function layoutPhotoOverlays(
   for (const element of stage.querySelectorAll<HTMLElement>('.photo-placement')) {
     element.classList.remove('is-docked');
     const id = element.dataset.overlayId ?? '';
-    const garageEquipment = id === 'garage_cabinet' || id === 'garage_battery_pylontech' || id === 'garage_battery_litime';
+    const garageEquipment = isGarageEquipment(id);
     // Every configured location must retain its badge even when no phone
     // reading is enabled yet. This allows new rooms to be positioned first
     // and populated with sensors later.

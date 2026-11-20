@@ -146,7 +146,7 @@ describe('approved-image climate overlays', () => {
 
   it('binds four independent garage panels and explicit object touch targets to their own detail sources', async () => {
     const building = getDefaultBuilding();
-    const ids = ['garage', 'garage_cabinet', 'garage_battery_pylontech', 'garage_battery_litime'];
+    const ids = ['garage', 'garage_cabinet', 'garage_battery_1', 'garage_battery_2'];
     const states: HomeAssistant['states'] = {};
     ids.forEach((id, index) => {
       const room = building.rooms.find((entry) => entry.id === id)!;
@@ -174,19 +174,68 @@ describe('approved-image climate overlays', () => {
     }
   });
 
+  it('retains the two earlier battery keys, sensor mappings and anchors on both sides', async () => {
+    const building = getDefaultBuilding();
+    const positions: NonNullable<HausKlimaCardConfig['badge_positions']> = {};
+    const states: HomeAssistant['states'] = {};
+    // The previous persisted suffixes, represented as exact base-36 values.
+    const savedIds = [73_239_332_885_729, 1_301_399_942].map((suffix) => `garage_battery_${suffix.toString(36)}`);
+    delete building.garage_components_initialized;
+    for (const [index, id] of savedIds.entries()) {
+      const room = building.rooms.find((entry) => entry.id === `garage_battery_${index + 1}`)!;
+      room.id = id;
+      room.name = `Eigene Batterie ${index + 1}`;
+      const entity = `sensor.test_saved_battery_${index + 1}`;
+      room.measurements = { temperature: { sensors: [{ entity, show_on_mobile: true }], primary: entity } };
+      states[entity] = { state: String(18 + index), attributes: { unit_of_measurement: '°C' } };
+      positions[id] = { desktop: { x: 78 + index, y: 88 }, mobile: { x: 84 + index, y: 77 } };
+    }
+    const card = await createCard(building, { states }, { badge_positions: positions });
+    for (const side of ['rear', 'front']) {
+      await expect.poll(() => query(card, '.photo-stage').getAttribute('data-scene-side')).toBe(side);
+      expect(card.shadowRoot?.querySelectorAll('.photo-object-target')).toHaveLength(4);
+      expect(card.shadowRoot?.querySelectorAll('.photo-device')).toHaveLength(3);
+      for (const [index, id] of savedIds.entries()) {
+        const panel = card.shadowRoot?.querySelector<HTMLElement>(`.photo-placement[data-overlay-id="${id}"]`);
+        const target = card.shadowRoot?.querySelector<HTMLElement>(`.photo-object-target[data-select-room="${id}"]`);
+        expect(panel?.textContent).toContain(`Eigene Batterie ${index + 1}`);
+        expect(textValues(panel!)).toEqual([`${18 + index},0`]);
+        expect(panel?.dataset.manualDesktopX).toBe(String(78 + index));
+        expect(panel?.dataset.manualMobileX).toBe(String(84 + index));
+        expect(target?.dataset.anchorX).toBe(index === 0 ? '84.2' : '90.1');
+      }
+      if (side === 'rear') {
+        query<HTMLButtonElement>(card, '[data-house-side-switch]').click();
+        await card.updateComplete;
+      }
+    }
+  });
+
+  it('honors earlier position-only configurations while showing the neutral default label', async () => {
+    const id = `garage_battery_${(1_301_399_942).toString(36)}`;
+    const card = await createCard(getDefaultBuilding(), { states: {} }, { building: undefined,
+      badge_positions: { [id]: { desktop: { x: 92, y: 87 }, mobile: { x: 93, y: 79 } } },
+    });
+    const panel = card.shadowRoot?.querySelector<HTMLElement>(`.photo-placement[data-overlay-id="${id}"]`);
+    expect(panel?.textContent).toContain('Batterie 2');
+    expect(panel?.dataset.manualDesktopX).toBe('92');
+    expect(panel?.dataset.manualMobileX).toBe('93');
+    expect(card.shadowRoot?.querySelector('[data-overlay-id="garage_battery_2"]')).toBeNull();
+  });
+
   it('adds no dark device panels for unconfigured or explicitly hidden garage measurements', async () => {
     const building = getDefaultBuilding();
-    building.rooms.find((room) => room.id === 'garage_battery_pylontech')!.measurements = {
-      temperature: { sensors: [{ entity: 'sensor.test_pylontech_temperature' }] },
+    building.rooms.find((room) => room.id === 'garage_battery_1')!.measurements = {
+      temperature: { sensors: [{ entity: 'sensor.test_battery1_temperature' }] },
     };
-    building.rooms.find((room) => room.id === 'garage_battery_litime')!.measurements = {
-      temperature: { visible: false, sensors: [{ entity: 'sensor.test_litime_temperature' }] },
+    building.rooms.find((room) => room.id === 'garage_battery_2')!.measurements = {
+      temperature: { visible: false, sensors: [{ entity: 'sensor.test_battery2_temperature' }] },
     };
     const card = await createCard(building);
     expect(card.shadowRoot?.querySelectorAll('.photo-badge.with-metrics')).toHaveLength(1);
-    expect(query(card, '.photo-badge.with-metrics').getAttribute('data-room-id')).toBe('garage_battery_pylontech');
+    expect(query(card, '.photo-badge.with-metrics').getAttribute('data-room-id')).toBe('garage_battery_1');
     expect(query(card, '.photo-device[data-room-id="garage_cabinet"]').classList.contains('name-only')).toBe(true);
-    expect(query(card, '.photo-device[data-room-id="garage_battery_litime"]').classList.contains('name-only')).toBe(true);
+    expect(query(card, '.photo-device[data-room-id="garage_battery_2"]').classList.contains('name-only')).toBe(true);
     expect(card.shadowRoot?.querySelector('.photo-garage')).toBeNull();
   });
 
@@ -259,7 +308,7 @@ describe('approved-image climate overlays', () => {
     const building = getDefaultBuilding();
     building.rooms = building.rooms.filter((room) => room.id !== 'garage');
     building.garage_components_initialized = true;
-    const ids = ['garage_cabinet', 'garage_battery_pylontech', 'garage_battery_litime'];
+    const ids = ['garage_cabinet', 'garage_battery_1', 'garage_battery_2'];
     const states: HomeAssistant['states'] = {};
     ids.forEach((id, index) => {
       building.rooms.find((room) => room.id === id)!.measurements = {
@@ -284,30 +333,30 @@ describe('approved-image climate overlays', () => {
 
   it('shows selected source groups with icons and both pressure kinds, retaining secondary sources only in details', async () => {
     const building = getDefaultBuilding();
-    const room = outdoor('test_grouped_outdoor', 'Außen', 'sensor.test_homematic', 'sensor.test_ecowitt');
+    const room = outdoor('test_grouped_outdoor', 'Außen', 'sensor.test_source_a', 'sensor.test_source_b');
     room.measurements = {
       temperature: { sensors: [
-        { entity: 'sensor.test_homematic', overview_group: 'Homematic', show_in_overview: true },
-        { entity: 'sensor.test_ecowitt', overview_group: 'Ecowitt', show_in_overview: true },
+        { entity: 'sensor.test_source_a', overview_group: 'Quelle A', show_in_overview: true },
+        { entity: 'sensor.test_source_b', overview_group: 'Quelle B', show_in_overview: true },
         { entity: 'sensor.test_secondary', overview_group: 'Nur Details', show_in_overview: false },
       ] },
-      relative_humidity: { sensors: [{ entity: 'sensor.test_homematic_rh', overview_group: 'Homematic' }] },
-      pressure_relative: { sensors: [{ entity: 'sensor.test_pressure_rel', overview_group: 'Ecowitt' }] },
-      pressure_absolute: { sensors: [{ entity: 'sensor.test_pressure_abs', overview_group: 'Ecowitt' }] },
+      relative_humidity: { sensors: [{ entity: 'sensor.test_source_a_rh', overview_group: 'Quelle A' }] },
+      pressure_relative: { sensors: [{ entity: 'sensor.test_pressure_rel', overview_group: 'Quelle B' }] },
+      pressure_absolute: { sensors: [{ entity: 'sensor.test_pressure_abs', overview_group: 'Quelle B' }] },
     };
     room.mobile_overview = { pressure_relative: true, pressure_absolute: true };
     building.rooms.push(room);
     const hass: HomeAssistant = { states: {
-      'sensor.test_homematic': { state: '3.39999', attributes: { unit_of_measurement: '°C' } },
-      'sensor.test_ecowitt': { state: '6.3', attributes: { unit_of_measurement: '°C' } },
+      'sensor.test_source_a': { state: '3.39999', attributes: { unit_of_measurement: '°C' } },
+      'sensor.test_source_b': { state: '6.3', attributes: { unit_of_measurement: '°C' } },
       'sensor.test_secondary': { state: '9.9', attributes: { unit_of_measurement: '°C' } },
-      'sensor.test_homematic_rh': { state: '86', attributes: { unit_of_measurement: '%' } },
+      'sensor.test_source_a_rh': { state: '86', attributes: { unit_of_measurement: '%' } },
       'sensor.test_pressure_rel': { state: '1013.26', attributes: { unit_of_measurement: 'hPa' } },
       'sensor.test_pressure_abs': { state: '996.7', attributes: { unit_of_measurement: 'hPa' } },
     } };
     const card = await createCard(building, hass);
     const panel = query<HTMLButtonElement>(card, '.photo-outdoor');
-    expect([...panel.querySelectorAll('[data-overview-group]')].map((node) => node.getAttribute('data-overview-group'))).toEqual(['Homematic', 'Ecowitt']);
+    expect([...panel.querySelectorAll('[data-overview-group]')].map((node) => node.getAttribute('data-overview-group'))).toEqual(['Quelle A', 'Quelle B']);
     expect(textValues(panel)).toEqual(['3,4', '86,0', '6,3', '1013', '997']);
     expect(panel.querySelectorAll('.photo-metric svg.metric-icon')).toHaveLength(5);
     expect(panel.querySelector('[data-room-icon="outdoor"]')).not.toBeNull();
@@ -325,14 +374,14 @@ describe('approved-image climate overlays', () => {
     const detail = query(card, '.room-detail');
     expect(detail.querySelectorAll('.sensor-row')).toHaveLength(6);
     expect(detail.querySelector('[data-entity="sensor.test_secondary"]')?.textContent).toContain('9,9');
-    expect(detail.querySelector('[data-entity="sensor.test_ecowitt"]')?.textContent).toContain('Hauptanzeige');
+    expect(detail.querySelector('[data-entity="sensor.test_source_b"]')?.textContent).toContain('Hauptanzeige');
     expect(detail.querySelectorAll('.overview-sensor')).toHaveLength(5);
   });
 
 
   it('uses the same named source groups in cabinet, battery and indoor badges on desktop and mobile', async () => {
     const building = getDefaultBuilding();
-    const roomIds = ['garage_cabinet', 'garage_battery_pylontech', 'bedroom'];
+    const roomIds = ['garage_cabinet', 'garage_battery_1', 'bedroom'];
     const states: HomeAssistant['states'] = {};
     for (const roomId of roomIds) {
       const room = building.rooms.find((candidate) => candidate.id === roomId)!;

@@ -1,61 +1,11 @@
-# AGENTS.md — HausKlima Card
+# AGENTS.md
 
-## Purpose
-This repository develops **HausKlima Card** (`custom:hausklima-card`), an independent HACS-installable Home Assistant Lovelace custom card. Its primary purpose is a visually clean, interactive SVG cross-section of a house and detached garage, with configurable climate sensor readings.
+HausKlima Card ist eine eigenständige Home-Assistant-Dashboardkarte für HACS. Verwende Deutsch für Berichte und PR-Beschreibungen.
 
-## Working agreement
-- The owner plans requirements and design in ChatGPT. Implement only work explicitly approved for the current phase; do not treat this file as a request to implement every future feature.
-- Communicate findings, choices, blockers, and pull-request summaries in **German**.
-- **Never invent** missing house dimensions, room geometries, sensors, entity IDs, sample readings presented as real data, supported units, or implementation results. Ask for decisions where required; clearly mark temporary schematic placeholders.
-- Prefer small, reviewable changes and a pull request against `main`. Do not merge pull requests or deploy into the owner's Home Assistant without explicit approval.
-- Before coding, inspect the actual repository state. Read `README.md`, `docs/architecture.md`, `docs/validation.md`, and any phase documentation **if those files exist**. Existing verified code and current accepted requirements take precedence over speculative plans.
-- Keep `AGENTS.md` for stable rules. Detailed design decisions, implementation plans, and open questions belong in appropriate project documents, not a growing monolithic instruction file.
-
-## Architecture and design principles
-- Independent frontend card using TypeScript, Lit/Web Components, SVG, and local styling; avoid mandatory dependencies on card-mod, Mushroom, Bubble Card, ApexCharts, or other HACS cards.
-- Bundle suitable for HACS Dashboard installation, with expected output `dist/hausklima-card.js`.
-- A user-friendly **visual Lovelace card editor is a core requirement**, not an optional afterthought. Users should eventually configure rooms, sensors, labels, positions and visibility without editing YAML.
-- Support Home Assistant light/dark themes and responsive desktop/tablet/mobile layouts; prioritize legibility and a restrained, polished design.
-- Model building, floors, rooms, visibility layers, sensor mappings, and presentation separately. Use stable room IDs and extensible metric types.
-- Preserve keyboard accessibility where relevant, handle entity state `unavailable` distinctly from an unconfigured entity, and do not silently fabricate measurements.
-- Before proposing changes to dependencies or APIs, check the current applicable Home Assistant and HACS documentation.
-
-## Confirmed building and UI requirements
-- House footprint: **12 m × 10 m**. The viewed side is the **12 m eaves side (Traufseite)**. The gable/ridge is **parallel** to the viewed side. Do **not** draw a gable triangle across the visible 12 m facade.
-- Detached garage to the **right**, approximately **5 m** from the house, not physically connected; footprint **6 m × 6 m**, height **3 m**.
-- Basement (Keller), left to right: **Werkstatt 4.00 m**, **Flur 3.40 m**, **Waschküche 3.50 m**; clear height **2.50 m**.
-- Ground floor (EG), left to right: **Wohnzimmer 6.50 m**, **Flur 0.90 m**, **Küche 3.51 m**; clear height **2.64 m**.
-- Converted attic (DG), left to right: **Schlafzimmer 7.60 m**, **Abstellraum 3.60 m**; knee-wall height **1.00 m** and interior ridge height **4.00 m** above the DG floor.
-- Reported wall thickness: **0.24 m**. Which walls this applies to, the complete dimension chains and the final roof cutaway geometry are **not fully confirmed**. Keep discrepancies explicit; do not adjust room widths or derive a final roof section by guessing.
-- Primary UI: show the visible cross-section and allow access to rooms behind it via a **separate room overview (variant A)**. Optional future enhancement: **switchable foreground/background room layers (variant B)**. Do not build a complex 3D view unless requested.
-- Show climate measurements in context without overloading the house drawing. Prioritize temperature and relative humidity on the overview; allow detail views/optional visibility for further values.
-
-## Sensor model and behavior
-- Room or location metrics may include **temperature**, **relative humidity**, **absolute humidity**, **CO₂**, **VOC**, **relative air pressure**, **absolute air pressure**, and future extensible types.
-- All types are optional. Only show configured metrics, while preserving a clear `unavailable` state for configured but unavailable entities.
-- Support multiple entities of a given metric for one room/location, for example distinct Homematic and Ecowitt outdoor temperature sensors. Retain the legacy primary as the default; independently selected overview sources can be grouped under freely configured names. All sources remain accessible in details.
-- Relative and absolute humidity are separate optional inputs; do not assume absolute humidity is present or automatically calculate it unless explicitly requested in a later phase.
-- VOC measurements differ in unit/index conventions; use the actual entity metadata, not an assumed universal unit.
-- Do not hard-code private real-world Home Assistant entity IDs in the source or examples.
-
-## Verification and delivery
-- Run the available project checks, tests, and build commands appropriate to the changed files; report which passed, failed, or could not run.
-- For UI changes, review at least desktop and narrow/mobile widths and light/dark themes when available.
-- Preserve the MIT license notices and relevant attribution.
-- Describe the actual changed files, open questions, verification outcomes and next proposed phase in the pull request. Do not claim HA/HACS integration testing unless it was actually performed.
-
-## Approved visual direction and phone requirement (from November 2026)
-- Approved style: **Design B** — a warm, spatial **2.5D architectural cutaway**, **with dark, high-contrast measurement tiles** for excellent readability, not the former white/light tiles.
-- See all the actual design pictures in `docs/design/`: **`design-b-selected-photo.webp` (user-selected spatial look)**, **`design-b-dark-chip.webp` (user-selected dark metric badge)**, `design-b-desktop.svg`, `design-b-mobile.svg`, and `docs/design/README.md`. Visually inspect the files before redesigning the card. The WebP pictures are compressed reference thumbnails, not production assets. All visuals are aesthetic references, not real measurements or runtime backgrounds.\n- Dark metric tiles must have **slightly translucent backgrounds**, e.g. starting at `rgba(22,26,30,0.82)` and fine-tuned visually. **Keep labels/values/icons fully opaque**, do not lower the whole tile's `opacity`. Background material/rooms should remain subtly visible behind the dark tile.
-- **iPhone 17 (portrait and landscape) is a first-class target**. No default horizontally scrolling / clipped house or garage, no tiny text-only desktop shrink. Touch-friendly room details and access to all sensor values are essential.
-- Concealed / rear rooms: current selected solution **variant A (separate room overview)**, later optional **variant B ('Vorne / Hinten' view switch)**. Do not invent the unconfirmed rear-side floor plan.
-- Preferred Home Assistant view: **Panel** with one HausKlima Card. The optional **Sections** example must remain functional, even if the section is narrower. See `examples/views/`.
-- For the currently approved Phase 2 implementation, follow `docs/tasks/phase-2.md` once available on the selected working branch. The existence of this file does **not** mean unrelated future tasks are automatically approved.
-
-## Current approved implementation direction (post Phase 2)
-- **Do not use the rejected Phase 1 or Phase 2 SVG screenshots as styling references.** The earlier hand-drawn room/roof/furniture approach was rejected by the owner.
-- The new card uses `src/assets/hausklima-cutaway.webp` as a locally bundled, **illustrative** architectural scene; live climate values, labels, touch targets and details are separate dynamic UI components in `src/photo-view.ts`. It is **not** a photograph of the owner's property or a precise construction drawing.
-- In a Home Assistant Panel view keep the architectural scene centered with a configurable maximum width (default 1400 CSS px, editor range 900–3200). Respect the available container width. iPhone 17 portrait/landscape must show a legible separate room list and garage-device controls.
-- Inside the garage there are **four independently named and sensor-configurable areas** with stable room IDs: `garage` (garage air), `garage_battery_pylontech`, `garage_battery_litime`, `garage_cabinet`. The displayed names can be changed in the editor. Temperature and relative humidity are expected; absolute humidity remains optional (other existing metric types also remain supported). Do not fabricate values or actual sensor entity IDs.
-- Existing saved Lovelace card configurations must continue working. `garage_components_initialized` is the migration marker; do not repeatedly re-add equipment the user has intentionally removed.
-- Design approval remains with the owner. A passing build/browser suite is a technical check, **not** visual acceptance.
+- Arbeite auf Basis des aktuellen `main` und bereite Änderungen in einem separaten Branch vor. Merge und Release bleiben beim Projektinhaber.
+- Halte die README auf Beschreibung, Beispielbild und Einrichtung beschränkt. Verwende in öffentlichen Texten, Standardbeschriftungen, Testdaten und Bildern neutrale Geräte- und Quellennamen. Raumbezeichnungen wie Schlafzimmer sind zulässig.
+- Erhalte die Grafikdateien unter `src/assets/` bytegenau. Messwerte und Beschriftungen sind getrennte Overlays.
+- Erhalte gespeicherte Raum-IDs, Sensorzuordnungen, Namen, Sichtbarkeit und Positionen. Geräte und Sensoren werden im grafischen Editor eingerichtet. Ergänze keine erfundenen Messwerte in der installierten Karte.
+- Nutze getrennte, als Demowerte erkennbare Daten für Vorschau und Screenshots. Veröffentliche keine privaten Kontaktdaten, echten Sensor-IDs oder vertraulichen Prüfbefunde.
+- Der Build erzeugt `dist/hausklima-card.js`. Halte Bundle und Quellcode in Einklang und erhalte die Lizenzhinweise.
+- Führe die für Änderungen vorgesehenen Prüfungen aus. Bei Änderungen an der Darstellung prüfe Desktop und Handy in hellen und dunklen Ansichten. Nenne die tatsächlich durchgeführten Prüfungen.

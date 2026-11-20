@@ -1,4 +1,5 @@
 import type { RoomConfig } from './types';
+import { garageLocationKey } from './garage-locations';
 
 export type PhotoHouseSide = 'front' | 'rear';
 export interface PhotoRoomCoordinates { x: number; y: number; anchorX?: number; anchorY?: number; }
@@ -19,11 +20,11 @@ export function photoRoomPosition(
   // rooms. Newly added rooms are not subject to any ID whitelist.
   const fixed = device === 'mobile' && mobileDefaults[room.id]
     ? mobileDefaults[room.id]
-    : room.level_id === 'garage' ? GARAGE_ART_POSITIONS[room.id] : defaults[room.id];
+    : room.level_id === 'garage' ? garageArtPosition(room.id) : defaults[room.id];
   if (fixed) return fixed;
   const added = allRooms.filter((candidate) => candidate.level_id === room.level_id &&
     candidate.location !== 'outdoor' && !(candidate.level_id === 'garage'
-      ? GARAGE_ART_POSITIONS[candidate.id] : defaults[candidate.id]));
+      ? garageArtPosition(candidate.id) : defaults[candidate.id]));
   const slot = Math.max(0, added.findIndex((candidate) => candidate.id === room.id));
   const column = slot % 5, row = Math.floor(slot / 5) % 4;
   const levelBase: Record<string, { x: number; y: number }> = side === 'front'
@@ -63,15 +64,20 @@ export const ROOM_ART_POSITIONS: Readonly<Record<string, { x: number; y: number 
 };
 
 /** Observed object anchors in the unchanged image (1300 × 732), not building dimensions.
- * Cabinet at left of garage, Pylontech left battery, LiTime right battery.
+ * Cabinet on the left, followed by batteries 1 and 2.
  * Preferred panels sit on the forecourt; leader lines connect each device.
  */
 export const GARAGE_ART_POSITIONS: Readonly<Record<string, { x: number; y: number; anchorX: number; anchorY: number }>> = {
   garage: { x: 85, y: 56, anchorX: 85, anchorY: 60 },
   garage_cabinet: { x: 75.5, y: 89, anchorX: 78.2, anchorY: 68.5 },
-  garage_battery_pylontech: { x: 85, y: 89, anchorX: 84.2, anchorY: 71 },
-  garage_battery_litime: { x: 94.5, y: 89, anchorX: 90.1, anchorY: 71 },
+  garage_battery_1: { x: 85, y: 89, anchorX: 84.2, anchorY: 71 },
+  garage_battery_2: { x: 94.5, y: 89, anchorX: 90.1, anchorY: 71 },
 };
+
+export function garageArtPosition(id: string) {
+  const key = garageLocationKey(id);
+  return Object.hasOwn(GARAGE_ART_POSITIONS, key) ? GARAGE_ART_POSITIONS[key] : undefined;
+}
 
 /** Identical right-side garage artwork anchors on both views. */
 export const FRONT_GARAGE_ART_POSITIONS = GARAGE_ART_POSITIONS;

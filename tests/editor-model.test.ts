@@ -285,14 +285,14 @@ describe('sensor lists and primary selection', () => {
   });
 
   it('preserves explicit source visibility and groups through entity edits and primary removal', () => {
-    let config = editSensor(withTwoSensors(), 'workshop', 'temperature', firstEntity, { overview_group: '  Homematic  ', show_in_overview: true });
-    config = editSensor(config, 'workshop', 'temperature', secondEntity, { overview_group: 'Ecowitt', show_in_overview: false });
+    let config = editSensor(withTwoSensors(), 'workshop', 'temperature', firstEntity, { overview_group: '  Quelle A  ', show_in_overview: true });
+    config = editSensor(config, 'workshop', 'temperature', secondEntity, { overview_group: 'Quelle B', show_in_overview: false });
     const renamed = editSensor(config, 'workshop', 'temperature', firstEntity, { entity: replacementEntity });
-    expect(room(renamed).measurements!.temperature!.sensors[0]).toMatchObject({ entity: replacementEntity, overview_group: 'Homematic', show_in_overview: true });
+    expect(room(renamed).measurements!.temperature!.sensors[0]).toMatchObject({ entity: replacementEntity, overview_group: 'Quelle A', show_in_overview: true });
     const removed = removeSensor(renamed, 'workshop', 'temperature', replacementEntity);
     expect(room(removed).measurements!.temperature!.primary).toBe(secondEntity);
     expect(resolveOverviewGroups(room(removed))).toEqual([]);
-    expect(room(removed).measurements!.temperature!.sensors[0]).toMatchObject({ overview_group: 'Ecowitt', show_in_overview: false });
+    expect(room(removed).measurements!.temperature!.sensors[0]).toMatchObject({ overview_group: 'Quelle B', show_in_overview: false });
     const cleared = editSensor(removed, 'workshop', 'temperature', secondEntity, { overview_group: ' ' });
     expect(room(cleared).measurements!.temperature!.sensors[0]).not.toHaveProperty('overview_group');
   });

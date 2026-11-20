@@ -52,8 +52,8 @@ describe('front and rear house separation', () => {
     const building = getDefaultBuilding();
     building.rooms.push({ id: 'outdoor_test', name: 'Außen', level_id: 'ground_floor',
       location: 'outdoor', visible: false, width_m: null });
-    const shared = ['garage', 'garage_cabinet', 'garage_battery_pylontech',
-      'garage_battery_litime', 'outdoor_test'];
+    const shared = ['garage', 'garage_cabinet', 'garage_battery_1',
+      'garage_battery_2', 'outdoor_test'];
     const original = normalizeConfig({ ...getDefaultConfig(), building,
       badge_positions: Object.fromEntries(shared.map((id, index) =>
         [id, { desktop: { x: 70 + index, y: 25 }, mobile: { x: 80 + index, y: 65 } }])),
@@ -90,8 +90,8 @@ describe('front and rear house separation', () => {
       badge_positions: {
         garage: { desktop: { x: 85, y: 56 }, mobile: { x: 86, y: 54 } },
         garage_cabinet: { desktop: { x: 75.5, y: 89 } },
-        garage_battery_pylontech: { desktop: { x: 85, y: 89 } },
-        garage_battery_litime: { mobile: { x: 94.5, y: 89 } },
+        garage_battery_1: { desktop: { x: 85, y: 89 } },
+        garage_battery_2: { mobile: { x: 94.5, y: 89 } },
       },
       front_badge_positions: {
         garage_cabinet: { desktop: { x: 16, y: 70 } },
